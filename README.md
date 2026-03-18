@@ -1,4 +1,7 @@
-# Engine [![Beta](https://img.shields.io/badge/status-beta-orange)](https://github.com/digitaledsafety/engine.digitaledsafety.github.io)
+# Engine 
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+![Status: Beta](https://img.shields.io/badge/status-beta-orange.svg)
 
 <div align="center">
   <video src="https://github.com/user-attachments/assets/f50a2e82-1dfa-4e60-94aa-717ae026ccdf" controls width="400px">
