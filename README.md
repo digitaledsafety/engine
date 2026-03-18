@@ -1,5 +1,11 @@
 # Engine [![Beta](https://img.shields.io/badge/status-beta-orange)](https://github.com/digitaledsafety/engine.digitaledsafety.github.io)
 
+<div align="center">
+  <video src="https://github.com/user-attachments/assets/f50a2e82-1dfa-4e60-94aa-717ae026ccdf" controls width="400px">
+    Your browser does not support the video tag.
+  </video>
+</div>
+
 **Engine** is an open-source, block-based 3D coding environment designed to make spatial programming intuitive and accessible. By leveraging a visual interface, it allows users to build and manipulate 3D worlds without needing to master complex syntax first.
 
 ---
