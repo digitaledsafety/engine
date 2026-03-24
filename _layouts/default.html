@@ -531,13 +531,11 @@
 
         // --- URL Sanitization ---
         function isValidAssetURL(url) {
-            if (typeof url !== 'string') return false;
-            const normalizedUrl = url.trim().toLowerCase();
-            if (normalizedUrl.startsWith('https://') || normalizedUrl.startsWith('blob:')) {
-                return true;
+            if (typeof url !== 'string' || !url.trim().toLowerCase().startsWith('https://')) {
+                console.error('Invalid URL:', url, 'Only HTTPS URLs are allowed for assets.');
+                return false;
             }
-            console.error('Invalid URL:', url, 'Only HTTPS and blob URLs are allowed for assets.');
-            return false;
+            return true;
         }
 
         // --- Hero Overlay Logic ---
@@ -2440,13 +2438,8 @@ workspace_data: "${base64WorkspaceData}"
                     return null;
                 }
                 try {
-                    // Split the URL into base path and filename for better GLTF/VRM asset resolution
-                    const lastSlash = url.lastIndexOf('/');
-                    const basePath = lastSlash !== -1 ? url.substring(0, lastSlash + 1) : '';
-                    const fileName = lastSlash !== -1 ? url.substring(lastSlash + 1) : url;
-
                     // Load model using SceneLoader
-                    const result = await BABYLON.SceneLoader.ImportMeshAsync(null, basePath, fileName, this.scene);
+                    const result = await BABYLON.SceneLoader.ImportMeshAsync(null, '', url, this.scene);
                     if (result.meshes.length > 0) {
                         const rootMesh = result.meshes[0];
                         rootMesh.name = name;
@@ -3256,13 +3249,8 @@ workspace_data: "${base64WorkspaceData}"
                     return null;
                 }
                 try {
-                    // Split the URL into base path and filename for better asset resolution
-                    const lastSlash = url.lastIndexOf('/');
-                    const basePath = lastSlash !== -1 ? url.substring(0, lastSlash + 1) : '';
-                    const fileName = lastSlash !== -1 ? url.substring(lastSlash + 1) : url;
-
                     // Note: LoadAssetContainerAsync is better for animations as it doesn't add to scene automatically.
-                    const container = await BABYLON.SceneLoader.LoadAssetContainerAsync(basePath, fileName, this.scene);
+                    const container = await BABYLON.SceneLoader.LoadAssetContainerAsync("", url, this.scene);
                     if (container.animationGroups.length > 0) {
                         const animationGroup = container.animationGroups[0];
                         animationGroup.stop(); // Stop by default
@@ -6213,7 +6201,7 @@ function ${generator.FUNCTION_NAME_PLACEHOLDER_}() {
   var num = Math.floor(Math.random() * 0x1000000);
   return '#' + ('00000' + num.toString(16)).substr(-6);
 }
-`) + '()', generator.ORDER_FUNCTION_CALL];
+`) + '()', generator.ORDER_FUNCTION_CALL];distin
         };
 
         javascript.javascriptGenerator.forBlock['colour_picker'] = function (block, generator) {
