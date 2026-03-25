@@ -995,52 +995,33 @@ workspace_data: "${base64WorkspaceData}"
             contents: [
                 {
                     kind: 'category',
+                    name: 'Events',
+                    categorystyle: 'loop_category',
+                    contents: [
+                        { kind: 'block', type: 'event_on_click' },
+                        { kind: 'block', type: 'event_every_frame' },
+                        { kind: 'block', type: 'on_button_press' },
+                        { kind: 'block', type: 'on_collision' },
+                        { kind: 'block', type: 'event_on_gui_click' },
+                    ]
+                },
+                {
+                    kind: 'category',
                     name: 'Logic',
                     categorystyle: 'logic_category',
                     contents: [
-                        {
-                            kind: 'block',
-                            type: 'controls_if',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'controls_if',
-                            extraState: {
-                                hasElse: 'true',
-                            },
-                        },
-                        {
-                            kind: 'block',
-                            type: 'controls_if',
-                            extraState: {
-                                hasElse: 'true',
-                                elseIfCount: 1,
-                            },
-                        },                      
-                        {
-                            kind: 'block',
-                            type: 'logic_compare',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'logic_operation',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'logic_negate',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'logic_boolean',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'logic_null',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'logic_ternary',
-                        },
+                        { kind: 'block', type: 'controls_if' },
+                        { kind: 'block', type: 'logic_compare' },
+                        { kind: 'block', type: 'logic_operation' },
+                        { kind: 'block', type: 'logic_negate' },
+                        { kind: 'block', type: 'logic_boolean' },
+                    ],
+                },
+                {
+                    kind: 'category',
+                    name: 'Loops',
+                    categorystyle: 'loop_category',
+                    contents: [
                         {
                             kind: 'block',
                             type: 'controls_repeat_ext',
@@ -1048,193 +1029,60 @@ workspace_data: "${base64WorkspaceData}"
                                 TIMES: {
                                     block: {
                                         type: 'math_number',
-                                        fields: {
-                                            NUM: 10,
-                                        },
+                                        fields: { NUM: 10 },
                                     },
                                 },
                             },
                         },
-                        {
-                            kind: 'block',
-                            type: 'controls_whileUntil',
-                        },
+                        { kind: 'block', type: 'controls_whileUntil' },
                         {
                             kind: 'block',
                             type: 'controls_for',
-                            fields: {
-                                VAR: 'i',
-                            },
+                            fields: { VAR: 'i' },
                             inputs: {
-                                FROM: {
-                                    block: {
-                                        type: 'math_number',
-                                        fields: {
-                                            NUM: 1,
-                                        },
-                                    },
-                                },
-                                TO: {
-                                    block: {
-                                        type: 'math_number',
-                                        fields: {
-                                            NUM: 10,
-                                        },
-                                    },
-                                },
-                                BY: {
-                                    block: {
-                                        type: 'math_number',
-                                        fields: {
-                                            NUM: 1,
-                                        },
-                                    },
-                                },
+                                FROM: { block: { type: 'math_number', fields: { NUM: 1 } } },
+                                TO: { block: { type: 'math_number', fields: { NUM: 10 } } },
+                                BY: { block: { type: 'math_number', fields: { NUM: 1 } } },
                             },
                         },
-                        {
-                            kind: 'block',
-                            type: 'controls_forEach',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'controls_flow_statements',
-                        },                      
-                        {
-                            kind: 'block',
-                            type: 'select_object',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'event_on_click',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'event_every_frame',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'action_rotate_continuously',
-                        },
-                    ],
+                        { kind: 'block', type: 'controls_forEach' },
+                        { kind: 'block', type: 'controls_flow_statements' },
+                    ]
                 },
                 {
                     kind: 'category',
                     name: 'GUI',
                     categorystyle: 'text_category',
                     contents: [
-                        {
-                            kind: 'block',
-                            type: 'create_loading_screen',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'show_loading_screen',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'hide_loading_screen',
-                        },                        
-                        {
-                            kind: 'block',
-                            type: 'gui_create_text_block',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'create_3d_text',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'gui_set_text',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'gui_create_input_text',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'gui_get_input_text',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'gui_create_button',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'gui_create_image_from_url',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'gui_create_image_from_asset',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'event_on_gui_click',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'create_popup',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'show_popup',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'hide_popup',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'gui_set_popup_title',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'gui_set_popup_image',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'gui_set_popup_button_text',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'gui_set_popup_text',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'console_log',
-                        },                       
-                        {
-                            kind: 'block',
-                            type: 'console_warn',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'console_error',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'console_clear',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'take_screenshot',
-                        },
+                        { kind: 'block', type: 'create_loading_screen' },
+                        { kind: 'block', type: 'show_loading_screen' },
+                        { kind: 'block', type: 'hide_loading_screen' },
+                        { kind: 'block', type: 'gui_create_text_block' },
+                        { kind: 'block', type: 'create_3d_text' },
+                        { kind: 'block', type: 'gui_set_text' },
+                        { kind: 'block', type: 'gui_create_input_text' },
+                        { kind: 'block', type: 'gui_get_input_text' },
+                        { kind: 'block', type: 'gui_create_button' },
+                        { kind: 'block', type: 'gui_create_image' },
+                        { kind: 'block', type: 'create_popup' },
+                        { kind: 'block', type: 'show_popup' },
+                        { kind: 'block', type: 'hide_popup' },
+                        { kind: 'block', type: 'gui_set_popup_title' },
+                        { kind: 'block', type: 'gui_set_popup_image' },
+                        { kind: 'block', type: 'gui_set_popup_button_text' },
+                        { kind: 'block', type: 'gui_set_popup_text' },
+                        { kind: 'block', type: 'console_print' },
+                        { kind: 'block', type: 'console_clear' },
+                        { kind: 'block', type: 'take_screenshot' },
                     ]
                 },
-
                 {
                     kind: 'category',
                     name: 'Audio',
                     categorystyle: 'audio_category',
                     contents: [
-                        {
-                            kind: 'block',
-                            type: 'play_sound_url',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'play_note',
-                        },
+                        { kind: 'block', type: 'play_sound' },
+                        { kind: 'block', type: 'play_note' },
                     ]
                 },
                 {
@@ -1242,42 +1090,14 @@ workspace_data: "${base64WorkspaceData}"
                     name: 'Game',
                     categorystyle: 'logic_category',
                     contents: [
-                        {
-                            kind: 'block',
-                            type: 'set_as_player',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'player_jump',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'player_move',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'enable_physics',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'apply_force',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'set_physics_impostor',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'on_button_press',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'get_joystick_direction',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'get_joystick_force',
-                        }                        
+                        { kind: 'block', type: 'set_as_player' },
+                        { kind: 'block', type: 'player_jump' },
+                        { kind: 'block', type: 'player_move' },
+                        { kind: 'block', type: 'enable_physics' },
+                        { kind: 'block', type: 'apply_force' },
+                        { kind: 'block', type: 'set_physics_impostor' },
+                        { kind: 'block', type: 'get_joystick_direction' },
+                        { kind: 'block', type: 'get_joystick_force' }
                     ]
                 },
                 {
@@ -1285,202 +1105,47 @@ workspace_data: "${base64WorkspaceData}"
                     name: 'Objects',
                     categorystyle: 'motion_category',
                     contents: [
-                        {
-                            kind: 'block',
-                            type: 'import_3d_file_url',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'on_collision',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'destroy_object',
-                        },                        
-                        {
-                            kind: 'block',
-                            type: 'create_box',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'create_sphere',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'move_object',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'change_object_color',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'rotate_object',
-                        },
-                        {
-                            "kind": "block",
-                            "type": "position_model"
-                        },
-                        {
-                            "kind": "block",
-                            "type": "scale_object"
-                        },
-                        {
-                            "kind": "block",
-                            "type": "get_property"
-                        },
-                        {
-                            "kind": "block",
-                            "type": "set_metadata"
-                        },
-                        {
-                            "kind": "block",
-                            "type": "get_metadata"
-                        },                                               
-                        {
-                            kind: 'block',
-                            type: 'animate_object',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'animate_rotation',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'animate_position',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'animate_scale',
-                        },
-                        {
-                            "kind": "block",
-                            "type": "import_animation"
-                        },
-                        {
-                            "kind": "block",
-                            "type": "apply_animation"
-                        },
-                        {
-                            "kind": "block",
-                            "type": "play_animation"
-                        },
-                        {
-                            "kind": "block",
-                            "type": "stop_skeletal_animation"
-                        },
-                        {
-                            "kind": "block",
-                            "type": "play_animation_by_index"
-                        },
-                        {
-                            "kind": "block",
-                            "type": "set_pixelated_look"
-                        },
-                        {
-                            kind: 'block',
-                            type: 'asset_model',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'asset_audio',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'asset_image',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'import_model_from_asset',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'play_sound_from_asset',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'set_texture_from_asset',
-                        }                        
+                        { kind: 'block', type: 'create_primitive' },
+                        { kind: 'block', type: 'import_model' },
+                        { kind: 'block', type: 'move_object' },
+                        { kind: 'block', type: 'rotate_object' },
+                        { kind: 'block', type: 'scale_object' },
+                        { kind: 'block', type: 'change_object_color' },
+                        { kind: 'block', type: 'animate_transform' },
+                        { kind: 'block', type: 'destroy_object' },
+                        { kind: 'block', type: 'select_object' },
+                        { kind: 'block', type: 'action_rotate_continuously' },
+                        { kind: 'block', type: 'get_property' },
+                        { kind: 'block', type: 'set_metadata' },
+                        { kind: 'block', type: 'get_metadata' },
+                        { kind: 'block', type: 'animate_object' },
+                        { kind: 'block', type: 'import_animation' },
+                        { kind: 'block', type: 'apply_animation' },
+                        { kind: 'block', type: 'play_animation' },
+                        { kind: 'block', type: 'stop_skeletal_animation' },
+                        { kind: 'block', type: 'play_animation_by_index' },
+                        { kind: 'block', type: 'set_pixelated_look' },
+                        { kind: 'block', type: 'set_texture_from_asset' }
                     ]
                 },
-
                 {
                     kind: 'category',
                     name: 'Scene',
                     categorystyle: 'scene_category',
                     contents: [
-                        {
-                            kind: 'block',
-                            type: 'create_camera',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'set_isometric_camera',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'point_camera_at_mesh'
-                        },
-                        {
-                            kind: 'block',
-                            type: 'create_camera',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'set_isometric_camera',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'set_fps_camera',
-                        },                        
-                        {
-                            kind: 'block',
-                            type: 'camera_follow',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'camera_zoom',
-                        },                        
-                        {
-                            kind: 'block',
-                            type: 'create_ground',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'set_ground_material',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'set_ground_physics',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'create_light',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'set_gravity',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'create_environment',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'set_background',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'set_background_image',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'procedural_texture'
-                        },
-                        {
-                            kind: 'block',
-                            type: 'colour_picker'
-                        }
+                        { kind: 'block', type: 'create_environment' },
+                        { kind: 'block', type: 'set_background' },
+                        { kind: 'block', type: 'set_background_image' },
+                        { kind: 'block', type: 'create_ground' },
+                        { kind: 'block', type: 'create_light' },
+                        { kind: 'block', type: 'set_gravity' },
+                        { kind: 'block', type: 'set_isometric_camera' },
+                        { kind: 'block', type: 'set_fps_camera' },
+                        { kind: 'block', type: 'camera_follow' },
+                        { kind: 'block', type: 'camera_zoom' },
+                        { kind: 'block', type: 'point_camera_at_mesh' },
+                        { kind: 'block', type: 'procedural_texture' },
+                        { kind: 'block', type: 'colour_picker' }
                     ]
                 },
                 {
@@ -1488,184 +1153,48 @@ workspace_data: "${base64WorkspaceData}"
                     name: 'Utils',
                     categorystyle: 'colour_category',
                     contents: [
-                        {
-                            kind: 'block',
-                            type: 'colour_picker',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'colour_random',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'colour_rgb',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'colour_blend',
-                        },
+                        { kind: 'block', type: 'colour_picker' },
+                        { kind: 'block', type: 'colour_random' },
+                        { kind: 'block', type: 'colour_rgb' },
+                        { kind: 'block', type: 'colour_blend' },
                         {
                             kind: 'block',
                             type: 'math_number',
-                            fields: {
-                                NUM: 123,
-                            },
+                            fields: { NUM: 123 },
                         },
                         {
                             kind: 'block',
                             type: 'math_arithmetic',
-                            fields: {
-                                OP: 'ADD',
-                            },
+                            fields: { OP: 'ADD' },
                         },
                         {
                             kind: 'block',
                             type: 'math_single',
-                            fields: {
-                                OP: 'ROOT',
-                            },
+                            fields: { OP: 'ROOT' },
                         },
                         {
                             kind: 'block',
                             type: 'math_trig',
-                            fields: {
-                                OP: 'SIN',
-                            },
-                        },
-                        {
-                            kind: 'block',
-                            type: 'math_constant',
-                            fields: {
-                                CONSTANT: 'PI',
-                            },
-                        },
-                        {
-                            kind: 'block',
-                            type: 'math_number_property',
-                            extraState: '<mutation divisor_input="false"></mutation>',
-                            fields: {
-                                PROPERTY: 'EVEN',
-                            },
+                            fields: { OP: 'SIN' },
                         },
                         {
                             kind: 'block',
                             type: 'math_round',
-                            fields: {
-                                OP: 'ROUND',
-                            },
+                            fields: { OP: 'ROUND' },
                         },
-                        {
-                            kind: 'block',
-                            type: 'math_on_list',
-                            extraState: '<mutation op="SUM"></mutation>',
-                            fields: {
-                                OP: 'SUM',
-                            },
-                        },
-                        {
-                            kind: 'block',
-                            type: 'math_modulo',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'math_constrain',
-                            inputs: {
-                                LOW: {
-                                    block: {
-                                        type: 'math_number',
-                                        fields: {
-                                            NUM: 1,
-                                        },
-                                    },
-                                },
-                                HIGH: {
-                                    block: {
-                                        type: 'math_number',
-                                        fields: {
-                                            NUM: 100,
-                                        },
-                                    },
-                                },
-                            },
-                        },
+                        { kind: 'block', type: 'math_modulo' },
                         {
                             kind: 'block',
                             type: 'math_random_int',
                             inputs: {
-                                FROM: {
-                                    block: {
-                                        type: 'math_number',
-                                        fields: {
-                                            NUM: 1,
-                                        },
-                                    },
-                                },
-                                TO: {
-                                    block: {
-                                        type: 'math_number',
-                                        fields: {
-                                            NUM: 100,
-                                        },
-                                    },
-                                },
+                                FROM: { block: { type: 'math_number', fields: { NUM: 1 } } },
+                                TO: { block: { type: 'math_number', fields: { NUM: 100 } } },
                             },
                         },
-                        {
-                            kind: 'block',
-                            type: 'math_random_float',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'math_atan2',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'parse_number_from',
-                        },                        
-                        {
-                            kind: 'block',
-                            type: 'text',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'text_join',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'text_append',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'text_length',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'text_isEmpty',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'text_indexOf',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'text_charAt',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'text_getSubstring',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'text_changeCase',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'text_trim',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'text_print',
-                        },                        
+                        { kind: 'block', type: 'parse_number_from' },
+                        { kind: 'block', type: 'text' },
+                        { kind: 'block', type: 'text_join' },
+                        { kind: 'block', type: 'text_length' },
                     ],
                 },
                 {
@@ -1673,61 +1202,35 @@ workspace_data: "${base64WorkspaceData}"
                     name: 'Lists',
                     categorystyle: 'list_category',
                     contents: [
-                        {
-                            kind: 'block',
-                            type: 'lists_create_empty',
-                        },
+                        { kind: 'block', type: 'lists_create_empty' },
                         {
                             kind: 'block',
                             type: 'lists_create_with',
-                            extraState: {
-                                itemCount: 3,
-                            },
+                            extraState: { itemCount: 3 },
                         },
                         {
                             kind: 'block',
                             type: 'lists_repeat',
                             inputs: {
-                                NUM: {
-                                    block: {
-                                        type: 'math_number',
-                                        fields: {
-                                            NUM: 5,
-                                        },
-                                    },
-                                },
+                                NUM: { block: { type: 'math_number', fields: { NUM: 5 } } },
                             },
                         },
-                        {
-                            kind: 'block',
-                            type: 'lists_length',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'lists_isEmpty',
-                        },
+                        { kind: 'block', type: 'lists_length' },
+                        { kind: 'block', type: 'lists_isEmpty' },
                         {
                             kind: 'block',
                             type: 'lists_indexOf',
-                            fields: {
-                                END: 'FIRST',
-                            },
+                            fields: { END: 'FIRST' },
                         },
                         {
                             kind: 'block',
                             type: 'lists_getIndex',
-                            fields: {
-                                MODE: 'GET',
-                                WHERE: 'FROM_START',
-                            },
+                            fields: { MODE: 'GET', WHERE: 'FROM_START' },
                         },
                         {
                             kind: 'block',
                             type: 'lists_setIndex',
-                            fields: {
-                                MODE: 'SET',
-                                WHERE: 'FROM_START',
-                            },
+                            fields: { MODE: 'SET', WHERE: 'FROM_START' },
                         },
                     ],
                 },
@@ -1742,408 +1245,6 @@ workspace_data: "${base64WorkspaceData}"
                     name: 'Functions',
                     categorystyle: 'procedure_category',
                     custom: 'PROCEDURE',
-                },
-                {
-                    kind: 'category',
-                    name: 'Library',
-                    expanded: 'false',
-                    contents: [
-                        {
-                            kind: 'category',
-                            name: 'Randomize',
-                            contents: [
-                                {
-                                    kind: 'block',
-                                    type: 'procedures_defnoreturn',
-                                    extraState: {
-                                        params: [
-                                            {
-                                                name: 'list',
-                                            },
-                                        ],
-                                    },
-                                    icons: {
-                                        comment: {
-                                            text: 'Describe this function...',
-                                            pinned: false,
-                                            height: 80,
-                                            width: 160,
-                                        },
-                                    },
-                                    fields: {
-                                        NAME: 'randomize',
-                                    },
-                                    inputs: {
-                                        STACK: {
-                                            block: {
-                                                type: 'controls_for',
-                                                fields: {
-                                                    VAR: {
-                                                        name: 'x',
-                                                    },
-                                                },
-                                                inputs: {
-                                                    FROM: {
-                                                        block: {
-                                                            type: 'math_number',
-                                                            fields: {
-                                                                NUM: 1,
-                                                            },
-                                                        },
-                                                    },
-                                                    TO: {
-                                                        block: {
-                                                            type: 'lists_length',
-                                                            inline: false,
-                                                            inputs: {
-                                                                VALUE: {
-                                                                    block: {
-                                                                        type: 'variables_get',
-                                                                        fields: {
-                                                                            VAR: {
-                                                                                name: 'list',
-                                                                            },
-                                                                        },
-                                                                    },
-                                                                },
-                                                            },
-                                                        },
-                                                    },
-                                                    BY: {
-                                                        block: {
-                                                            type: 'math_number',
-                                                            fields: {
-                                                                NUM: 1,
-                                                            },
-                                                        },
-                                                    },
-                                                    DO: {
-                                                        block: {
-                                                            type: 'variables_set',
-                                                            inline: false,
-                                                            fields: {
-                                                                VAR: {
-                                                                    name: 'y',
-                                                                },
-                                                            },
-                                                            inputs: {
-                                                                VALUE: {
-                                                                    block: {
-                                                                        type: 'math_random_int',
-                                                                        inputs: {
-                                                                            FROM: {
-                                                                                block: {
-                                                                                    type: 'math_number',
-                                                                                    fields: {
-                                                                                        NUM: 1,
-                                                                                    },
-                                                                                },
-                                                                            },
-                                                                            TO: {
-                                                                                block: {
-                                                                                    type: 'lists_length',
-                                                                                    inline: false,
-                                                                                    inputs: {
-                                                                                        VALUE: {
-                                                                                            block: {
-                                                                                                type: 'variables_get',
-                                                                                                fields: {
-                                                                                                    VAR: {
-                                                                                                        name: 'list',
-                                                                                                    },
-                                                                                                },
-                                                                                            },
-                                                                                        },
-                                                                                    },
-                                                                                },
-                                                                            },
-                                                                        },
-                                                                    },
-                                                                },
-                                                            },
-                                                            next: {
-                                                                block: {
-                                                                    type: 'variables_set',
-                                                                    inline: false,
-                                                                    fields: {
-                                                                        VAR: {
-                                                                            name: 'temp',
-                                                                        },
-                                                                    },
-                                                                    inputs: {
-                                                                        VALUE: {
-                                                                            block: {
-                                                                                type: 'lists_getIndex',
-                                                                                fields: {
-                                                                                    MODE: 'GET',
-                                                                                    WHERE: 'FROM_START',
-                                                                                },
-                                                                                inputs: {
-                                                                                    VALUE: {
-                                                                                        block: {
-                                                                                            type: 'variables_get',
-                                                                                            fields: {
-                                                                                                VAR: {
-                                                                                                    name: 'list',
-                                                                                                },
-                                                                                            },
-                                                                                        },
-                                                                                    },
-                                                                                    AT: {
-                                                                                        block: {
-                                                                                            type: 'variables_get',
-                                                                                            fields: {
-                                                                                                VAR: {
-                                                                                                    name: 'y',
-                                                                                                },
-                                                                                            },
-                                                                                        },
-                                                                                    },
-                                                                                },
-                                                                            },
-                                                                        },
-                                                                    },
-                                                                    next: {
-                                                                        block: {
-                                                                            type: 'lists_setIndex',
-                                                                            inline: false,
-                                                                            fields: {
-                                                                                MODE: 'SET',
-                                                                                WHERE: 'FROM_START',
-                                                                            },
-                                                                            inputs: {
-                                                                                LIST: {
-                                                                                    block: {
-                                                                                        type: 'variables_get',
-                                                                                        fields: {
-                                                                                            VAR: {
-                                                                                                name: 'list',
-                                                                                            },
-                                                                                        },
-                                                                                    },
-                                                                                },
-                                                                                AT: {
-                                                                                    block: {
-                                                                                        type: 'variables_get',
-                                                                                        fields: {
-                                                                                            VAR: {
-                                                                                                name: 'y',
-                                                                                            },
-                                                                                        },
-                                                                                    },
-                                                                                },
-                                                                                TO: {
-                                                                                    block: {
-                                                                                        type: 'lists_getIndex',
-                                                                                        fields: {
-                                                                                            MODE: 'GET',
-                                                                                            WHERE: 'FROM_START',
-                                                                                        },
-                                                                                        inputs: {
-                                                                                            VALUE: {
-                                                                                                block: {
-                                                                                                    type: 'variables_get',
-                                                                                                    fields: {
-                                                                                                        VAR: {
-                                                                                                            name: 'list',
-                                                                                                        },
-                                                                                                    },
-                                                                                                },
-                                                                                            },
-                                                                                            AT: {
-                                                                                                block: {
-                                                                                                    type: 'variables_get',
-                                                                                                    fields: {
-                                                                                                        VAR: {
-                                                                                                            name: 'x',
-                                                                                                        },
-                                                                                                    },
-                                                                                                },
-                                                                                            },
-                                                                                        },
-                                                                                    },
-                                                                                },
-                                                                            },
-                                                                            next: {
-                                                                                block: {
-                                                                                    type: 'lists_setIndex',
-                                                                                    inline: false,
-                                                                                    fields: {
-                                                                                        MODE: 'SET',
-                                                                                        WHERE: 'FROM_START',
-                                                                                    },
-                                                                                    inputs: {
-                                                                                        LIST: {
-                                                                                            block: {
-                                                                                                type: 'variables_get',
-                                                                                                fields: {
-                                                                                                    VAR: {
-                                                                                                        name: 'list',
-                                                                                                    },
-                                                                                                },
-                                                                                            },
-                                                                                        },
-                                                                                        AT: {
-                                                                                            block: {
-                                                                                                type: 'variables_get',
-                                                                                                fields: {
-                                                                                                    VAR: {
-                                                                                                        name: 'x',
-                                                                                                    },
-                                                                                                },
-                                                                                            },
-                                                                                        },
-                                                                                        TO: {
-                                                                                            block: {
-                                                                                                type: 'variables_get',
-                                                                                                fields: {
-                                                                                                    VAR: {
-                                                                                                        name: 'temp',
-                                                                                                    },
-                                                                                                },
-                                                                                            },
-                                                                                        },
-                                                                                    },
-                                                                                },
-                                                                            },
-                                                                        },
-                                                                    },
-                                                                },
-                                                            },
-                                                        },
-                                                    },
-                                                },
-                                            },
-                                        },
-                                    },
-                                },
-                                {
-                                    kind: 'category',
-                                    name: 'Jabberwocky',
-                                    contents: [
-                                        {
-                                            kind: 'block',
-                                            type: 'text_print',
-                                            inputs: {
-                                                TEXT: {
-                                                    block: {
-                                                        type: 'text',
-                                                        fields: {
-                                                            TEXT: "'Twas brillig, and the slithy toves",
-                                                        },
-                                                    },
-                                                },
-                                            },
-                                            next: {
-                                                block: {
-                                                    type: 'text_print',
-                                                    inputs: {
-                                                        TEXT: {
-                                                            block: {
-                                                                type: 'text',
-                                                                fields: {
-                                                                    TEXT: '  Did gyre and gimble in the wabe:',
-                                                                },
-                                                            },
-                                                        },
-                                                    },
-                                                    next: {
-                                                        block: {
-                                                            type: 'text_print',
-                                                            inputs: {
-                                                                TEXT: {
-                                                                    block: {
-                                                                        type: 'text',
-                                                                        fields: {
-                                                                            TEXT: 'All mimsy were the borogroves,',
-                                                                        },
-                                                                    },
-                                                                },
-                                                            },
-                                                            next: {
-                                                                block: {
-                                                                    type: 'text_print',
-                                                                    inputs: {
-                                                                        TEXT: {
-                                                                            block: {
-                                                                                type: 'text',
-                                                                                fields: {
-                                                                                    TEXT: '  And the mome raths outgrabe.',
-                                                                                },
-                                                                            },
-                                                                        },
-                                                                    },
-                                                                },
-                                                            },
-                                                        },
-                                                    },
-                                                },
-                                            },
-                                        },
-                                        {
-                                            kind: 'block',
-                                            type: 'text_print',
-                                            inputs: {
-                                                TEXT: {
-                                                    block: {
-                                                        type: 'text',
-                                                        fields: {
-                                                            TEXT: '"Beware the Jabberwock, my son!',
-                                                        },
-                                                    },
-                                                },
-                                            },
-                                            next: {
-                                                block: {
-                                                    type: 'text_print',
-                                                    inputs: {
-                                                        TEXT: {
-                                                            block: {
-                                                                type: 'text',
-                                                                fields: {
-                                                                    TEXT: '  The jaws that bite, the claws that catch!',
-                                                                },
-                                                            },
-                                                        },
-                                                    },
-                                                    next: {
-                                                        block: {
-                                                            type: 'text_print',
-                                                            inputs: {
-                                                                TEXT: {
-                                                                    block: {
-                                                                        type: 'text',
-                                                                        fields: {
-                                                                            TEXT: 'Beware the Jubjub bird, and shun',
-                                                                        },
-                                                                    },
-                                                                },
-                                                            },
-                                                            next: {
-                                                                block: {
-                                                                    type: 'text_print',
-                                                                    inputs: {
-                                                                        TEXT: {
-                                                                            block: {
-                                                                                type: 'text',
-                                                                                fields: {
-                                                                                    TEXT: '  The frumious Bandersnatch!"',
-                                                                                },
-                                                                            },
-                                                                        },
-                                                                    },
-                                                                },
-                                                            },
-                                                        },
-                                                    },
-                                                },
-                                            },
-                                        },
-                                    ],
-                                },
-                            ],
-                        },
-                    ],
                 }
             ]
         };
@@ -2471,11 +1572,11 @@ workspace_data: "${base64WorkspaceData}"
                 return null;
             }
 
-            async importModelAsset(name, assetManager) {
+            async importModelAsset(name, assetManager, x, y, z) {
                 let asset = await assetManager.getAsset(name);
                 if (asset) {
                     let url = URL.createObjectURL(asset.data);
-                    return await this.importModel(name, url);
+                    return await this.importModel(name, url, x, y, z);
                 }
             }
 
@@ -3879,6 +2980,119 @@ workspace_data: "${base64WorkspaceData}"
         };
 
         Blockly.defineBlocksWithJsonArray([
+            {
+                "type": "create_primitive",
+                "message0": "create %1 named %2 at x %3 y %4 z %5",
+                "args0": [
+                    {
+                        "type": "field_dropdown",
+                        "name": "TYPE",
+                        "options": [
+                            ["box", "BOX"],
+                            ["sphere", "SPHERE"]
+                        ]
+                    },
+                    { "type": "input_value", "name": "NAME", "check": "String" },
+                    { "type": "input_value", "name": "X", "check": "Number" },
+                    { "type": "input_value", "name": "Y", "check": "Number" },
+                    { "type": "input_value", "name": "Z", "check": "Number" }
+                ],
+                "inputsInline": true,
+                "output": "Mesh",
+                "colour": 160,
+                "tooltip": "Creates a primitive shape (box or sphere) at the specified position."
+            },
+            {
+                "type": "import_model",
+                "message0": "import model %1 at x %2 y %3 z %4",
+                "args0": [
+                    { "type": "input_value", "name": "SOURCE", "check": "String" },
+                    { "type": "input_value", "name": "X", "check": "Number" },
+                    { "type": "input_value", "name": "Y", "check": "Number" },
+                    { "type": "input_value", "name": "Z", "check": "Number" }
+                ],
+                "inputsInline": true,
+                "output": "Mesh",
+                "colour": 160,
+                "tooltip": "Imports a 3D model from a URL or an asset."
+            },
+            {
+                "type": "animate_transform",
+                "message0": "animate %1 of %2 to x %3 y %4 z %5 over %6 seconds",
+                "args0": [
+                    {
+                        "type": "field_dropdown",
+                        "name": "TRANSFORM",
+                        "options": [
+                            ["position", "POSITION"],
+                            ["rotation", "ROTATION"],
+                            ["scale", "SCALE"]
+                        ]
+                    },
+                    { "type": "input_value", "name": "OBJECT" },
+                    { "type": "input_value", "name": "X", "check": "Number" },
+                    { "type": "input_value", "name": "Y", "check": "Number" },
+                    { "type": "input_value", "name": "Z", "check": "Number" },
+                    { "type": "input_value", "name": "DURATION", "check": "Number" }
+                ],
+                "message1": "loop %1",
+                "args1": [
+                    {
+                        "type": "field_dropdown",
+                        "name": "LOOP",
+                        "options": [["no", "NO"], ["yes", "YES"], ["ping-pong", "PINGPONG"]]
+                    }
+                ],
+                "inputsInline": false,
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": 300,
+                "tooltip": "Animates the position, rotation, or scale of an object."
+            },
+            {
+                "type": "play_sound",
+                "message0": "play sound %1",
+                "args0": [
+                    { "type": "input_value", "name": "SOURCE", "check": "String" }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": "#5B80A5",
+                "tooltip": "Plays a sound from a URL or an asset."
+            },
+            {
+                "type": "gui_create_image",
+                "message0": "create image named %1 from source %2",
+                "args0": [
+                    { "type": "field_input", "name": "NAME", "text": "myImage" },
+                    { "type": "input_value", "name": "SOURCE", "check": "String" }
+                ],
+                "inputsInline": true,
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": "#5B80A5",
+                "tooltip": "Creates an image in the GUI from a URL or an asset."
+            },
+            {
+                "type": "console_print",
+                "message0": "console %1 %2",
+                "args0": [
+                    {
+                        "type": "field_dropdown",
+                        "name": "TYPE",
+                        "options": [
+                            ["log", "LOG"],
+                            ["warn", "WARN"],
+                            ["error", "ERROR"]
+                        ]
+                    },
+                    { "type": "input_value", "name": "VALUE" }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": "#5B80A5",
+                "tooltip": "Prints a message to the browser console."
+            },
             {
                 "type": "take_screenshot",
                 "message0": "take screenshot",
@@ -5331,6 +4545,99 @@ workspace_data: "${base64WorkspaceData}"
         ]);
 
         {
+            javascript.javascriptGenerator.forBlock['create_primitive'] = function (block, generator) {
+                const type = block.getFieldValue('TYPE');
+                const name = generator.valueToCode(block, 'NAME', generator.ORDER_ATOMIC) || "'myObject'";
+                const x = generator.valueToCode(block, 'X', generator.ORDER_ATOMIC) || 0;
+                const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || 0;
+                const z = generator.valueToCode(block, 'Z', generator.ORDER_ATOMIC) || 0;
+                const method = type === 'BOX' ? 'createBox' : 'createSphere';
+                const code = `sceneManager.${method}(${name}, ${x}, ${y}, ${z})`;
+                return [code, generator.ORDER_ATOMIC];
+            };
+
+            javascript.javascriptGenerator.forBlock['import_model'] = function (block, generator) {
+                const source = generator.valueToCode(block, 'SOURCE', generator.ORDER_ATOMIC) || "''";
+                const x = generator.valueToCode(block, 'X', generator.ORDER_ATOMIC) || 0;
+                const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || 0;
+                const z = generator.valueToCode(block, 'Z', generator.ORDER_ATOMIC) || 0;
+                const modelVarName = javascript.javascriptGenerator.nameDB_.getDistinctName(Blockly.utils.idGenerator.genUid(), Blockly.Variables.NameType);
+                const code = `await (async () => {
+                    const src = ${source};
+                    if (src.includes('://') || src.startsWith('blob:')) {
+                        return await sceneManager.importModel('${modelVarName}', src, ${x}, ${y}, ${z});
+                    } else {
+                        return await sceneManager.importModelAsset(src, assetManager, ${x}, ${y}, ${z});
+                    }
+                })()`;
+                return [code, generator.ORDER_ATOMIC];
+            };
+
+            javascript.javascriptGenerator.forBlock['animate_transform'] = function (block, generator) {
+                const transform = block.getFieldValue('TRANSFORM');
+                const object = generator.valueToCode(block, 'OBJECT', generator.ORDER_ATOMIC) || 'null';
+                const x = generator.valueToCode(block, 'X', generator.ORDER_ATOMIC) || 0;
+                const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || 0;
+                const z = generator.valueToCode(block, 'Z', generator.ORDER_ATOMIC) || 0;
+                const duration = generator.valueToCode(block, 'DURATION', generator.ORDER_ATOMIC) || 1;
+                const loop = block.getFieldValue('LOOP');
+
+                let loopBool = false;
+                let loopMode = 'CYCLE';
+                if (loop === 'YES') {
+                    loopBool = true;
+                } else if (loop === 'PINGPONG') {
+                    loopBool = true;
+                    loopMode = 'PINGPONG';
+                }
+
+                let method;
+                if (transform === 'POSITION') method = 'animatePosition';
+                else if (transform === 'ROTATION') method = 'animateRotation';
+                else if (transform === 'SCALE') method = 'animateScale';
+
+                return `sceneManager.${method}(${object}, ${x}, ${y}, ${z}, ${duration}, ${loopBool}, '${loopMode}');\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['play_sound'] = function (block, generator) {
+                const source = generator.valueToCode(block, 'SOURCE', generator.ORDER_ATOMIC) || "''";
+                return `
+                    (async () => {
+                        const src = ${source};
+                        if (src.includes('://') || src.startsWith('blob:')) {
+                            await sceneManager.playSound(src);
+                        } else {
+                            await sceneManager.playSoundAsset(src, assetManager);
+                        }
+                    })();
+                `;
+            };
+
+            javascript.javascriptGenerator.forBlock['gui_create_image'] = function (block, generator) {
+                const name = block.getFieldValue('NAME');
+                const source = generator.valueToCode(block, 'SOURCE', generator.ORDER_ATOMIC) || "''";
+                return `
+                    (async () => {
+                        const src = ${source};
+                        if (src.includes('://') || src.startsWith('blob:')) {
+                            sceneManager.uiManager.createImage('${name}', src);
+                        } else {
+                            const asset = await assetManager.getAsset(src);
+                            if (asset) {
+                                sceneManager.uiManager.createImageFromAsset('${name}', asset);
+                            }
+                        }
+                    })();
+                `;
+            };
+
+            javascript.javascriptGenerator.forBlock['console_print'] = function (block, generator) {
+                const type = block.getFieldValue('TYPE');
+                const value = generator.valueToCode(block, 'VALUE', generator.ORDER_ATOMIC) || 'null';
+                const method = type.toLowerCase();
+                return `console.${method}(${value});\n`;
+            };
+
             javascript.javascriptGenerator.forBlock['create_popup'] = function (block, generator) {
                 const title = generator.valueToCode(block, 'TITLE', generator.ORDER_ATOMIC) || "''";
                 const image = generator.valueToCode(block, 'IMAGE', generator.ORDER_ATOMIC) || "null";
