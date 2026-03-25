@@ -2471,6 +2471,129 @@ workspace_data: "${base64WorkspaceData}"
                 return null;
             }
 
+            async importRobloxAvatar(name, userId, x = 0, y = 0, z = 0) {
+                try {
+                    const thumbUrl = `https://thumbnails.roblox.com/v1/users/avatar-3d?userId=${userId}`;
+                    const thumbProxyUrl = `https://proxy.fxio.workers.dev/corsproxy/?apiurl=${encodeURIComponent(thumbUrl)}`;
+                    const thumbResponse = await fetch(thumbProxyUrl);
+                    const thumbData = await thumbResponse.json();
+
+                    if (thumbData.state !== 'Completed' || !thumbData.imageUrl) {
+                        throw new Error('Avatar not ready or not found');
+                    }
+
+                    const manifestProxyUrl = `https://proxy.fxio.workers.dev/corsproxy/?apiurl=${encodeURIComponent(thumbData.imageUrl)}`;
+                    const manifestResponse = await fetch(manifestProxyUrl);
+                    const manifest = await manifestResponse.json();
+
+                    const thumbSubdomain = thumbData.imageUrl.match(/t(\d)\.rbxcdn\.com/)?.[1] || "0";
+
+                    const fetchAsset = async (hash, isBinary = false) => {
+                        const url = `https://t${thumbSubdomain}.rbxcdn.com/${hash}`;
+                        const proxyUrl = `https://proxy.fxio.workers.dev/corsproxy/?apiurl=${encodeURIComponent(url)}`;
+                        const res = await fetch(proxyUrl);
+                        if (res.ok) {
+                            if (isBinary) {
+                                const blob = await res.blob();
+                                if (blob.type !== 'application/xml') return blob;
+                            } else {
+                                const text = await res.text();
+                                if (!text.includes('<Error>')) return text;
+                            }
+                        }
+                        // Fallback
+                        for (let i = 0; i < 8; i++) {
+                            if (i == thumbSubdomain) continue;
+                            const url = `https://t${i}.rbxcdn.com/${hash}`;
+                            const proxyUrl = `https://proxy.fxio.workers.dev/corsproxy/?apiurl=${encodeURIComponent(url)}`;
+                            const res = await fetch(proxyUrl);
+                            if (res.ok) {
+                                if (isBinary) {
+                                    const blob = await res.blob();
+                                    if (blob.type !== 'application/xml') return blob;
+                                } else {
+                                    const text = await res.text();
+                                    if (!text.includes('<Error>')) return text;
+                                }
+                            }
+                        }
+                        throw new Error(`Could not fetch asset ${hash}`);
+                    };
+
+                    const objText = await fetchAsset(manifest.obj);
+                    const mtlText = await fetchAsset(manifest.mtl);
+
+                    const textureMap = {};
+                    for (const texHash of manifest.textures) {
+                        const blob = await fetchAsset(texHash, true);
+                        const dataUrl = await new Promise(resolve => {
+                            const reader = new FileReader();
+                            reader.onloadend = () => resolve(reader.result);
+                            reader.readAsDataURL(blob);
+                        });
+                        textureMap[texHash] = dataUrl;
+                    }
+
+                    const mtlData = {};
+                    let currentMat = null;
+                    mtlText.split('\n').forEach(line => {
+                        const parts = line.trim().split(/\s+/);
+                        if (parts[0] === 'newmtl') {
+                            currentMat = parts[1];
+                            mtlData[currentMat] = {};
+                        } else if (currentMat && parts.length >= 2) {
+                            if (parts[0] === 'map_Kd') mtlData[currentMat].texture = parts[1];
+                            if (parts[0] === 'Kd') mtlData[currentMat].color = new BABYLON.Color3(parseFloat(parts[1]), parseFloat(parts[2]), parseFloat(parts[3]));
+                        }
+                    });
+
+                    const cleanObjText = objText.replace(/^mtllib\s+.+$/gm, "");
+                    const objBlob = new Blob([cleanObjText], { type: 'text/plain' });
+                    const objUrl = URL.createObjectURL(objBlob);
+
+                    const result = await BABYLON.SceneLoader.ImportMeshAsync(null, "", objUrl, this.scene, null, ".obj");
+                    if (result.meshes.length > 0) {
+                        const avatarRoot = new BABYLON.Mesh(name, this.scene);
+                        result.meshes.forEach(mesh => {
+                            if (!mesh.parent) mesh.parent = avatarRoot;
+                            if (mesh.material) {
+                                const matName = Object.keys(mtlData).find(k => mesh.material.name.includes(k)) || mesh.material.name;
+                                const data = mtlData[matName];
+                                if (data) {
+                                    if (data.texture && textureMap[data.texture]) {
+                                        mesh.material.diffuseTexture = new BABYLON.Texture(textureMap[data.texture], this.scene);
+                                    }
+                                    if (data.color) {
+                                        mesh.material.diffuseColor = data.color;
+                                    }
+                                }
+                            }
+                        });
+
+                        const boundingInfo = avatarRoot.getHierarchyBoundingVectors(true);
+                        const height = boundingInfo.max.y - boundingInfo.min.y;
+                        if (height > 0.001) {
+                            const targetHeight = 2.0;
+                            const scale = targetHeight / height;
+                            avatarRoot.scaling = new BABYLON.Vector3(scale, scale, scale);
+
+                            const center = boundingInfo.max.add(boundingInfo.min).scale(0.5);
+                            avatarRoot.position.x = x - center.x * scale;
+                            avatarRoot.position.y = y - boundingInfo.min.y * scale;
+                            avatarRoot.position.z = z - center.z * scale;
+                        } else {
+                            avatarRoot.position = new BABYLON.Vector3(x, y, z);
+                        }
+
+                        this.objects[name] = avatarRoot;
+                        return avatarRoot;
+                    }
+                } catch (error) {
+                    console.error('Failed to import Roblox avatar:', error);
+                }
+                return null;
+            }
+
             async importModelAsset(name, assetManager) {
                 let asset = await assetManager.getAsset(name);
                 if (asset) {
@@ -5544,7 +5667,15 @@ if (${name}) {
                 const posY = block.getFieldValue('POS_Y');
                 const posZ = block.getFieldValue('POS_Z');                
                 const modelVarName = javascript.javascriptGenerator.nameDB_.getDistinctName(Blockly.utils.idGenerator.genUid(), Blockly.Variables.NameType);
-                let code = `await sceneManager.importModel('${modelVarName}', '${modelUrl}', ${posX}, ${posY}, ${posZ})`;
+
+                let code;
+                const robloxMatch = modelUrl.match(/roblox\.com\/(?:users|users\/profile)\/(\d+)/i);
+                if (robloxMatch) {
+                    const userId = robloxMatch[1];
+                    code = `await sceneManager.importRobloxAvatar('${modelVarName}', ${userId}, ${posX}, ${posY}, ${posZ})`;
+                } else {
+                    code = `await sceneManager.importModel('${modelVarName}', '${modelUrl}', ${posX}, ${posY}, ${posZ})`;
+                }
                 return [code, generator.ORDER_ATOMIC];
             };
 
