@@ -2473,37 +2473,72 @@ workspace_data: "${base64WorkspaceData}"
 
             async importRobloxAvatar(name, userId, x = 0, y = 0, z = 0) {
                 try {
-                    const thumbUrl = `https://thumbnails.roblox.com/v1/users/avatar-3d?userId=${userId}`;
-                    const thumbResponse = await fetch(thumbUrl);
-                    const thumbData = await thumbResponse.json();
+                    const getProxiedUrl = (url) => `https://proxy.fxio.workers.dev/corsproxy/?apiurl=${encodeURIComponent(url)}`;
 
-                    if (thumbData.state !== 'Completed' || !thumbData.imageUrl) {
-                        throw new Error('Avatar not ready or not found');
-                    }
-                    
-                    const manifestResponse = await fetch(thumbData.imageUrl);
-                    const manifest = await manifestResponse.json();
-
-                    const thumbSubdomain = thumbData.imageUrl.match(/t(\d)\.rbxcdn\.com/)?.[1] || "0";
-
-                    const fetchAsset = async (hash, isBinary = false) => {
-                        const url = `https://t${thumbSubdomain}.rbxcdn.com/${hash}`;
-                        const res = await fetch(url);
-                        if (res.ok) {
-                            if (isBinary) {
-                                const blob = await res.blob();
-                                if (blob.type !== 'application/xml') return blob;
-                            } else {
-                                const text = await res.text();
-                                if (!text.includes('<Error>')) return text;
+                    let thumbData = null;
+                    // Try V1 API first
+                    try {
+                        const v1Url = `https://thumbnails.roblox.com/v1/users/avatar-3d?userId=${userId}`;
+                        const response = await fetch(getProxiedUrl(v1Url));
+                        if (response.ok) {
+                            const data = await response.json();
+                            if (data && data.imageUrl) {
+                                thumbData = data;
                             }
                         }
-                        // Fallback
-                        for (let i = 0; i < 8; i++) {
-                            if (i == thumbSubdomain) continue;
-                            const url = `https://t${i}.rbxcdn.com/${hash}`;
-                            const proxyUrl = url;
-                            const res = await fetch(proxyUrl);
+                    } catch (e) {
+                        console.warn("V1 API failed, trying legacy endpoint", e);
+                    }
+
+                    // Try legacy endpoint if V1 failed
+                    if (!thumbData) {
+                        try {
+                            const legacyUrl = `https://www.roblox.com/avatar-thumbnail-3d/json?userId=${userId}`;
+                            const response = await fetch(getProxiedUrl(legacyUrl));
+                            if (response.ok) {
+                                const data = await response.json();
+                                // Legacy endpoint might return manifest directly or a URL in 'url' property
+                                if (data && (data.obj || data.url || data.imageUrl)) {
+                                    thumbData = data;
+                                }
+                            }
+                        } catch (e) {
+                            console.error("Legacy endpoint also failed", e);
+                        }
+                    }
+
+                    if (!thumbData) {
+                        throw new Error('Avatar not ready or not found');
+                    }
+
+                    let manifest = null;
+                    const manifestUrl = thumbData.imageUrl || thumbData.url;
+                    
+                    if (thumbData.obj && thumbData.mtl) {
+                        // Manifest was returned directly
+                        manifest = thumbData;
+                    } else if (manifestUrl) {
+                        // Need to fetch manifest
+                        const manifestResponse = await fetch(getProxiedUrl(manifestUrl));
+                        manifest = await manifestResponse.json();
+                        // If the proxied response is wrapped (like some proxies do), unwrap it
+                        if (manifest.contents && typeof manifest.contents === 'string') {
+                            try {
+                                manifest = JSON.parse(manifest.contents);
+                            } catch(e) {}
+                        }
+                    }
+
+                    if (!manifest || !manifest.obj) {
+                        throw new Error('Could not retrieve avatar manifest');
+                    }
+
+                    const thumbSubdomain = (manifestUrl || "").match(/t(\d)\.rbxcdn\.com/)?.[1] || "0";
+
+                    const fetchAsset = async (hash, isBinary = false) => {
+                        const tryFetch = async (subdomain) => {
+                            const url = `https://t${subdomain}.rbxcdn.com/${hash}`;
+                            const res = await fetch(getProxiedUrl(url));
                             if (res.ok) {
                                 if (isBinary) {
                                     const blob = await res.blob();
@@ -2513,6 +2548,18 @@ workspace_data: "${base64WorkspaceData}"
                                     if (!text.includes('<Error>')) return text;
                                 }
                             }
+                            return null;
+                        };
+
+                        // Try primary subdomain
+                        let result = await tryFetch(thumbSubdomain);
+                        if (result) return result;
+
+                        // Fallback to other subdomains
+                        for (let i = 0; i < 8; i++) {
+                            if (i == thumbSubdomain) continue;
+                            result = await tryFetch(i);
+                            if (result) return result;
                         }
                         throw new Error(`Could not fetch asset ${hash}`);
                     };
@@ -2521,14 +2568,20 @@ workspace_data: "${base64WorkspaceData}"
                     const mtlText = await fetchAsset(manifest.mtl);
 
                     const textureMap = {};
-                    for (const texHash of manifest.textures) {
-                        const blob = await fetchAsset(texHash, true);
-                        const dataUrl = await new Promise(resolve => {
-                            const reader = new FileReader();
-                            reader.onloadend = () => resolve(reader.result);
-                            reader.readAsDataURL(blob);
-                        });
-                        textureMap[texHash] = dataUrl;
+                    if (manifest.textures) {
+                        for (const texHash of manifest.textures) {
+                            try {
+                                const blob = await fetchAsset(texHash, true);
+                                const dataUrl = await new Promise(resolve => {
+                                    const reader = new FileReader();
+                                    reader.onloadend = () => resolve(reader.result);
+                                    reader.readAsDataURL(blob);
+                                });
+                                textureMap[texHash] = dataUrl;
+                            } catch (e) {
+                                console.warn(`Failed to fetch texture ${texHash}`, e);
+                            }
+                        }
                     }
 
                     const mtlData = {};
