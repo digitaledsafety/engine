@@ -2474,24 +2474,21 @@ workspace_data: "${base64WorkspaceData}"
             async importRobloxAvatar(name, userId, x = 0, y = 0, z = 0) {
                 try {
                     const thumbUrl = `https://thumbnails.roblox.com/v1/users/avatar-3d?userId=${userId}`;
-                    const thumbProxyUrl = `https://proxy.fxio.workers.dev/corsproxy/?apiurl=${encodeURIComponent(thumbUrl)}`;
-                    const thumbResponse = await fetch(thumbProxyUrl);
+                    const thumbResponse = await fetch(thumbUrl);
                     const thumbData = await thumbResponse.json();
 
                     if (thumbData.state !== 'Completed' || !thumbData.imageUrl) {
                         throw new Error('Avatar not ready or not found');
                     }
-
-                    const manifestProxyUrl = `https://proxy.fxio.workers.dev/corsproxy/?apiurl=${encodeURIComponent(thumbData.imageUrl)}`;
-                    const manifestResponse = await fetch(manifestProxyUrl);
+                    
+                    const manifestResponse = await fetch(thumbData.imageUrl);
                     const manifest = await manifestResponse.json();
 
                     const thumbSubdomain = thumbData.imageUrl.match(/t(\d)\.rbxcdn\.com/)?.[1] || "0";
 
                     const fetchAsset = async (hash, isBinary = false) => {
                         const url = `https://t${thumbSubdomain}.rbxcdn.com/${hash}`;
-                        const proxyUrl = url;
-                        const res = await fetch(proxyUrl);
+                        const res = await fetch(url);
                         if (res.ok) {
                             if (isBinary) {
                                 const blob = await res.blob();
