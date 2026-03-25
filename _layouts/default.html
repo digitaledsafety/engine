@@ -2490,7 +2490,7 @@ workspace_data: "${base64WorkspaceData}"
 
                     const fetchAsset = async (hash, isBinary = false) => {
                         const url = `https://t${thumbSubdomain}.rbxcdn.com/${hash}`;
-                        const proxyUrl = `https://proxy.fxio.workers.dev/corsproxy/?apiurl=${encodeURIComponent(url)}`;
+                        const proxyUrl = url;
                         const res = await fetch(proxyUrl);
                         if (res.ok) {
                             if (isBinary) {
@@ -2505,7 +2505,7 @@ workspace_data: "${base64WorkspaceData}"
                         for (let i = 0; i < 8; i++) {
                             if (i == thumbSubdomain) continue;
                             const url = `https://t${i}.rbxcdn.com/${hash}`;
-                            const proxyUrl = `https://proxy.fxio.workers.dev/corsproxy/?apiurl=${encodeURIComponent(url)}`;
+                            const proxyUrl = url;
                             const res = await fetch(proxyUrl);
                             if (res.ok) {
                                 if (isBinary) {
