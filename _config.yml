@@ -1,4 +1,4 @@
-baseurl: "/engine"
+baseurl: ""
 
 collections:
   workspaces:
@@ -24,6 +24,8 @@ collections:
 include:
   - "script.js"
   - "favicon.ico"
+  - "manifest.json"
+  - "sw.js"
 
 exclude:
   - tests

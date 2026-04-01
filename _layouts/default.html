@@ -3,8 +3,11 @@
 
 <head>
     <meta charset="UTF-8">
+    <title>Engine</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/x-icon" href="{{ site.baseurl }}/favicon.ico">
+    <link rel="manifest" href="{{ site.baseurl }}/manifest.json">
+    <meta name="theme-color" content="#007bff">
     <script src="https://cdn.digitaleducationsafety.org/packages/babylon.js@8.36.1/babylon.js"></script>
     <script src="https://cdn.digitaleducationsafety.org/packages/babylon.js@8.36.1/babylon.gui.min.js"></script>
     <script src="https://cdn.digitaleducationsafety.org/packages/babylon.js@8.36.1/babylonjs.loaders.min.js"></script>
@@ -427,6 +430,17 @@
             text-transform: uppercase;
         }
     </style>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('{{ site.baseurl }}/sw.js').then(registration => {
+                    console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                }, err => {
+                    console.log('ServiceWorker registration failed: ', err);
+                });
+            });
+        }
+    </script>
 </head>
 
 <body>
@@ -3993,6 +4007,7 @@ workspace_data: "${base64WorkspaceData}"
             },
             trashcan: true
         });
+        window.workspace = workspace;
 
         function getModelAssets() {
             const modelOptions = assetManager.assets
@@ -6358,6 +6373,7 @@ if (${name}) {
                 console.log("JULES_VERIFICATION: SCENE_READY");
             }
         }
+        window.doRun = doRun;
 
         const helper = function () {
             this.getField('MODEL_URL').maxDisplayLength = 16;

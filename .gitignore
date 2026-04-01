@@ -4,8 +4,15 @@ _site/
 .bundle/
 vendor/bundle/
 .DS_Store
-_site/
 .jekyll-cache/
 .sass-cache/
 Gemfile.lock
 .jekyll-metadata
+node_modules/
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+*.txt
+verify_collision.py
+verify_popup_variables.py
