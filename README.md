@@ -1,6 +1,5 @@
 # Engine 
-
-[![CI](https://github.com/digitaledsafety/engine.digitaledsafety.github.io/actions/workflows/deploy.yml/badge.svg)]
+[![CI](https://github.com/digitaledsafety/engine.digitaledsafety.github.io/actions/workflows/deploy.yml/badge.svg)](https://github.com/digitaledsafety/engine.digitaledsafety.github.io/actions/workflows/deploy.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 ![Status: Beta](https://img.shields.io/badge/status-beta-orange.svg)
 
