@@ -2490,90 +2490,75 @@ workspace_data: "${base64WorkspaceData}"
                     const getProxiedUrl = (url) => `https://proxy.fxio.workers.dev/corsproxy/?apiurl=${encodeURIComponent(url)}`;
 
                     let thumbData = null;
-                    // Try V1 API first
-                    try {
-                        const v1Url = `https://thumbnails.roblox.com/v1/users/avatar-3d?userId=${userId}`;
-                        const response = await fetch(getProxiedUrl(v1Url));
-                        if (response.ok) {
-                            const data = await response.json();
-                            if (data && data.imageUrl) {
-                                thumbData = data;
-                            }
-                        }
-                    } catch (e) {
-                        console.warn("V1 API failed, trying legacy endpoint", e);
-                    }
+                    const tryEndpoints = [
+                        `https://apis.roblox.com/thumbnails/v1/users/avatar-3d?userId=${userId}`,
+                        `https://thumbnails.roblox.com/v1/users/avatar-3d?userId=${userId}`,
+                        `https://www.roblox.com/avatar-thumbnail-3d/json?userId=${userId}`
+                    ];
 
-                    // Try legacy endpoint if V1 failed
-                    if (!thumbData) {
+                    for (const url of tryEndpoints) {
                         try {
-                            const legacyUrl = `https://www.roblox.com/avatar-thumbnail-3d/json?userId=${userId}`;
-                            const response = await fetch(getProxiedUrl(legacyUrl));
+                            const response = await fetch(getProxiedUrl(url));
                             if (response.ok) {
                                 const data = await response.json();
-                                // Legacy endpoint might return manifest directly or a URL in 'url' property
-                                if (data && (data.obj || data.url || data.imageUrl)) {
+                                if (data && (data.imageUrl || data.url || (data.obj && data.mtl))) {
                                     thumbData = data;
+                                    break;
                                 }
                             }
                         } catch (e) {
-                            console.error("Legacy endpoint also failed", e);
+                            console.warn(`Endpoint ${url} failed:`, e.message);
                         }
                     }
 
                     if (!thumbData) {
-                        throw new Error('Avatar not ready or not found');
+                        throw new Error("Avatar not ready or not found");
                     }
 
                     let manifest = null;
                     const manifestUrl = thumbData.imageUrl || thumbData.url;
-                    
+
                     if (thumbData.obj && thumbData.mtl) {
-                        // Manifest was returned directly
                         manifest = thumbData;
                     } else if (manifestUrl) {
-                        // Need to fetch manifest
                         const manifestResponse = await fetch(getProxiedUrl(manifestUrl));
                         manifest = await manifestResponse.json();
-                        // If the proxied response is wrapped (like some proxies do), unwrap it
-                        if (manifest.contents && typeof manifest.contents === 'string') {
+                        if (manifest.contents && typeof manifest.contents === "string") {
                             try {
                                 manifest = JSON.parse(manifest.contents);
-                            } catch(e) {}
+                            } catch (e) { }
                         }
                     }
 
                     if (!manifest || !manifest.obj) {
-                        throw new Error('Could not retrieve avatar manifest');
+                        throw new Error("Could not retrieve avatar manifest");
                     }
 
-                    const thumbSubdomain = (manifestUrl || "").match(/t(\d)\.rbxcdn\.com/)?.[1] || "0";
+                    const getCDNUrl = (hash) => {
+                        let i = 31;
+                        for (let t = 0; t < 38; t++) i ^= hash[t].charCodeAt(0);
+                        return `https://t${(i % 8).toString()}.rbxcdn.com/${hash}`;
+                    };
 
                     const fetchAsset = async (hash, isBinary = false) => {
-                        const tryFetch = async (subdomain) => {
-                            const url = `https://t${subdomain}.rbxcdn.com/${hash}`;
-                            const res = await fetch(getProxiedUrl(url));
+                        const primaryUrl = getCDNUrl(hash);
+                        try {
+                            const res = await fetch(getProxiedUrl(primaryUrl));
                             if (res.ok) {
-                                if (isBinary) {
-                                    const blob = await res.blob();
-                                    if (blob.type !== 'application/xml') return blob;
-                                } else {
-                                    const text = await res.text();
-                                    if (!text.includes('<Error>')) return text;
-                                }
+                                const data = isBinary ? await res.blob() : await res.text();
+                                if (isBinary || !data.includes("<Error>")) return data;
                             }
-                            return null;
-                        };
+                        } catch (e) {}
 
-                        // Try primary subdomain
-                        let result = await tryFetch(thumbSubdomain);
-                        if (result) return result;
-
-                        // Fallback to other subdomains
-                        for (let i = 0; i < 8; i++) {
-                            if (i == thumbSubdomain) continue;
-                            result = await tryFetch(i);
-                            if (result) return result;
+                        for (let s = 0; s < 8; s++) {
+                            const fallbackUrl = `https://t${s}.rbxcdn.com/${hash}`;
+                            try {
+                                const res = await fetch(getProxiedUrl(fallbackUrl));
+                                if (res.ok) {
+                                    const data = isBinary ? await res.blob() : await res.text();
+                                    if (isBinary || !data.includes("<Error>")) return data;
+                                }
+                            } catch (e) {}
                         }
                         throw new Error(`Could not fetch asset ${hash}`);
                     };
@@ -2586,7 +2571,7 @@ workspace_data: "${base64WorkspaceData}"
                         for (const texHash of manifest.textures) {
                             try {
                                 const blob = await fetchAsset(texHash, true);
-                                const dataUrl = await new Promise(resolve => {
+                                const dataUrl = await new Promise((resolve) => {
                                     const reader = new FileReader();
                                     reader.onloadend = () => resolve(reader.result);
                                     reader.readAsDataURL(blob);
@@ -2600,28 +2585,28 @@ workspace_data: "${base64WorkspaceData}"
 
                     const mtlData = {};
                     let currentMat = null;
-                    mtlText.split('\n').forEach(line => {
+                    mtlText.split("\n").forEach((line) => {
                         const parts = line.trim().split(/\s+/);
-                        if (parts[0] === 'newmtl') {
+                        if (parts[0] === "newmtl") {
                             currentMat = parts[1];
                             mtlData[currentMat] = {};
                         } else if (currentMat && parts.length >= 2) {
-                            if (parts[0] === 'map_Kd') mtlData[currentMat].texture = parts[1];
-                            if (parts[0] === 'Kd') mtlData[currentMat].color = new BABYLON.Color3(parseFloat(parts[1]), parseFloat(parts[2]), parseFloat(parts[3]));
+                            if (parts[0] === "map_Kd") mtlData[currentMat].texture = parts[1];
+                            if (parts[0] === "Kd") mtlData[currentMat].color = new BABYLON.Color3(parseFloat(parts[1]), parseFloat(parts[2]), parseFloat(parts[3]));
                         }
                     });
 
                     const cleanObjText = objText.replace(/^mtllib\s+.+$/gm, "");
-                    const objBlob = new Blob([cleanObjText], { type: 'text/plain' });
+                    const objBlob = new Blob([cleanObjText], { type: "text/plain" });
                     const objUrl = URL.createObjectURL(objBlob);
 
                     const result = await BABYLON.SceneLoader.ImportMeshAsync(null, "", objUrl, this.scene, null, ".obj");
                     if (result.meshes.length > 0) {
                         const avatarRoot = new BABYLON.Mesh(name, this.scene);
-                        result.meshes.forEach(mesh => {
+                        result.meshes.forEach((mesh) => {
                             if (!mesh.parent) mesh.parent = avatarRoot;
                             if (mesh.material) {
-                                const matName = Object.keys(mtlData).find(k => mesh.material.name.includes(k)) || mesh.material.name;
+                                const matName = Object.keys(mtlData).find((k) => mesh.material.name.includes(k)) || mesh.material.name;
                                 const data = mtlData[matName];
                                 if (data) {
                                     if (data.texture && textureMap[data.texture]) {
@@ -2631,6 +2616,9 @@ workspace_data: "${base64WorkspaceData}"
                                         mesh.material.diffuseColor = data.color;
                                     }
                                 }
+                                mesh.material.alpha = 1.0;
+                                mesh.material.transparencyMode = BABYLON.Material.MATERIAL_OPAQUE;
+                                mesh.material.backFaceCulling = false;
                             }
                         });
 
@@ -2653,82 +2641,9 @@ workspace_data: "${base64WorkspaceData}"
                         return avatarRoot;
                     }
                 } catch (error) {
-                    console.error('Failed to import Roblox avatar:', error);
+                    console.error("Failed to import Roblox avatar:", error);
                 }
                 return null;
-            }
-
-            async importModelAsset(name, assetManager) {
-                let asset = await assetManager.getAsset(name);
-                if (asset) {
-                    let url = URL.createObjectURL(asset.data);
-                    return await this.importModel(name, url);
-                }
-            }
-
-            async setTexture(target, assetName, assetManager) {
-                let name;
-                if (typeof target === 'string') {
-                    name = target;
-                } else if (target && typeof target === 'object' && target.name) {
-                    name = target.name;
-                }
-
-                if (this.objects[name]) {
-                    const asset = await assetManager.getAsset(assetName);
-                    if (asset && asset.type.startsWith('image/')) {
-                        const url = URL.createObjectURL(asset.data);
-                        const texture = new BABYLON.Texture(url, this.scene);
-                        if (!this.objects[name].material) {
-                            this.objects[name].material = new BABYLON.StandardMaterial(`${name}_material`, this.scene);
-                        }
-                        this.objects[name].material.diffuseTexture = texture;
-                    }
-                }
-            }
-
-            move(target, x, y, z) {
-                let name;
-                if (typeof target === 'string') {
-                    name = target;
-                } else if (target && typeof target === 'object' && target.name) {
-                    name = target.name;
-                }
-
-                if (name && this.objects[name]) {
-                    this.objects[name].position.set(x, y, z);
-                }
-            }
-
-            changeColor(target, color) {
-                let name;
-                if (typeof target === 'string') {
-                    name = target;
-                } else if (target && typeof target === 'object' && target.name) {
-                    name = target.name;
-                }
-                if (this.objects[name]) {
-                    if (!this.objects[name].material) {
-                        this.objects[name].material = new BABYLON.StandardMaterial(`${name}_material`, this.scene);
-                    }
-                    this.objects[name].material.diffuseColor = BABYLON.Color3.FromHexString(color);
-                }
-            }
-
-            rotate(target, x, y, z) {
-                let name;
-                if (typeof target === 'string') {
-                    name = target;
-                } else if (target && typeof target === 'object' && target.name) {
-                    name = target.name;
-                }
-                if (this.objects[name]) {
-                    this.objects[name].rotation = new BABYLON.Vector3(
-                        BABYLON.Tools.ToRadians(x),
-                        BABYLON.Tools.ToRadians(y),
-                        BABYLON.Tools.ToRadians(z)
-                    );
-                }
             }
 
             enablePhysics(target, mass, impostorType = 'BoxImpostor') {
@@ -2822,6 +2737,31 @@ workspace_data: "${base64WorkspaceData}"
                     return mesh.parent.physicsImpostor;
                 }
                 return null;
+            }
+
+            move(target, x, y, z) {
+                let mesh = this._getMesh(target);
+                if (mesh) {
+                    mesh.position.set(x, y, z);
+                }
+            }
+
+            rotate(target, x, y, z) {
+                let mesh = this._getMesh(target);
+                if (mesh) {
+                    mesh.rotation.set(x * (Math.PI / 180), y * (Math.PI / 180), z * (Math.PI / 180));
+                }
+            }
+            changeColor(target, color) {
+                let mesh = this._getMesh(target);
+                if (mesh) {
+                    if (!mesh.material) {
+                        mesh.material = new BABYLON.StandardMaterial(mesh.name + "_material", this.scene);
+                    }
+                    if (mesh.material.diffuseColor) {
+                        mesh.material.diffuseColor = BABYLON.Color3.FromHexString(color);
+                    }
+                }
             }
 
             onCollision(target1, target2, callback) {
@@ -6354,7 +6294,7 @@ if (${name}) {
             doRun();
         }
 
-        async function doRun(code) {
+        window.doRun = async function (code) {
             let codeToRun = code || generateCode();
 
             if (sceneManager) {
@@ -6382,7 +6322,7 @@ if (${name}) {
 
         const canvas = document.getElementById('gameCanvas');
         const assetManager = new AssetManager();
-        let sceneManager = new BabylonSceneManager(canvas);
+        window.sceneManager = new BabylonSceneManager(canvas);
         const projectManager = new ProjectManager(assetManager, workspace, sceneManager);
 
         // Set up our default Blockly color blocks
