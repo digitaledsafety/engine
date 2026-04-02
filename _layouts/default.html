@@ -20,6 +20,8 @@
     <script src="https://cdn.digitaleducationsafety.org/packages/@blockly/field-colour@6.0.6/index.js"></script>
     <script src="https://cdn.digitaleducationsafety.org/packages/cannon@0.6.2/cannon.min.js"></script>
     <script src="https://cdn.digitaleducationsafety.org/packages/nipplejs@0.10.2/nipplejs.js"></script>
+    <script src="https://unpkg.com/@blockly/toolbox-search@3.1.8/dist/index.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/@blockly/toolbox-search@3.1.8/dist/index.css">
     <script src="https://cdn.babylonjs.com/proceduralTexturesLibrary/babylon.cloudProceduralTexture.min.js"></script>
     <script src="https://cdn.babylonjs.com/proceduralTexturesLibrary/babylon.grassProceduralTexture.min.js"></script>
     <script src="https://cdn.babylonjs.com/proceduralTexturesLibrary/babylon.woodProceduralTexture.min.js"></script>
@@ -429,6 +431,74 @@
             pointer-events: none;
             text-transform: uppercase;
         }
+
+        @media (max-width: 768px) {
+
+        }
+
+
+
+        @media (max-width: 768px) {
+
+        }
+
+
+
+        /* Full Screen Toolbox Styles */
+        body.toolbox-fullscreen .blocklyToolboxDiv {
+            width: 100% !important;
+            height: 100% !important;
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            z-index: 5000 !important;
+            background: white !important;
+            display: block !important;
+        }
+        body.toolbox-fullscreen .blocklyFlyout {
+            z-index: 5001 !important;
+        }
+        #closeToolboxFullscreen {
+            display: none;
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            z-index: 5002;
+            background: #ff4d4d;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            font-size: 20px;
+            cursor: pointer;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            align-items: center;
+            justify-content: center;
+        }
+        body.toolbox-fullscreen #closeToolboxFullscreen {
+            display: flex;
+        }
+        #toggleToolboxFullscreen {
+            display: none;
+        }
+        @media (max-width: 768px) {
+            #toggleToolboxFullscreen {
+                display: block;
+            }
+        }
+        .blocklyToolboxSearchInput {
+            width: 80% !important;
+            margin: 10px auto !important;
+            display: block !important;
+            padding: 8px !important;
+            font-size: 16px !important;
+            border: 1px solid #ccc !important;
+            border-radius: 5px !important;
+        }
+        body.toolbox-fullscreen .blocklyToolboxSearch {
+             padding-top: 60px !important;
+        }
     </style>
     <script>
         if ('serviceWorker' in navigator) {
@@ -486,6 +556,7 @@
         </div>
         <div class="nav-section-right">
             <button id="toggleToolboxButton" class="btn btn-icon" title="Toggle Toolbox">➕</button>
+            <button id="toggleToolboxFullscreen" class="btn btn-icon" title="Full Screen Toolbox">🔍⛶</button>
             <button id="runButton" class="btn btn-run btn-icon" title="Run">▶</button>
             <div class="dropdown-menu-container">
                 <button id="menuButton" class="btn btn-icon btn-menu-toggle" title="More actions">⚙️</button>
@@ -1007,6 +1078,11 @@ workspace_data: "${base64WorkspaceData}"
         var toolbox = {
             kind: 'categoryToolbox',
             contents: [
+                {
+                    kind: 'search',
+                    name: 'Search',
+                    contents: [],
+                },
                 {
                     kind: 'category',
                     name: 'Logic',
@@ -6294,7 +6370,8 @@ if (${name}) {
             doRun();
         }
 
-        window.doRun = async function (code) {
+        async function doRun(code) {
+            window.doRun = doRun;
             let codeToRun = code || generateCode();
 
             if (sceneManager) {
@@ -6313,7 +6390,7 @@ if (${name}) {
                 console.log("JULES_VERIFICATION: SCENE_READY");
             }
         }
-        window.doRun = doRun;
+
 
         const helper = function () {
             this.getField('MODEL_URL').maxDisplayLength = 16;
@@ -6322,6 +6399,7 @@ if (${name}) {
 
         const canvas = document.getElementById('gameCanvas');
         const assetManager = new AssetManager();
+        window.assetManager = assetManager;
         window.sceneManager = new BabylonSceneManager(canvas);
         const projectManager = new ProjectManager(assetManager, workspace, sceneManager);
 
@@ -6338,7 +6416,7 @@ function ${generator.FUNCTION_NAME_PLACEHOLDER_}() {
   var num = Math.floor(Math.random() * 0x1000000);
   return '#' + ('00000' + num.toString(16)).substr(-6);
 }
-`) + '()', generator.ORDER_FUNCTION_CALL];distin
+`) + '()', generator.ORDER_FUNCTION_CALL];
         };
 
         javascript.javascriptGenerator.forBlock['colour_picker'] = function (block, generator) {
@@ -6464,6 +6542,19 @@ function ${generator.FUNCTION_NAME_PLACEHOLDER_}(c1, c2, ratio) {
             if (event.target.tagName === 'BUTTON') {
                 document.getElementById('dropdownMenu').classList.remove('show');
             }
+        });
+
+
+        // Close Full Screen Toolbox
+        document.getElementById('closeToolboxFullscreen').addEventListener('click', () => {
+            document.body.classList.remove('toolbox-fullscreen');
+            if (window.workspace) Blockly.svgResize(window.workspace);
+        });
+
+        // Toggle Full Screen Toolbox
+        document.getElementById('toggleToolboxFullscreen').addEventListener('click', () => {
+            document.body.classList.toggle('toolbox-fullscreen');
+            if (window.workspace) Blockly.svgResize(window.workspace);
         });
 
         document.getElementById('runButton').addEventListener('click', () => {
@@ -6690,6 +6781,7 @@ function ${generator.FUNCTION_NAME_PLACEHOLDER_}(c1, c2, ratio) {
 
 
     </script>
+<button id="closeToolboxFullscreen" title="Close Full Screen Toolbox">✕</button>
 </body>
 
 </html>
