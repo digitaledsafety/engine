@@ -438,6 +438,12 @@
 
 
 
+        @media (max-width: 768px) {
+
+        }
+
+
+
         /* Full Screen Toolbox Styles */
         body.toolbox-fullscreen .blocklyToolboxDiv {
             width: 100% !important;
@@ -6364,7 +6370,8 @@ if (${name}) {
             doRun();
         }
 
-        window.doRun = async function (code) {
+        async function doRun(code) {
+            window.doRun = doRun;
             let codeToRun = code || generateCode();
 
             if (sceneManager) {
@@ -6383,7 +6390,7 @@ if (${name}) {
                 console.log("JULES_VERIFICATION: SCENE_READY");
             }
         }
-        window.doRun = doRun;
+
 
         const helper = function () {
             this.getField('MODEL_URL').maxDisplayLength = 16;
@@ -6392,6 +6399,7 @@ if (${name}) {
 
         const canvas = document.getElementById('gameCanvas');
         const assetManager = new AssetManager();
+        window.assetManager = assetManager;
         window.sceneManager = new BabylonSceneManager(canvas);
         const projectManager = new ProjectManager(assetManager, workspace, sceneManager);
 
@@ -6408,7 +6416,7 @@ function ${generator.FUNCTION_NAME_PLACEHOLDER_}() {
   var num = Math.floor(Math.random() * 0x1000000);
   return '#' + ('00000' + num.toString(16)).substr(-6);
 }
-`) + '()', generator.ORDER_FUNCTION_CALL];distin
+`) + '()', generator.ORDER_FUNCTION_CALL];
         };
 
         javascript.javascriptGenerator.forBlock['colour_picker'] = function (block, generator) {
