@@ -429,6 +429,42 @@
             pointer-events: none;
             text-transform: uppercase;
         }
+
+        /* Full-screen Toolbox Styles */
+        body.toolbox-fullscreen .blocklyToolboxDiv {
+            width: 100vw !important;
+            height: 100vh !important;
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            z-index: 3001 !important;
+            background-color: white !important;
+            display: flex !important;
+            flex-direction: column !important;
+        }
+        body.toolbox-fullscreen .blocklyFlyout {
+            z-index: 3002 !important;
+        }
+        #closeToolboxFullscreen {
+            display: none;
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            z-index: 3003;
+            background: #ff4d4d;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            font-size: 24px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+        body.toolbox-fullscreen #closeToolboxFullscreen {
+            display: block;
+        }
     </style>
     <script>
         if ('serviceWorker' in navigator) {
@@ -441,10 +477,13 @@
             });
         }
     </script>
+    <script src="https://unpkg.com/@blockly/toolbox-search@3.1.8/dist/index.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/@blockly/toolbox-search@3.1.8/dist/index.css">
 </head>
 
 <body>
     <div class="persistent-beta-badge">Beta</div>
+    <button id="closeToolboxFullscreen" title="Close Fullscreen Toolbox">×</button>
     <div id="hero-overlay">
         <div class="hero-content">
             <h1>Welcome to the Creative Coding Environment <span class="beta-badge">Beta</span></h1>
@@ -485,6 +524,7 @@
             <button id="preview-tab" class="nav-tab" title="Preview">✨</button>            
         </div>
         <div class="nav-section-right">
+            <button id="toggleToolboxFullscreen" class="btn btn-icon" title="Full Screen Toolbox">⛶</button>
             <button id="toggleToolboxButton" class="btn btn-icon" title="Toggle Toolbox">➕</button>
             <button id="runButton" class="btn btn-run btn-icon" title="Run">▶</button>
             <div class="dropdown-menu-container">
@@ -6661,6 +6701,25 @@ function ${generator.FUNCTION_NAME_PLACEHOLDER_}(c1, c2, ratio) {
             }
         }
         loadProjectFromUrl();
+
+        // Toolbox Fullscreen Logic
+        (function() {
+            const toggleBtn = document.getElementById('toggleToolboxFullscreen');
+            const closeBtn = document.getElementById('closeToolboxFullscreen');
+            if (toggleBtn) {
+                toggleBtn.addEventListener('click', () => {
+                    document.body.classList.toggle('toolbox-fullscreen');
+                    if (window.workspace) Blockly.svgResize(window.workspace);
+                });
+            }
+            if (closeBtn) {
+                closeBtn.addEventListener('click', () => {
+                    document.body.classList.remove('toolbox-fullscreen');
+                    if (window.workspace) Blockly.svgResize(window.workspace);
+                });
+            }
+        })();
+
 
         // --- Bottom Nav Logic ---
         document.addEventListener('DOMContentLoaded', () => {
