@@ -6334,7 +6334,7 @@ if (${name}) {
             doRun();
         }
 
-        async function doRun(code) {
+        window.doRun = async function (code) {
             let codeToRun = code || generateCode();
 
             if (sceneManager) {
@@ -6378,7 +6378,7 @@ function ${generator.FUNCTION_NAME_PLACEHOLDER_}() {
   var num = Math.floor(Math.random() * 0x1000000);
   return '#' + ('00000' + num.toString(16)).substr(-6);
 }
-`) + '()', generator.ORDER_FUNCTION_CALL];
+`) + '()', generator.ORDER_FUNCTION_CALL];distin
         };
 
         javascript.javascriptGenerator.forBlock['colour_picker'] = function (block, generator) {
