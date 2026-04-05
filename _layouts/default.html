@@ -6384,7 +6384,6 @@ if (${name}) {
                 console.log("JULES_VERIFICATION: SCENE_READY");
             }
         }
-        window.doRun = doRun;
 
         const helper = function () {
             this.getField('MODEL_URL').maxDisplayLength = 16;
@@ -6409,7 +6408,7 @@ function ${generator.FUNCTION_NAME_PLACEHOLDER_}() {
   var num = Math.floor(Math.random() * 0x1000000);
   return '#' + ('00000' + num.toString(16)).substr(-6);
 }
-`) + '()', generator.ORDER_FUNCTION_CALL];distin
+`) + '()', generator.ORDER_FUNCTION_CALL];
         };
 
         javascript.javascriptGenerator.forBlock['colour_picker'] = function (block, generator) {
