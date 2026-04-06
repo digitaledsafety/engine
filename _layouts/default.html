@@ -6365,7 +6365,7 @@ if (${name}) {
             doRun();
         }
 
-        window.doRun = async function (code) {
+        async function doRun(code) {
             let codeToRun = code || generateCode();
 
             if (sceneManager) {
@@ -6384,6 +6384,7 @@ if (${name}) {
                 console.log("JULES_VERIFICATION: SCENE_READY");
             }
         }
+        window.doRun = doRun;
 
         const helper = function () {
             this.getField('MODEL_URL').maxDisplayLength = 16;
