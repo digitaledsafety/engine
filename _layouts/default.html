@@ -658,7 +658,7 @@
 
                     let mimeType = 'application/octet-stream';
                     const extension = fileName.split('.').pop().toLowerCase();
-                    if (extension === 'glb' || extension === 'gltf') {
+                    if (extension === 'glb' || extension === 'gltf' || extension === 'vrm') {
                         mimeType = `model/${extension}`;
                     } else if (['png', 'jpg', 'jpeg', 'gif'].includes(extension)) {
                         mimeType = `image/${extension}`;
@@ -866,6 +866,39 @@ workspace_data: "${base64WorkspaceData}"
                 });
             }
 
+            migrateWorkspaceData(workspace) {
+                if (!workspace || !workspace.blocks || !workspace.blocks.blocks) return;
+
+                const migrateBlock = (block) => {
+                    // Migrate 'apply_force' from field NAME to input OBJECT
+                    if (block.type === 'apply_force' && block.fields && block.fields.NAME) {
+                        const nameValue = block.fields.NAME;
+                        delete block.fields.NAME;
+                        block.inputs = block.inputs || {};
+                        if (!block.inputs.OBJECT) {
+                            block.inputs.OBJECT = {
+                                block: {
+                                    type: 'text',
+                                    fields: { TEXT: nameValue }
+                                }
+                            };
+                        }
+                    }
+
+                    // Recursively migrate children
+                    if (block.next && block.next.block) migrateBlock(block.next.block);
+                    if (block.inputs) {
+                        for (const input in block.inputs) {
+                            if (block.inputs[input] && block.inputs[input].block) {
+                                migrateBlock(block.inputs[input].block);
+                            }
+                        }
+                    }
+                };
+
+                workspace.blocks.blocks.forEach(migrateBlock);
+            }
+
             async loadProjectData(projectData) {
                 if (!projectData.workspace || !projectData.assets) {
                     throw new Error('Invalid project data format.');
@@ -885,6 +918,7 @@ workspace_data: "${base64WorkspaceData}"
                 loadAssetsIntoView();
 
                 // 3. Load Workspace
+                this.migrateWorkspaceData(projectData.workspace);
                 Blockly.serialization.workspaces.load(projectData.workspace, this.workspace);
 
                 // 4. Run the loaded project
@@ -2232,6 +2266,10 @@ workspace_data: "${base64WorkspaceData}"
                 this.resumeEngine();
             }
 
+            setPopupText(target, text) {
+                this.uiManager.setPopupText(target, text);
+            }
+
             setPopupTitle(target, title) {
                 let popup = null;
                 if (typeof target === 'string') {
@@ -2462,7 +2500,7 @@ workspace_data: "${base64WorkspaceData}"
                         }
 
                         // If it's a VRM model, normalize its height to a sane default
-                        if (url.toLowerCase().endsWith('.vrm')) {
+                        if (url.toLowerCase().endsWith('.vrm') || name.toLowerCase().endsWith('.vrm')) {
                             const boundingInfo = rootMesh.getHierarchyBoundingVectors(true);
                             const height = boundingInfo.max.y - boundingInfo.min.y;
                             if (height > 0.001) { // Avoid division by zero or tiny values
@@ -3682,20 +3720,12 @@ workspace_data: "${base64WorkspaceData}"
             }
 
             setPopupText(name, text) {
-                if (this.popups[name]) {
-                    let textControl = this.popups[name].elements['text'];
-                    if (textControl) {
-                        textControl.text = text;
-                    } else {
-                        // If no text block exists, create one
-                        const textBlock = new BABYLON.GUI.TextBlock(`${name}_text`, text);
-                        textBlock.color = "white";
-                        textBlock.fontSize = 24;
-                        this.popups[name].container.addControl(textBlock);
-                        this.popups[name].elements['text'] = textBlock;
-                    }
+                const control = this.controls[`${name}_text`];
+                if (control) {
+                    control.text = text;
+                    control.isVisible = true;
                 }
-            }            
+            }
 
             createButton(name, text, options = {}) {
                 const button = BABYLON.GUI.Button.CreateSimpleButton(name, text);
@@ -3786,14 +3816,14 @@ workspace_data: "${base64WorkspaceData}"
                 panel.maxWidth = "500px";
                 container.addControl(panel);
 
-                // Add Image if provided
-                if (options.image) {
-                    const image = new BABYLON.GUI.Image(`${name}_image`, options.image);
-                    image.width = "150px";
-                    image.height = "150px";
-                    image.paddingBottom = "20px";
-                    panel.addControl(image);
-                }
+                // Add Image
+                const image = new BABYLON.GUI.Image(`${name}_image`, options.image || "");
+                image.width = "150px";
+                image.height = "150px";
+                image.paddingBottom = "20px";
+                image.isVisible = !!options.image;
+                panel.addControl(image);
+                this.controls[`${name}_image`] = image;
 
                 // Add Title
                 const titleBlock = new BABYLON.GUI.TextBlock(`${name}_title`, title);
@@ -3802,6 +3832,16 @@ workspace_data: "${base64WorkspaceData}"
                 titleBlock.fontSize = 32;
                 titleBlock.paddingBottom = "20px";
                 panel.addControl(titleBlock);
+                this.controls[`${name}_title`] = titleBlock;
+
+                // Add Text
+                const textBlock = new BABYLON.GUI.TextBlock(`${name}_text`, options.text || "");
+                textBlock.resizeToFit = true;
+                textBlock.color = "white";
+                textBlock.fontSize = 24;
+                textBlock.paddingBottom = "20px";
+                panel.addControl(textBlock);
+                this.controls[`${name}_text`] = textBlock;
 
                 // Add Button 1 if text is provided
                 if (options.button1_text) {
@@ -3951,7 +3991,7 @@ workspace_data: "${base64WorkspaceData}"
 
         function getModelAssets() {
             const modelOptions = assetManager.assets
-                .filter(asset => asset.type.startsWith('model/') || asset.name.endsWith('.glb') || asset.name.endsWith('.gltf'))
+                .filter(asset => asset.type.startsWith('model/') || asset.name.endsWith('.glb') || asset.name.endsWith('.gltf') || asset.name.endsWith('.vrm'))
                 .map(asset => [asset.name, asset.name]);
             return modelOptions.length > 0 ? modelOptions : [['none', 'NONE']];
         }
@@ -4606,9 +4646,9 @@ workspace_data: "${base64WorkspaceData}"
             },
             {
                 type: 'apply_force',
-                message0: 'Apply force to %1 x: %2 y: %3 z: %4 at point x: %5 y: %6 z: %7',
+                message0: 'Apply force to %1 force x: %2 y: %3 z: %4 at point x: %5 y: %6 z: %7',
                 args0: [
-                    { type: 'field_input', name: 'NAME', text: 'object' },
+                    { type: 'input_value', name: 'OBJECT' },
                     { type: 'input_value', name: 'FX', check: 'Number' },
                     { type: 'input_value', name: 'FY', check: 'Number' },
                     { type: 'input_value', name: 'FZ', check: 'Number' },
@@ -5920,12 +5960,15 @@ if (${name}) {
             };
 
             javascript.javascriptGenerator.forBlock['apply_force'] = function (block, generator) {
-                // This is a more advanced physics function. A helper could be added if needed frequently.
-                const name = block.getFieldValue('NAME');
+                const target = generator.valueToCode(block, 'OBJECT', generator.ORDER_ATOMIC);
                 const fx = generator.valueToCode(block, 'FX', generator.ORDER_ATOMIC) || 0;
                 const fy = generator.valueToCode(block, 'FY', generator.ORDER_ATOMIC) || 0;
                 const fz = generator.valueToCode(block, 'FZ', generator.ORDER_ATOMIC) || 0;
-                return `// Apply force requires direct physics access, consider a high-level alternative.\n`;
+                const px = generator.valueToCode(block, 'PX', generator.ORDER_ATOMIC) || 0;
+                const py = generator.valueToCode(block, 'PY', generator.ORDER_ATOMIC) || 0;
+                const pz = generator.valueToCode(block, 'PZ', generator.ORDER_ATOMIC) || 0;
+
+                return `sceneManager.applyForce(${target}, new BABYLON.Vector3(${fx}, ${fy}, ${fz}), new BABYLON.Vector3(${px}, ${py}, ${pz}));\n`;
             };
 
             javascript.javascriptGenerator.forBlock['set_gravity'] = function (block, generator) {
@@ -6338,7 +6381,7 @@ function ${generator.FUNCTION_NAME_PLACEHOLDER_}() {
   var num = Math.floor(Math.random() * 0x1000000);
   return '#' + ('00000' + num.toString(16)).substr(-6);
 }
-`) + '()', generator.ORDER_FUNCTION_CALL];distin
+`) + '()', generator.ORDER_FUNCTION_CALL];
         };
 
         javascript.javascriptGenerator.forBlock['colour_picker'] = function (block, generator) {
