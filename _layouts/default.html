@@ -2283,6 +2283,30 @@ workspace_data: "${base64WorkspaceData}"
                 }
             }
 
+            setPopupText(target, text) {
+                let popup = null;
+                if (typeof target === 'string') {
+                    popup = this.uiManager.getControlByName(target);
+                } else if (target && target.name) {
+                    popup = target;
+                }
+
+                if (popup && popup.children && popup.children.length > 0) {
+                    const panel = popup.children[0];
+                    let textControl = panel.getChildByName(`${popup.name}_text`);
+                    if (textControl) {
+                        textControl.text = text;
+                    } else {
+                        const textBlock = new BABYLON.GUI.TextBlock(`${popup.name}_text`, text);
+                        textBlock.resizeToFit = true;
+                        textBlock.color = "white";
+                        textBlock.fontSize = 24;
+                        textBlock.paddingBottom = "20px";
+                        panel.addControl(textBlock);
+                    }
+                }
+            }
+
             async initAudioEngine() {
                 if (this.audioEngine && this.sounds.length > 0) {
                     this.sounds.forEach(sound => {
@@ -3059,8 +3083,20 @@ workspace_data: "${base64WorkspaceData}"
                 }
             }
 
-            destroyObject(name) {
-                name.dispose();
+            destroyObject(target) {
+                const mesh = this._getMesh(target);
+                if (mesh) {
+                    mesh.dispose();
+                    let name;
+                    if (typeof target === 'string') {
+                        name = target;
+                    } else if (target && typeof target === 'object' && target.name) {
+                        name = target.name;
+                    }
+                    if (name && this.objects[name]) {
+                        delete this.objects[name];
+                    }
+                }
             }
 
             onButtonPress(button, callback) {
@@ -3681,21 +3717,6 @@ workspace_data: "${base64WorkspaceData}"
                 return "";
             }
 
-            setPopupText(name, text) {
-                if (this.popups[name]) {
-                    let textControl = this.popups[name].elements['text'];
-                    if (textControl) {
-                        textControl.text = text;
-                    } else {
-                        // If no text block exists, create one
-                        const textBlock = new BABYLON.GUI.TextBlock(`${name}_text`, text);
-                        textBlock.color = "white";
-                        textBlock.fontSize = 24;
-                        this.popups[name].container.addControl(textBlock);
-                        this.popups[name].elements['text'] = textBlock;
-                    }
-                }
-            }            
 
             createButton(name, text, options = {}) {
                 const button = BABYLON.GUI.Button.CreateSimpleButton(name, text);
@@ -3802,6 +3823,16 @@ workspace_data: "${base64WorkspaceData}"
                 titleBlock.fontSize = 32;
                 titleBlock.paddingBottom = "20px";
                 panel.addControl(titleBlock);
+
+                // Add Text if provided
+                if (options.text) {
+                    const textBlock = new BABYLON.GUI.TextBlock(`${name}_text`, options.text);
+                    textBlock.resizeToFit = true;
+                    textBlock.color = "white";
+                    textBlock.fontSize = 24;
+                    textBlock.paddingBottom = "20px";
+                    panel.addControl(textBlock);
+                }
 
                 // Add Button 1 if text is provided
                 if (options.button1_text) {
@@ -5360,8 +5391,9 @@ workspace_data: "${base64WorkspaceData}"
                 "args0": [
                     { "type": "input_value", "name": "TITLE", "check": "String" }
                 ],
-                "message1": "image URL %1",
+                "message1": "text %1 image URL %2",
                 "args1": [
+                    { "type": "input_value", "name": "TEXT", "check": "String" },
                     { "type": "input_value", "name": "IMAGE", "check": "String" }
                 ],
                 "message2": "button 1 name %1 text %2",
@@ -5376,7 +5408,7 @@ workspace_data: "${base64WorkspaceData}"
                 ],
                 "output": "Rectangle",
                 "colour": "#5B80A5",
-                "tooltip": "Creates a popup with a title, an optional image, and up to two buttons.",
+                "tooltip": "Creates a popup with a title, an optional image, text, and up to two buttons.",
                 "helpUrl": ""
             },
             {
@@ -5461,6 +5493,7 @@ workspace_data: "${base64WorkspaceData}"
         {
             javascript.javascriptGenerator.forBlock['create_popup'] = function (block, generator) {
                 const title = generator.valueToCode(block, 'TITLE', generator.ORDER_ATOMIC) || "''";
+                const text = generator.valueToCode(block, 'TEXT', generator.ORDER_ATOMIC) || "''";
                 const image = generator.valueToCode(block, 'IMAGE', generator.ORDER_ATOMIC) || "null";
                 const button1Name = generator.valueToCode(block, 'BUTTON1_NAME', generator.ORDER_ATOMIC) || "''";
                 const button1Text = generator.valueToCode(block, 'BUTTON1_TEXT', generator.ORDER_ATOMIC) || "''";
@@ -5475,6 +5508,7 @@ workspace_data: "${base64WorkspaceData}"
                 }
 
                 const options = `{
+                    text: ${text},
                     image: ${image},
                     button1_name: ${button1Name} || \`\${'${variableName}'}_button1\`,
                     button1_text: ${button1Text},
@@ -6338,7 +6372,7 @@ function ${generator.FUNCTION_NAME_PLACEHOLDER_}() {
   var num = Math.floor(Math.random() * 0x1000000);
   return '#' + ('00000' + num.toString(16)).substr(-6);
 }
-`) + '()', generator.ORDER_FUNCTION_CALL];distin
+`) + '()', generator.ORDER_FUNCTION_CALL];
         };
 
         javascript.javascriptGenerator.forBlock['colour_picker'] = function (block, generator) {
