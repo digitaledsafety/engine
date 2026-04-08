@@ -1278,6 +1278,26 @@ workspace_data: "${base64WorkspaceData}"
                         },
                         {
                             kind: 'block',
+                            type: 'apply_impulse',
+                        },
+                        {
+                            kind: 'block',
+                            type: 'get_linear_velocity',
+                        },
+                        {
+                            kind: 'block',
+                            type: 'set_linear_velocity',
+                        },
+                        {
+                            kind: 'block',
+                            type: 'set_gravity',
+                        },
+                        {
+                            kind: 'block',
+                            type: 'get_collided_object',
+                        },
+                        {
+                            kind: 'block',
                             type: 'set_physics_impostor',
                         },
                         {
@@ -1291,7 +1311,7 @@ workspace_data: "${base64WorkspaceData}"
                         {
                             kind: 'block',
                             type: 'get_joystick_force',
-                        }                        
+                        }
                     ]
                 },
                 {
@@ -1499,9 +1519,41 @@ workspace_data: "${base64WorkspaceData}"
                 },
                 {
                     kind: 'category',
-                    name: 'Utils',
+                    name: 'Math',
                     categorystyle: 'colour_category',
                     contents: [
+                        {
+                            kind: "block",
+                            type: "get_position_component",
+                        },
+                        {
+                            kind: "block",
+                            type: "get_rotation_component",
+                        },
+                        {
+                            kind: "block",
+                            type: "get_distance",
+                        },
+                        {
+                            kind: "block",
+                            type: "get_forward_vector",
+                        },
+                        {
+                            kind: "block",
+                            type: "delta_time",
+                        },
+                        {
+                            kind: "block",
+                            type: "get_self",
+                        },
+                        {
+                            kind: "block",
+                            type: "look_at_object",
+                        },
+                        {
+                            kind: "block",
+                            type: "move_towards_object",
+                        },
                         {
                             kind: 'block',
                             type: 'colour_picker',
@@ -1631,55 +1683,7 @@ workspace_data: "${base64WorkspaceData}"
                         {
                             kind: 'block',
                             type: 'math_atan2',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'parse_number_from',
-                        },                        
-                        {
-                            kind: 'block',
-                            type: 'text',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'text_join',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'text_append',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'text_length',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'text_isEmpty',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'text_indexOf',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'text_charAt',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'text_getSubstring',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'text_changeCase',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'text_trim',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'text_print',
-                        },                        
+                        }
                     ],
                 },
                 {
@@ -3302,6 +3306,53 @@ workspace_data: "${base64WorkspaceData}"
                 return Object.keys(this.objects);
             }
 
+            applyForce(target, force, contactPoint) {
+                const impostor = this._getPhysicsImpostor(target);
+                if (impostor) {
+                    const forceVec = new BABYLON.Vector3(force.x, force.y, force.z);
+                    const contactVec = contactPoint ? new BABYLON.Vector3(contactPoint.x, contactPoint.y, contactPoint.z) : impostor.object.getAbsolutePosition();
+                    impostor.applyForce(forceVec, contactVec);
+                }
+            }
+
+            applyImpulse(target, impulse, contactPoint) {
+                const impostor = this._getPhysicsImpostor(target);
+                if (impostor) {
+                    const impulseVec = new BABYLON.Vector3(impulse.x, impulse.y, impulse.z);
+                    const contactVec = contactPoint ? new BABYLON.Vector3(contactPoint.x, contactPoint.y, contactPoint.z) : impostor.object.getAbsolutePosition();
+                    impostor.applyImpulse(impulseVec, contactVec);
+                }
+            }
+
+            getLinearVelocity(target) {
+                const impostor = this._getPhysicsImpostor(target);
+                return impostor ? impostor.getLinearVelocity() : new BABYLON.Vector3(0, 0, 0);
+            }
+
+            setLinearVelocity(target, velocity) {
+                const impostor = this._getPhysicsImpostor(target);
+                if (impostor) {
+                    impostor.setLinearVelocity(new BABYLON.Vector3(velocity.x, velocity.y, velocity.z));
+                }
+            }
+
+            getDistance(target1, target2) {
+                const mesh1 = this._getMesh(target1);
+                const mesh2 = this._getMesh(target2);
+                if (mesh1 && mesh2) {
+                    return BABYLON.Vector3.Distance(mesh1.getAbsolutePosition(), mesh2.getAbsolutePosition());
+                }
+                return 0;
+            }
+
+            getForwardVector(target) {
+                const mesh = this._getMesh(target);
+                if (mesh) {
+                    return mesh.getDirection(BABYLON.Vector3.Forward());
+                }
+                return new BABYLON.Vector3(0, 0, 1);
+            }
+
             _getMesh(target) {
                 let name;
                 if (typeof target === 'string') {
@@ -3310,6 +3361,10 @@ workspace_data: "${base64WorkspaceData}"
                     name = target.name;
                 }
                 return this.objects[name];
+            }
+
+            getDeltaTime() {
+                return this.engine.getDeltaTime() / 1000;
             }
 
             getProperty(target, property) {
@@ -3338,6 +3393,24 @@ workspace_data: "${base64WorkspaceData}"
                 if (!mesh || !mesh.metadata || typeof mesh.metadata[key] === 'undefined') {
                     return null;
                 }
+
+            lookAt(target, targetObject) {
+                const mesh = this._getMesh(target);
+                const targetMesh = this._getMesh(targetObject);
+                if (mesh && targetMesh) {
+                    mesh.lookAt(targetMesh.getAbsolutePosition());
+                }
+            }
+
+            moveTowards(target, targetObject, speed) {
+                const mesh = this._getMesh(target);
+                const targetMesh = this._getMesh(targetObject);
+                if (mesh && targetMesh) {
+                    const direction = targetMesh.getAbsolutePosition().subtract(mesh.getAbsolutePosition()).normalize();
+                    mesh.position.addInPlace(direction.scale(speed * this.getDeltaTime()));
+                }
+            }
+
                 return mesh.metadata[key];
             }
 
@@ -3959,7 +4032,7 @@ workspace_data: "${base64WorkspaceData}"
         });
 
 
-        const workspace = Blockly.inject('blocklyDiv', {
+        window.workspace = Blockly.inject('blocklyDiv', {
             toolbox: toolbox,
             theme: Blockly.Themes.DigitalEducationSafety,
             undoStack: true,
@@ -4636,25 +4709,73 @@ workspace_data: "${base64WorkspaceData}"
                 tooltip: 'Enables physics on the specified object with the given mass',
             },
             {
-                type: 'apply_force',
-                message0: 'Apply force to %1 x: %2 y: %3 z: %4 at point x: %5 y: %6 z: %7',
+            {
+                type: "apply_force",
+                message0: "Apply force to %1 x: %2 y: %3 z: %4",
                 args0: [
-                    { type: 'field_input', name: 'NAME', text: 'object' },
-                    { type: 'input_value', name: 'FX', check: 'Number' },
-                    { type: 'input_value', name: 'FY', check: 'Number' },
-                    { type: 'input_value', name: 'FZ', check: 'Number' },
-                    { type: 'input_value', name: 'PX', check: 'Number' },
-                    { type: 'input_value', name: 'PY', check: 'Number' },
-                    { type: 'input_value', name: 'PZ', check: 'Number' },
+                    { "type": "input_value", "name": "NAME" },
+                    { "type": "input_value", "name": "FX", "check": "Number" },
+                    { "type": "input_value", "name": "FY", "check": "Number" },
+                    { "type": "input_value", "name": "FZ", "check": "Number" }
                 ],
-                "inputsInline": false,
+                message1: "at contact point x: %1 y: %2 z: %3",
+                args1: [
+                    { "type": "input_value", "name": "PX", "check": "Number" },
+                    { "type": "input_value", "name": "PY", "check": "Number" },
+                    { "type": "input_value", "name": "PZ", "check": "Number" }
+                ],
+                inputsInline: false,
                 previousStatement: null,
                 nextStatement: null,
                 colour: 120,
-                tooltip: 'Applies a force to the specified object at a given point',
+                tooltip: "Applies a force to the specified object at an optional contact point."
+            },
+                type: 'set_gravity',
+            {
+                type: "apply_impulse",
+                message0: "Apply impulse to %1 x: %2 y: %3 z: %4",
+                args0: [
+                    { "type": "input_value", "name": "NAME" },
+                    { "type": "input_value", "name": "IX", "check": "Number" },
+                    { "type": "input_value", "name": "IY", "check": "Number" },
+                    { "type": "input_value", "name": "IZ", "check": "Number" }
+                ],
+                message1: "at contact point x: %1 y: %2 z: %3",
+                args1: [
+                    { "type": "input_value", "name": "PX", "check": "Number" },
+                    { "type": "input_value", "name": "PY", "check": "Number" },
+                    { "type": "input_value", "name": "PZ", "check": "Number" }
+                ],
+                inputsInline: false,
+                previousStatement: null,
+                nextStatement: null,
+                colour: 120,
+                tooltip: "Applies an impulse (instantaneous change in momentum) to the specified object."
             },
             {
-                type: 'set_gravity',
+                type: "get_linear_velocity",
+                message0: "get linear velocity of %1",
+                args0: [
+                    { "type": "input_value", "name": "NAME" }
+                ],
+                output: "Vector",
+                colour: 120,
+                tooltip: "Gets the current linear velocity of the object."
+            },
+            {
+                type: "set_linear_velocity",
+                message0: "set linear velocity of %1 to x: %2 y: %3 z: %4",
+                args0: [
+                    { "type": "input_value", "name": "NAME" },
+                    { "type": "input_value", "name": "VX", "check": "Number" },
+                    { "type": "input_value", "name": "VY", "check": "Number" },
+                    { "type": "input_value", "name": "VZ", "check": "Number" }
+                ],
+                previousStatement: null,
+                nextStatement: null,
+                colour: 120,
+                tooltip: "Sets the current linear velocity of the object."
+            },
                 message0: 'Set scene gravity to x: %1 y: %2 z: %3',
                 args0: [
                     { type: 'input_value', name: 'GX', check: 'Number' },
@@ -4700,6 +4821,103 @@ workspace_data: "${base64WorkspaceData}"
                         variable: 'camera',
                     },
                 ],
+            {
+                type: "get_position_component",
+                message0: "get position %1 of %2",
+                args0: [
+                    {
+                        type: "field_dropdown",
+                        name: "COMPONENT",
+                        options: [["x", "x"], ["y", "y"], ["z", "z"]]
+                    },
+                    { "type": "input_value", "name": "NAME" }
+                ],
+                output: "Number",
+                colour: 230,
+                tooltip: "Gets a specific coordinate (x, y, or z) of the object's position."
+            },
+            {
+                type: "get_rotation_component",
+                message0: "get rotation %1 of %2",
+                args0: [
+                    {
+                        type: "field_dropdown",
+                        name: "COMPONENT",
+                        options: [["x", "x"], ["y", "y"], ["z", "z"]]
+                    },
+                    { "type": "input_value", "name": "NAME" }
+                ],
+                output: "Number",
+                colour: 230,
+                tooltip: "Gets a specific rotation angle (x, y, or z) of the object."
+            },
+            {
+                type: "get_distance",
+                message0: "distance between %1 and %2",
+                args0: [
+                    { "type": "input_value", "name": "A" },
+                    { "type": "input_value", "name": "B" }
+                ],
+                output: "Number",
+                colour: 230,
+                tooltip: "Calculates the distance between two objects."
+            },
+            {
+                type: "get_forward_vector",
+                message0: "get forward direction of %1",
+                args0: [
+                    { "type": "input_value", "name": "NAME" }
+                ],
+                output: "Vector",
+                colour: 230,
+                tooltip: "Gets the forward direction vector of the object."
+            },
+            {
+                type: "delta_time",
+                message0: "time since last frame",
+                output: "Number",
+                colour: 230,
+                tooltip: "The time elapsed since the last frame (in seconds)."
+            },
+            {
+                type: "get_self",
+                message0: "myself",
+                output: "Mesh",
+                colour: 230,
+                tooltip: "The object this code is running for."
+            },
+            {
+                type: "get_collided_object",
+                message0: "collided object",
+                output: "Mesh",
+                colour: 230,
+            {
+                type: "look_at_object",
+                message0: "make %1 look at %2",
+                args0: [
+                    { "type": "input_value", "name": "NAME" },
+                    { "type": "input_value", "name": "TARGET" }
+                ],
+                previousStatement: null,
+                nextStatement: null,
+                colour: 230,
+                tooltip: "Makes one object face another."
+            },
+            {
+                type: "move_towards_object",
+                message0: "make %1 move towards %2 with speed %3",
+                args0: [
+                    { "type": "input_value", "name": "NAME" },
+                    { "type": "input_value", "name": "TARGET" },
+                    { "type": "input_value", "name": "SPEED", "check": "Number" }
+                ],
+                previousStatement: null,
+                nextStatement: null,
+                colour: 230,
+                tooltip: "Moves one object towards another at a constant speed."
+            },
+                tooltip: "The object that was collided with (only valid inside on_collision)."
+            },
                 "inputsInline": true,
                 previousStatement: null,
                 nextStatement: null,
@@ -5953,15 +6171,96 @@ if (${name}) {
                 return `sceneManager.enablePhysics(${name}, ${mass}, '${impostorType}');\n`;
             };
 
-            javascript.javascriptGenerator.forBlock['apply_force'] = function (block, generator) {
-                // This is a more advanced physics function. A helper could be added if needed frequently.
-                const name = block.getFieldValue('NAME');
-                const fx = generator.valueToCode(block, 'FX', generator.ORDER_ATOMIC) || 0;
-                const fy = generator.valueToCode(block, 'FY', generator.ORDER_ATOMIC) || 0;
-                const fz = generator.valueToCode(block, 'FZ', generator.ORDER_ATOMIC) || 0;
-                return `// Apply force requires direct physics access, consider a high-level alternative.\n`;
+            javascript.javascriptGenerator.forBlock["apply_force"] = function (block, generator) {
+                const target = generator.valueToCode(block, "NAME", generator.ORDER_ATOMIC) || "null";
+                const fx = generator.valueToCode(block, "FX", generator.ORDER_ATOMIC) || 0;
+                const fy = generator.valueToCode(block, "FY", generator.ORDER_ATOMIC) || 0;
+                const fz = generator.valueToCode(block, "FZ", generator.ORDER_ATOMIC) || 0;
+                const px = generator.valueToCode(block, "PX", generator.ORDER_ATOMIC) || "null";
+                const py = generator.valueToCode(block, "PY", generator.ORDER_ATOMIC) || "null";
+                const pz = generator.valueToCode(block, "PZ", generator.ORDER_ATOMIC) || "null";
+                const contactPoint = (px === "null" || py === "null" || pz === "null") ? "null" : `{x: ${px}, y: ${py}, z: ${pz}}`;
+                return `sceneManager.applyForce(${target}, {x: ${fx}, y: ${fy}, z: ${fz}}, ${contactPoint});\n`;
             };
 
+            javascript.javascriptGenerator.forBlock["apply_impulse"] = function (block, generator) {
+                const target = generator.valueToCode(block, "NAME", generator.ORDER_ATOMIC) || "null";
+                const ix = generator.valueToCode(block, "IX", generator.ORDER_ATOMIC) || 0;
+                const iy = generator.valueToCode(block, "IY", generator.ORDER_ATOMIC) || 0;
+                const iz = generator.valueToCode(block, "IZ", generator.ORDER_ATOMIC) || 0;
+                const px = generator.valueToCode(block, "PX", generator.ORDER_ATOMIC) || "null";
+                const py = generator.valueToCode(block, "PY", generator.ORDER_ATOMIC) || "null";
+                const pz = generator.valueToCode(block, "PZ", generator.ORDER_ATOMIC) || "null";
+                const contactPoint = (px === "null" || py === "null" || pz === "null") ? "null" : `{x: ${px}, y: ${py}, z: ${pz}}`;
+                return `sceneManager.applyImpulse(${target}, {x: ${ix}, y: ${iy}, z: ${iz}}, ${contactPoint});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock["get_linear_velocity"] = function (block, generator) {
+                const target = generator.valueToCode(block, "NAME", generator.ORDER_ATOMIC) || "null";
+                const code = `sceneManager.getLinearVelocity(${target})`;
+                return [code, generator.ORDER_ATOMIC];
+            };
+
+            javascript.javascriptGenerator.forBlock["set_linear_velocity"] = function (block, generator) {
+                const target = generator.valueToCode(block, "NAME", generator.ORDER_ATOMIC) || "null";
+                const vx = generator.valueToCode(block, "VX", generator.ORDER_ATOMIC) || 0;
+                const vy = generator.valueToCode(block, "VY", generator.ORDER_ATOMIC) || 0;
+                const vz = generator.valueToCode(block, "VZ", generator.ORDER_ATOMIC) || 0;
+                return `sceneManager.setLinearVelocity(${target}, {x: ${vx}, y: ${vy}, z: ${vz}});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock["get_position_component"] = function (block, generator) {
+                const component = block.getFieldValue("COMPONENT");
+                const target = generator.valueToCode(block, "NAME", generator.ORDER_ATOMIC) || "null";
+                const code = `sceneManager.getProperty(${target}, "position.${component}")`;
+                return [code, generator.ORDER_ATOMIC];
+            };
+
+            javascript.javascriptGenerator.forBlock["get_rotation_component"] = function (block, generator) {
+                const component = block.getFieldValue("COMPONENT");
+                const target = generator.valueToCode(block, "NAME", generator.ORDER_ATOMIC) || "null";
+                const code = `sceneManager.getProperty(${target}, "rotation.${component}")`;
+                return [code, generator.ORDER_ATOMIC];
+            };
+
+            javascript.javascriptGenerator.forBlock["get_distance"] = function (block, generator) {
+                const target1 = generator.valueToCode(block, "A", generator.ORDER_ATOMIC) || "null";
+                const target2 = generator.valueToCode(block, "B", generator.ORDER_ATOMIC) || "null";
+                const code = `sceneManager.getDistance(${target1}, ${target2})`;
+                return [code, generator.ORDER_ATOMIC];
+            };
+
+            javascript.javascriptGenerator.forBlock["get_forward_vector"] = function (block, generator) {
+                const target = generator.valueToCode(block, "NAME", generator.ORDER_ATOMIC) || "null";
+                const code = `sceneManager.getForwardVector(${target})`;
+                return [code, generator.ORDER_ATOMIC];
+            };
+
+            javascript.javascriptGenerator.forBlock["delta_time"] = function (block, generator) {
+                const code = `sceneManager.getDeltaTime()`;
+                return [code, generator.ORDER_ATOMIC];
+            };
+
+            javascript.javascriptGenerator.forBlock["get_self"] = function (block, generator) {
+                return ["thisMesh", generator.ORDER_ATOMIC];
+            };
+
+            javascript.javascriptGenerator.forBlock["get_collided_object"] = function (block, generator) {
+                return ["collidedMesh", generator.ORDER_ATOMIC];
+            };
+
+            javascript.javascriptGenerator.forBlock["look_at_object"] = function (block, generator) {
+                const target = generator.valueToCode(block, "NAME", generator.ORDER_ATOMIC) || "null";
+                const targetObject = generator.valueToCode(block, "TARGET", generator.ORDER_ATOMIC) || "null";
+                return `sceneManager.lookAt(${target}, ${targetObject});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock["move_towards_object"] = function (block, generator) {
+                const target = generator.valueToCode(block, "NAME", generator.ORDER_ATOMIC) || "null";
+                const targetObject = generator.valueToCode(block, "TARGET", generator.ORDER_ATOMIC) || "null";
+                const speed = generator.valueToCode(block, "SPEED", generator.ORDER_ATOMIC) || 0;
+                return `sceneManager.moveTowards(${target}, ${targetObject}, ${speed});\n`;
+            };
             javascript.javascriptGenerator.forBlock['set_gravity'] = function (block, generator) {
                 const gx = generator.valueToCode(block, 'GX', generator.ORDER_ATOMIC) || 0;
                 const gy = generator.valueToCode(block, 'GY', generator.ORDER_ATOMIC) || -9.81;
