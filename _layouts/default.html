@@ -4044,12 +4044,6 @@ workspace_data: "${base64WorkspaceData}"
             }
         });
 
-        document.getElementById('flyout-close-button').addEventListener('click', () => {
-            const toolbox = workspace.getToolbox();
-            if (toolbox) {
-                toolbox.clearSelection();
-            }
-        });
 
         function getModelAssets() {
             const modelOptions = assetManager.assets
@@ -6789,6 +6783,16 @@ function ${generator.FUNCTION_NAME_PLACEHOLDER_}(c1, c2, ratio) {
                     workspaceTab.classList.remove('active');
                     // We need to resize the canvas when it becomes visible, especially after being hidden
                     setTimeout(resizeCanvas, 0);
+                });
+            }
+
+            const flyoutCloseButton = document.getElementById('flyout-close-button');
+            if (flyoutCloseButton) {
+                flyoutCloseButton.addEventListener('click', () => {
+                    const toolbox = workspace.getToolbox();
+                    if (toolbox) {
+                        toolbox.clearSelection();
+                    }
                 });
             }
         });
