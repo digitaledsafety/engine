@@ -1,7 +1,7 @@
 const { test, expect } = require('@playwright/test');
 
 test('Dump Flyout DOM', async ({ page }) => {
-  await page.goto('http://localhost:4000/engine/');
+  await page.goto('/');
 
   const startButton = page.locator('#start-button');
   if (await startButton.isVisible()) {
