@@ -432,17 +432,14 @@
 
         /* Fullscreen Flyout Styles */
         #blocklyDiv.flyout-fullscreen .blocklyFlyout {
-            position: fixed !important;
-            top: 0 !important;
-            left: 0 !important;
-            width: 100vw !important;
-            height: 100vh !important;
+            width: 100% !important;
+            height: 100% !important;
             transform: none !important;
             z-index: 2000 !important;
         }
 
         #blocklyDiv.flyout-fullscreen .blocklyFlyoutBackground {
-            fill: #ffffff !important;
+            fill: rgba(255, 255, 255, 0.9) !important;
             fill-opacity: 1 !important;
             width: 100% !important;
             height: 100% !important;
@@ -3991,57 +3988,6 @@ workspace_data: "${base64WorkspaceData}"
             trashcan: true
         });
         window.workspace = workspace;
-
-        // --- Grid Layout for Flyout ---
-        if (Blockly.HorizontalFlyout) {
-            const originalReflow = Blockly.HorizontalFlyout.prototype.reflow;
-            Blockly.HorizontalFlyout.prototype.reflow = function() {
-                if (!document.getElementById("blocklyDiv").classList.contains("flyout-fullscreen")) {
-                    return originalReflow.call(this);
-                }
-
-                const flyoutWidth = window.innerWidth;
-                const margin = 40;
-                const gap = 30;
-                let cursorX = margin;
-                let cursorY = margin;
-                let maxRowHeight = 0;
-
-                const blocks = this.workspace_.getTopBlocks(false).filter(b => b.isEnabled());
-                for (let i = 0; i < blocks.length; i++) {
-                    const block = blocks[i];
-                    const blockHW = block.getHeightWidth();
-
-                    if (cursorX + blockHW.width > flyoutWidth - margin && cursorX > margin) {
-                        cursorX = margin;
-                        cursorY += maxRowHeight + gap;
-                        maxRowHeight = 0;
-                    }
-
-                    const currentPos = block.getRelativeToSurfaceXY();
-                    block.moveBy(cursorX - currentPos.x, cursorY - currentPos.y);
-
-                    maxRowHeight = Math.max(maxRowHeight, blockHW.height);
-                    cursorX += blockHW.width + gap;
-                }
-
-                const totalHeight = Math.max(window.innerHeight, cursorY + maxRowHeight + margin);
-                this.width_ = flyoutWidth;
-                this.height_ = totalHeight;
-
-                if (this.backgroundVisual_) {
-                    this.backgroundVisual_.setAttribute("width", this.width_);
-                    this.backgroundVisual_.setAttribute("height", this.height_);
-                }
-
-                if (this.workspace_) {
-                    if (this.scrollbar_) this.scrollbar_.setHandleLength(window.innerHeight, totalHeight);
-                if (this.scrollbar_ && this.scrollbar_.set) {
-                    this.scrollbar_.set(this.workspace_.scrollY);
-                }
-                }
-            };
-        }
 
         // --- Fullscreen Flyout Logic ---
         workspace.addChangeListener((event) => {
