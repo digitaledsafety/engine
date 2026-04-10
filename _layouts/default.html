@@ -430,19 +430,53 @@
             text-transform: uppercase;
         }
 
+
+
+
+
+
+
+
+
         /* Fullscreen Flyout Styles */
         #blocklyDiv.flyout-fullscreen .blocklyFlyout {
-            width: 100% !important;
-            height: 100% !important;
-            transform: none !important;
+            display: block !important;
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+
+            height: 100vh !important;
+            z-index: 2000 !important;
+        }
+
+        /* Target the SVG specifically within the flyout container */
+        #blocklyDiv.flyout-fullscreen .blocklyFlyout > svg {
+            display: block !important;
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+
+            height: 100vh !important;
             z-index: 2000 !important;
         }
 
         #blocklyDiv.flyout-fullscreen .blocklyFlyoutBackground {
-            fill: rgba(255, 255, 255, 0.9) !important;
+            width: 100vw !important;
+            height: 2000px !important;
+            fill: #ffffff !important;
             fill-opacity: 1 !important;
-            width: 100% !important;
-            height: 100% !important;
+
+
+
+             /* Large height to ensure coverage when scrolling */
+        }
+
+        #blocklyDiv.flyout-fullscreen .blocklyWorkspace {
+            z-index: 1000;
+        }
+
+        #blocklyDiv.flyout-fullscreen .blocklyFlyout .blocklyScrollbarHorizontal {
+            display: none !important;
         }
 
         #flyout-close-button {
@@ -2323,30 +2357,6 @@ workspace_data: "${base64WorkspaceData}"
                 }
             }
 
-            setPopupText(target, text) {
-                let popup = null;
-                if (typeof target === 'string') {
-                    popup = this.uiManager.getControlByName(target);
-                } else if (target && target.name) {
-                    popup = target;
-                }
-
-                if (popup && popup.children && popup.children.length > 0) {
-                    const panel = popup.children[0];
-                    let textControl = panel.getChildByName(`${popup.name}_text`);
-                    if (textControl) {
-                        textControl.text = text;
-                    } else {
-                        const textBlock = new BABYLON.GUI.TextBlock(`${popup.name}_text`, text);
-                        textBlock.resizeToFit = true;
-                        textBlock.color = "white";
-                        textBlock.fontSize = 24;
-                        textBlock.paddingBottom = "20px";
-                        panel.addControl(textBlock);
-                    }
-                }
-            }
-
             async initAudioEngine() {
                 if (this.audioEngine && this.sounds.length > 0) {
                     this.sounds.forEach(sound => {
@@ -3123,20 +3133,8 @@ workspace_data: "${base64WorkspaceData}"
                 }
             }
 
-            destroyObject(target) {
-                const mesh = this._getMesh(target);
-                if (mesh) {
-                    mesh.dispose();
-                    let name;
-                    if (typeof target === 'string') {
-                        name = target;
-                    } else if (target && typeof target === 'object' && target.name) {
-                        name = target.name;
-                    }
-                    if (name && this.objects[name]) {
-                        delete this.objects[name];
-                    }
-                }
+            destroyObject(name) {
+                name.dispose();
             }
 
             onButtonPress(button, callback) {
@@ -3757,6 +3755,21 @@ workspace_data: "${base64WorkspaceData}"
                 return "";
             }
 
+            setPopupText(name, text) {
+                if (this.popups[name]) {
+                    let textControl = this.popups[name].elements['text'];
+                    if (textControl) {
+                        textControl.text = text;
+                    } else {
+                        // If no text block exists, create one
+                        const textBlock = new BABYLON.GUI.TextBlock(`${name}_text`, text);
+                        textBlock.color = "white";
+                        textBlock.fontSize = 24;
+                        this.popups[name].container.addControl(textBlock);
+                        this.popups[name].elements['text'] = textBlock;
+                    }
+                }
+            }            
 
             createButton(name, text, options = {}) {
                 const button = BABYLON.GUI.Button.CreateSimpleButton(name, text);
@@ -3863,16 +3876,6 @@ workspace_data: "${base64WorkspaceData}"
                 titleBlock.fontSize = 32;
                 titleBlock.paddingBottom = "20px";
                 panel.addControl(titleBlock);
-
-                // Add Text if provided
-                if (options.text) {
-                    const textBlock = new BABYLON.GUI.TextBlock(`${name}_text`, options.text);
-                    textBlock.resizeToFit = true;
-                    textBlock.color = "white";
-                    textBlock.fontSize = 24;
-                    textBlock.paddingBottom = "20px";
-                    panel.addControl(textBlock);
-                }
 
                 // Add Button 1 if text is provided
                 if (options.button1_text) {
@@ -3999,6 +4002,107 @@ workspace_data: "${base64WorkspaceData}"
         });
 
 
+
+
+
+
+
+
+
+        // --- Grid Layout for Flyout Overrides ---
+        function initFlyoutOverrides(workspace) {
+            const flyout = workspace.getFlyout();
+            if (!flyout) return;
+
+            // Override on prototype for consistency
+            const proto = Object.getPrototypeOf(flyout);
+
+            const originalReflow = proto.reflow;
+            proto.reflow = function() {
+                if (!document.getElementById("blocklyDiv").classList.contains("flyout-fullscreen")) {
+                    return originalReflow.call(this);
+                }
+
+                const flyoutWidth = window.innerWidth;
+                const margin = 50;
+                const gap = 40;
+                let cursorX = margin;
+                let cursorY = margin;
+                let maxRowHeight = 0;
+
+                const blocks = this.workspace_.getTopBlocks(false);
+                for (let i = 0; i < blocks.length; i++) {
+                    const block = blocks[i];
+                    if (!block.isEnabled()) continue;
+
+                    const blockHW = block.getHeightWidth();
+
+                    if (cursorX + blockHW.width > flyoutWidth - margin && cursorX > margin) {
+                        cursorX = margin;
+                        cursorY += maxRowHeight + gap;
+                        maxRowHeight = 0;
+                    }
+
+                    const currentPos = block.getRelativeToSurfaceXY();
+                    block.moveBy(cursorX - currentPos.x, cursorY - currentPos.y);
+
+                    maxRowHeight = Math.max(maxRowHeight, blockHW.height);
+                    cursorX += blockHW.width + gap;
+                }
+
+                this.width_ = flyoutWidth;
+                this.height_ = Math.max(window.innerHeight, cursorY + maxRowHeight + margin);
+
+                if (this.backgroundVisual_) {
+                    this.backgroundVisual_.setAttribute("width", this.width_);
+                    this.backgroundVisual_.setAttribute("height", this.height_);
+                }
+
+                const svg = this.workspace_.getParentSvg();
+                if (svg) {
+                    svg.setAttribute('width', this.width_);
+                    svg.setAttribute('height', this.height_);
+                }
+            };
+
+            const originalPosition = proto.position;
+            proto.position = function() {
+                if (!document.getElementById("blocklyDiv").classList.contains("flyout-fullscreen")) {
+                    return originalPosition.call(this);
+                }
+                if (this.svgGroup_) {
+                    this.svgGroup_.setAttribute('transform', 'translate(0, 0)');
+                }
+                const svg = this.workspace_.getParentSvg();
+                if (svg) {
+                    svg.setAttribute('x', '0');
+                    svg.setAttribute('y', '0');
+                }
+            };
+
+            // Custom wheel scroll handler
+            let flyoutScrollY = 0;
+            const flyoutWorkspace = flyout.getWorkspace();
+            const flyoutSvg = flyoutWorkspace.getParentSvg();
+            if (flyoutSvg) {
+                flyoutSvg.addEventListener('wheel', (e) => {
+                    if (!document.getElementById("blocklyDiv").classList.contains("flyout-fullscreen")) return;
+
+                    const totalHeight = flyout.height_ || 0;
+                    const visibleHeight = window.innerHeight;
+
+                    if (totalHeight <= visibleHeight) return;
+
+                    flyoutScrollY -= e.deltaY;
+                    flyoutScrollY = Math.min(0, Math.max(visibleHeight - totalHeight, flyoutScrollY));
+
+                    flyoutWorkspace.translate(0, flyoutScrollY);
+                    e.preventDefault();
+                    e.stopPropagation();
+                }, { passive: false, capture: true });
+            }
+        }
+
         const workspace = Blockly.inject('blocklyDiv', {
             toolbox: toolbox,
             theme: Blockly.Themes.DigitalEducationSafety,
@@ -4019,6 +4123,15 @@ workspace_data: "${base64WorkspaceData}"
             trashcan: true
         });
         window.workspace = workspace;
+        initFlyoutOverrides(workspace);
+
+
+
+
+
+
+
+
 
         // --- Fullscreen Flyout Logic ---
         workspace.addChangeListener((event) => {
@@ -4027,22 +4140,28 @@ workspace_data: "${base64WorkspaceData}"
                 const closeButton = document.getElementById('flyout-close-button');
 
                 if (event.newItem) {
-                    // Category selected
                     blocklyDiv.classList.add('flyout-fullscreen');
                     closeButton.style.display = 'flex';
 
-                    // Force flyout to fill available space
                     const flyout = workspace.getFlyout();
                     if (flyout) {
-                        flyout.reflow();
+                        // Re-run reflow and position to ensure grid layout
+                        setTimeout(() => {
+                            flyout.reflow();
+                            flyout.position();
+                        }, 50);
                     }
                 } else {
-                    // Selection cleared
                     blocklyDiv.classList.remove('flyout-fullscreen');
                     closeButton.style.display = 'none';
+                    const flyout = workspace.getFlyout();
+                    if (flyout) {
+                        flyout.hide();
+                    }
                 }
             }
         });
+
 
 
         function getModelAssets() {
@@ -5456,9 +5575,8 @@ workspace_data: "${base64WorkspaceData}"
                 "args0": [
                     { "type": "input_value", "name": "TITLE", "check": "String" }
                 ],
-                "message1": "text %1 image URL %2",
+                "message1": "image URL %1",
                 "args1": [
-                    { "type": "input_value", "name": "TEXT", "check": "String" },
                     { "type": "input_value", "name": "IMAGE", "check": "String" }
                 ],
                 "message2": "button 1 name %1 text %2",
@@ -5473,7 +5591,7 @@ workspace_data: "${base64WorkspaceData}"
                 ],
                 "output": "Rectangle",
                 "colour": "#5B80A5",
-                "tooltip": "Creates a popup with a title, an optional image, text, and up to two buttons.",
+                "tooltip": "Creates a popup with a title, an optional image, and up to two buttons.",
                 "helpUrl": ""
             },
             {
@@ -5558,7 +5676,6 @@ workspace_data: "${base64WorkspaceData}"
         {
             javascript.javascriptGenerator.forBlock['create_popup'] = function (block, generator) {
                 const title = generator.valueToCode(block, 'TITLE', generator.ORDER_ATOMIC) || "''";
-                const text = generator.valueToCode(block, 'TEXT', generator.ORDER_ATOMIC) || "''";
                 const image = generator.valueToCode(block, 'IMAGE', generator.ORDER_ATOMIC) || "null";
                 const button1Name = generator.valueToCode(block, 'BUTTON1_NAME', generator.ORDER_ATOMIC) || "''";
                 const button1Text = generator.valueToCode(block, 'BUTTON1_TEXT', generator.ORDER_ATOMIC) || "''";
@@ -5573,7 +5690,6 @@ workspace_data: "${base64WorkspaceData}"
                 }
 
                 const options = `{
-                    text: ${text},
                     image: ${image},
                     button1_name: ${button1Name} || \`\${'${variableName}'}_button1\`,
                     button1_text: ${button1Text},
