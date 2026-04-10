@@ -429,46 +429,6 @@
             pointer-events: none;
             text-transform: uppercase;
         }
-
-        /* Fullscreen Flyout Styles */
-        #blocklyDiv.flyout-fullscreen .blocklyFlyout {
-            width: 100% !important;
-            height: 100% !important;
-            transform: none !important;
-            z-index: 2000 !important;
-        }
-
-        #blocklyDiv.flyout-fullscreen .blocklyFlyoutBackground {
-            fill: rgba(255, 255, 255, 0.9) !important;
-            fill-opacity: 1 !important;
-            width: 100% !important;
-            height: 100% !important;
-        }
-
-        #flyout-close-button {
-            display: none;
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 4000;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            background: rgba(0, 0, 0, 0.5);
-            color: white;
-            border: 2px solid white;
-            font-size: 24px;
-            font-weight: bold;
-            cursor: pointer;
-            justify-content: center;
-            align-items: center;
-            padding: 0;
-            line-height: 1;
-        }
-
-        #flyout-close-button:hover {
-            background: rgba(0, 0, 0, 0.7);
-        }
     </style>
     <script>
         if ('serviceWorker' in navigator) {
@@ -4020,31 +3980,6 @@ workspace_data: "${base64WorkspaceData}"
         });
         window.workspace = workspace;
 
-        // --- Fullscreen Flyout Logic ---
-        workspace.addChangeListener((event) => {
-            if (event.type === Blockly.Events.TOOLBOX_ITEM_SELECT) {
-                const blocklyDiv = document.getElementById('blocklyDiv');
-                const closeButton = document.getElementById('flyout-close-button');
-
-                if (event.newItem) {
-                    // Category selected
-                    blocklyDiv.classList.add('flyout-fullscreen');
-                    closeButton.style.display = 'flex';
-
-                    // Force flyout to fill available space
-                    const flyout = workspace.getFlyout();
-                    if (flyout) {
-                        flyout.reflow();
-                    }
-                } else {
-                    // Selection cleared
-                    blocklyDiv.classList.remove('flyout-fullscreen');
-                    closeButton.style.display = 'none';
-                }
-            }
-        });
-
-
         function getModelAssets() {
             const modelOptions = assetManager.assets
                 .filter(asset => asset.type.startsWith('model/') || asset.name.endsWith('.glb') || asset.name.endsWith('.gltf'))
@@ -6393,7 +6328,7 @@ if (${name}) {
             doRun();
         }
 
-        async function doRun(code) {
+        window.doRun = async function (code) {
             let codeToRun = code || generateCode();
 
             if (sceneManager) {
@@ -6785,21 +6720,10 @@ function ${generator.FUNCTION_NAME_PLACEHOLDER_}(c1, c2, ratio) {
                     setTimeout(resizeCanvas, 0);
                 });
             }
-
-            const flyoutCloseButton = document.getElementById('flyout-close-button');
-            if (flyoutCloseButton) {
-                flyoutCloseButton.addEventListener('click', () => {
-                    const toolbox = workspace.getToolbox();
-                    if (toolbox) {
-                        toolbox.clearSelection();
-                    }
-                });
-            }
         });
 
 
     </script>
-    <button id="flyout-close-button" title="Close Selection">×</button>
 </body>
 
 </html>
