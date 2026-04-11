@@ -12,10 +12,10 @@ test('verify all changes', async ({ page }) => {
   });
   expect(flyoutScale).toBe(1.0);
 
-  // 2. Verify Search Button and Toggle
-  const searchButton = page.locator('#searchBlocksButton');
-  await expect(searchButton).toBeVisible();
-  await searchButton.click();
+  // 2. Verify Add Blocks Button and Search Toggle
+  const addBlocksButton = page.locator('#toggleToolboxButton');
+  await expect(addBlocksButton).toBeVisible();
+  await addBlocksButton.click();
   await expect(page.locator('#search-container')).toHaveClass(/show/);
 
   // 3. Verify Search Functionality
