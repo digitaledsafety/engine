@@ -510,8 +510,7 @@
             <button id="preview-tab" class="nav-tab" title="Preview">✨</button>            
         </div>
         <div class="nav-section-right">
-            <button id="searchBlocksButton" class="btn btn-icon" title="Search Blocks">🔍</button>
-            <button id="toggleToolboxButton" class="btn btn-icon" title="Toggle Toolbox">➕</button>
+            <button id="toggleToolboxButton" class="btn btn-icon" title="Add Blocks">➕</button>
             <button id="runButton" class="btn btn-run btn-icon" title="Run">▶</button>
             <div class="dropdown-menu-container">
                 <button id="menuButton" class="btn btn-icon btn-menu-toggle" title="More actions">⚙️</button>
@@ -6694,21 +6693,24 @@ function ${generator.FUNCTION_NAME_PLACEHOLDER_}(c1, c2, ratio) {
         document.getElementById('screenshotButton').addEventListener('click', () => {
             sceneManager.takeScreenshot();
         });
-        document.getElementById('toggleToolboxButton').addEventListener('click', () => {
-            const blocklyDiv = document.getElementById('blocklyDiv');
-            blocklyDiv.classList.toggle('toolbox-collapsed');
-            Blockly.svgResize(workspace);
-        });
-
-        const searchBlocksButton = document.getElementById('searchBlocksButton');
         const searchContainer = document.getElementById('search-container');
         const searchInput = document.getElementById('search-input');
 
-        searchBlocksButton.addEventListener('click', () => {
-            searchContainer.classList.toggle('show');
-            if (searchContainer.classList.contains('show')) {
+        document.getElementById('toggleToolboxButton').addEventListener('click', () => {
+            const blocklyDiv = document.getElementById('blocklyDiv');
+            const isToolboxVisible = !blocklyDiv.classList.contains('toolbox-collapsed');
+            const isSearchVisible = searchContainer.classList.contains('show');
+
+            if (!isToolboxVisible) {
+                blocklyDiv.classList.remove('toolbox-collapsed');
+                searchContainer.classList.add('show');
+                searchInput.focus();
+            } else if (!isSearchVisible) {
+                searchContainer.classList.add('show');
                 searchInput.focus();
             } else {
+                blocklyDiv.classList.add('toolbox-collapsed');
+                searchContainer.classList.remove('show');
                 searchInput.value = '';
                 filterToolbox('');
             }
