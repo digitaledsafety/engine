@@ -75,7 +75,7 @@ test.describe('Engine Popup with Variables', () => {
         setButtonTextBlock.nextConnection.connect(setImageBlock.previousConnection);
 
         // Execute
-        const code = Blockly.JavaScript.workspaceToCode(workspace);
+        const code = javascript.javascriptGenerator.workspaceToCode(workspace);
         await window.doRun(code);
 
         // Verify state
@@ -111,7 +111,7 @@ test.describe('Engine Popup with Variables', () => {
         getVarBlockHide.setFieldValue(myPopupVar.getId(), 'VAR');
         hidePopupBlock.getInput('NAME').connection.connect(getVarBlockHide.outputConnection);
 
-        const code = Blockly.JavaScript.workspaceToCode(workspace);
+        const code = javascript.javascriptGenerator.workspaceToCode(workspace);
         await window.doRun(code);
 
         return !window.sceneManager.uiManager.getControlByName('myPopup').isVisible;

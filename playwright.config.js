@@ -21,6 +21,6 @@ module.exports = defineConfig({
     command: 'bundle exec jekyll serve',
     url: 'http://127.0.0.1:4000',
     reuseExistingServer: !process.env.CI,
-    timeout: 120 * 1000,
+    timeout: 120000,
   },
 });
