@@ -1352,6 +1352,14 @@ workspace_data: "${base64WorkspaceData}"
                             "type": "get_metadata"
                         },                                               
                         {
+                            kind: "block",
+                            type: "animate_keyframes",
+                        },
+                        {
+                            kind: "block",
+                            type: "create_keyframe",
+                        },
+                        {
                             kind: 'block',
                             type: 'animate_object',
                         },
@@ -3406,6 +3414,68 @@ workspace_data: "${base64WorkspaceData}"
                 const endFrame = loopMode === 'PINGPONG' ? totalFrames * 2 : totalFrames;
                 this.scene.beginDirectAnimation(mesh, [animation], 0, endFrame, loop);
             }
+            animateKeyframes(target, property, keyframes, loop, loopMode) {
+                const mesh = this._getMesh(target);
+                if (!mesh) return;
+
+                const frameRate = 30;
+
+                // Determine the data type of the property
+                let propertyType;
+                const propertyPath = property.split(".");
+                let temp = mesh;
+                for (let i = 0; i < propertyPath.length; i++) {
+                    if (temp[propertyPath[i]] === undefined) {
+                        console.error("Invalid property path");
+                        return;
+                    }
+                    temp = temp[propertyPath[i]];
+                }
+
+                if (typeof temp === "number") {
+                    propertyType = BABYLON.Animation.ANIMATIONTYPE_FLOAT;
+                } else if (temp instanceof BABYLON.Vector3) {
+                    propertyType = BABYLON.Animation.ANIMATIONTYPE_VECTOR3;
+                } else if (temp instanceof BABYLON.Color3) {
+                    propertyType = BABYLON.Animation.ANIMATIONTYPE_COLOR3;
+                } else {
+                    console.error("Unsupported animation property type");
+                    return;
+                }
+
+                const bjsLoopMode = BABYLON.Animation.ANIMATIONLOOPMODE_CYCLE;
+
+                const animation = new BABYLON.Animation(
+                    "keyframeAnimation",
+                    property,
+                    frameRate,
+                    propertyType,
+                    bjsLoopMode
+                );
+
+                // Sort keyframes by frame number
+                keyframes.sort((a, b) => a.frame - b.frame);
+
+                const finalKeyframes = [...keyframes];
+                let endFrame = keyframes[keyframes.length - 1].frame;
+
+                if (loopMode === "PINGPONG") {
+                    for (let i = keyframes.length - 2; i >= 0; i--) {
+                        const original = keyframes[i];
+                        const durationFromNext = keyframes[i + 1].frame - original.frame;
+                        endFrame += durationFromNext;
+                        finalKeyframes.push({ frame: endFrame, value: original.value });
+                    }
+                }
+
+                animation.setKeys(finalKeyframes);
+
+                // Stop any previous animations on the same property before starting a new one
+                this.scene.stopAnimation(mesh, property);
+
+                this.scene.beginDirectAnimation(mesh, [animation], 0, endFrame, loop);
+            }
+
 
             async importAnimation(url) {
                 if (!isValidAssetURL(url)) {
@@ -4427,6 +4497,54 @@ workspace_data: "${base64WorkspaceData}"
                 nextStatement: null,
                 colour: 120,
                 tooltip: 'Rotates an object by the specified angles',
+            },
+            {
+                "type": "create_keyframe",
+                "message0": "keyframe at %1 value %2",
+                "args0": [
+                    { "type": "input_value", "name": "FRAME", "check": "Number" },
+                    { "type": "input_value", "name": "VALUE" }
+                ],
+                "output": "Keyframe",
+                "colour": 300,
+                "tooltip": "Defines a single keyframe with a frame number and value."
+            },
+            {
+                "type": "animate_keyframes",
+                "message0": "animate property %1 of %2",
+                "args0": [
+                    {
+                        "type": "field_dropdown",
+                        "name": "PROPERTY",
+                        "options": [
+                            ["position", "position"],
+                            ["rotation", "rotation"],
+                            ["scaling", "scaling"],
+                            ["visibility", "visibility"]
+                        ]
+                    },
+                    { "type": "input_value", "name": "OBJECT" }
+                ],
+                "message1": "with keyframes %1",
+                "args1": [
+                    { "type": "input_value", "name": "KEYFRAMES", "check": "Array" }
+                ],
+                "message2": "loop %1",
+                "args2": [
+                    {
+                        "type": "field_dropdown",
+                        "name": "LOOP",
+                        "options": [
+                            ["no", "NO"],
+                            ["yes", "YES"],
+                            ["ping-pong", "PINGPONG"]
+                        ]
+                    }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": 300,
+                "tooltip": "Animates a property using a list of keyframes."
             },
             {
                 "type": "animate_object",
@@ -5830,6 +5948,31 @@ if (${name}) {
                 return `sceneManager.rotate(${name}, ${x}, ${y}, ${z});\n`;
             };
 
+            javascript.javascriptGenerator.forBlock['create_keyframe'] = function (block, generator) {
+                const frame = generator.valueToCode(block, 'FRAME', generator.ORDER_ATOMIC) || 0;
+                const value = generator.valueToCode(block, 'VALUE', generator.ORDER_ATOMIC) || 0;
+                const code = "{ frame: " + frame + ", value: " + value + " }";
+                return [code, generator.ORDER_ATOMIC];
+            };
+
+            javascript.javascriptGenerator.forBlock['animate_keyframes'] = function (block, generator) {
+                const object = generator.valueToCode(block, 'OBJECT', generator.ORDER_ATOMIC) || 'null';
+                const property = block.getFieldValue('PROPERTY');
+                const keyframes = generator.valueToCode(block, 'KEYFRAMES', generator.ORDER_ATOMIC) || '[]';
+                const loop = block.getFieldValue('LOOP');
+
+                let loopBool = false;
+                let loopMode = 'CYCLE';
+
+                if (loop === 'YES') {
+                    loopBool = true;
+                } else if (loop === 'PINGPONG') {
+                    loopBool = true;
+                    loopMode = 'PINGPONG';
+                }
+
+                return "sceneManager.animateKeyframes(" + object + ", '" + property + "', " + keyframes + ", " + loopBool + ", '" + loopMode + "');\n";
+            };
             javascript.javascriptGenerator.forBlock['animate_object'] = function (block, generator) {
                 const object = generator.valueToCode(block, 'OBJECT', generator.ORDER_ATOMIC) || 'null';
                 const property = block.getFieldValue('PROPERTY');
@@ -6328,7 +6471,7 @@ if (${name}) {
             doRun();
         }
 
-        window.doRun = async function (code) {
+        async function doRun(code) {
             let codeToRun = code || generateCode();
 
             if (sceneManager) {
