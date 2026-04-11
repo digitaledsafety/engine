@@ -8,7 +8,7 @@ module.exports = defineConfig({
   workers: process.env.CI ? 1 : undefined,
   reporter: 'html',
   use: {
-    baseURL: 'http://127.0.0.1:4000',
+    baseURL: "http://127.0.0.1:4000/engine/",
     trace: 'on-first-retry',
   },
   projects: [
@@ -18,8 +18,8 @@ module.exports = defineConfig({
     },
   ],
   webServer: {
-    command: 'bundle exec jekyll serve',
-    url: 'http://127.0.0.1:4000',
+    command: 'bundle exec jekyll serve --host 0.0.0.0 --baseurl /engine',
+    url: 'http://127.0.0.1:4000/engine/',
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000,
   },
