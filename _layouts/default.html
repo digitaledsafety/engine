@@ -71,7 +71,7 @@
         }
 
         .blockly-workspace {
-            height: 100%;
+            flex: 1;
             background-color: #f8f8f8;
             border: 1px solid #ddd;
         }
@@ -79,6 +79,8 @@
         #code-view,
         #assets-view {
             height: 100%;
+            display: flex;
+            flex-direction: column;
         }
 
         #gameCanvas {
@@ -6849,10 +6851,10 @@ function ${generator.FUNCTION_NAME_PLACEHOLDER_}(c1, c2, ratio) {
 
             // Show the selected view and activate its button
             if (viewToShow === 'code') {
-                codeView.style.display = 'block';
+                codeView.style.display = 'flex';
                 codeViewButton.classList.add('active');
             } else if (viewToShow === 'assets') {
-                assetsView.style.display = 'block';
+                assetsView.style.display = 'flex';
                 assetsViewButton.classList.add('active');
             }
         }
