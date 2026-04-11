@@ -429,6 +429,22 @@
             pointer-events: none;
             text-transform: uppercase;
         }
+
+        .blocklyFlyout {
+            z-index: 100;
+            transition: opacity 0.2s ease-in-out;
+        }
+
+        .blocklyFlyout:not([style*="display: block"]) {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .blocklyFlyoutBackground {
+            fill: #1e1e1e !important;
+            fill-opacity: 0.8 !important;
+            pointer-events: all;
+        }
     </style>
     <script>
         if ('serviceWorker' in navigator) {
@@ -3959,6 +3975,137 @@ workspace_data: "${base64WorkspaceData}"
         });
 
 
+        class FullScreenVerticalFlyout extends Blockly.VerticalFlyout {
+            constructor(workspaceOptions) {
+                workspaceOptions.horizontalLayout = false;
+                workspaceOptions.RTL = false;
+                super(workspaceOptions);
+                this.horizontalLayout = false;
+                this.RTL = false;
+            }
+
+            init(workspace) {
+                super.init(workspace);
+                this.horizontalLayout = false;
+                this.RTL = false;
+                if (this.svgBackground_) {
+                    this.svgBackground_.addEventListener('mousedown', (e) => {
+                        this.hide();
+                        e.stopPropagation();
+                    });
+                }
+            }
+
+            position() {
+                if (!this.isVisible()) return;
+
+                const injectionDiv = this.targetWorkspace.getInjectionDiv();
+                this.width_ = injectionDiv.offsetWidth;
+                this.height_ = injectionDiv.offsetHeight;
+
+                const svg = this.svgGroup_.parentElement;
+                if (svg && svg.tagName === 'svg') {
+                    svg.setAttribute('x', '0');
+                    svg.setAttribute('y', '0');
+                    svg.setAttribute('width', this.width_);
+                    svg.setAttribute('height', this.height_);
+                    svg.style.width = this.width_;
+                    svg.style.height = this.height_;
+                    svg.style.top = '0px';
+                    svg.style.left = '0px';
+                }
+
+                this.svgGroup_.setAttribute('transform', 'translate(0,0)');
+                this.svgGroup_.setAttribute('clip-path', 'none');
+
+                if (this.svgBackground_) {
+                    this.svgBackground_.setAttribute('width', this.width_);
+                    this.svgBackground_.setAttribute('height', this.height_);
+                    this.svgBackground_.setAttribute('x', 0);
+                    this.svgBackground_.setAttribute('y', 0);
+                }
+
+                if (this.workspace_) {
+                    const self = this;
+                    this.workspace_.getMetrics = function() {
+                        return {
+                            viewWidth: self.width_,
+                            viewHeight: self.height_,
+                            absoluteLeft: 0,
+                            absoluteTop: 0,
+                            contentWidth: self.width_,
+                            contentHeight: self.contentHeight_ || self.height_,
+                            contentTop: 0,
+                            contentLeft: 0
+                        };
+                    };
+                    const canvas = this.workspace_.getCanvas();
+                    if (canvas) {
+                        canvas.setAttribute('transform', 'translate(0,0)');
+                    }
+                }
+            }
+
+            createBackground_() {
+                this.svgBackground_ = Blockly.utils.dom.createSvgElement(
+                    Blockly.utils.Svg.RECT,
+                    { 'class': 'blocklyFlyoutBackground' },
+                    this.svgGroup_
+                );
+                return this.svgBackground_;
+            }
+
+            layout_(contents, gaps) {
+                this.position();
+                let cursorY = this.GAP_Y;
+
+                const scale = this.workspace_.scale || 1;
+                const scaledWidth = this.width_ / scale;
+                const centerX = scaledWidth / 2;
+
+                for (let i = 0; i < contents.length; i++) {
+                    const item = contents[i];
+                    let element = item.block || item.button || item.label;
+                    if (!element) continue;
+
+                    if (item.type === 'block' && !element.rendered) {
+                        element.initSvg();
+                        element.render();
+                    }
+
+                    const hw = element.getHeightWidth ? element.getHeightWidth() : {width: item.width || 0, height: item.height || 0};
+                    const x = centerX - (hw.width / 2);
+
+                    if (element.moveTo) {
+                        element.moveTo(new Blockly.utils.Coordinate(x, cursorY));
+                    } else if (element.translate) {
+                        element.translate(x, cursorY);
+                    }
+
+                    cursorY += hw.height + gaps[i];
+                }
+                this.contentHeight_ = cursorY;
+            }
+
+            reflow() {
+                this.position();
+                super.reflow();
+                if (this.workspace_) {
+                    const blocks = this.workspace_.getTopBlocks(false);
+                    const scale = this.workspace_.scale || 1;
+                    const centerX = (this.width_ / scale) / 2;
+                    for (const block of blocks) {
+                        const x = centerX - (block.getHeightWidth().width / 2);
+                        block.translate(x, block.getRelativeToSurfaceXY().y);
+                    }
+                }
+            }
+        }
+
+        // Register the class for both vertical and horizontal flyouts
+        Blockly.registry.register(Blockly.registry.Type.FLYOUTS_VERTICAL_TOOLBOX, Blockly.registry.DEFAULT, FullScreenVerticalFlyout, true);
+        Blockly.registry.register(Blockly.registry.Type.FLYOUTS_HORIZONTAL_TOOLBOX, Blockly.registry.DEFAULT, FullScreenVerticalFlyout, true);
+
         const workspace = Blockly.inject('blocklyDiv', {
             toolbox: toolbox,
             theme: Blockly.Themes.DigitalEducationSafety,
@@ -3967,6 +4114,9 @@ workspace_data: "${base64WorkspaceData}"
             renderer: 'zelos',
             horizontalLayout: true,
             toolboxPosition: 'end',
+            plugins: {
+                'flyout': FullScreenVerticalFlyout
+            },
             zoom: {
                 controls: true,
                 wheel: true,
