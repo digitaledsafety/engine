@@ -320,6 +320,29 @@
             #jump-button-container {
                 display: block;
             }
+
+            /* Improve Toolbox Accessibility on Mobile */
+            .blocklyToolboxCategory {
+                height: 48px !important; /* Larger touch target */
+                display: flex;
+                align-items: center;
+            }
+
+            .blocklyToolboxCategoryLabel {
+                font-size: 16px !important;
+                padding-left: 15px !important;
+            }
+
+            /* Make flyout easier to scroll and larger */
+            .blocklyFlyoutBackground {
+                fill-opacity: 0.9 !important;
+            }
+
+            /* Ensure search input is easy to tap */
+            #search-input {
+                height: 44px;
+                font-size: 18px;
+            }
         }
 
         /* Hero Overlay Styles */
@@ -403,6 +426,26 @@
             display: none !important;
         }        
 
+        #search-container {
+            display: none;
+            padding: 10px;
+            background-color: #f1f1f1;
+            border-bottom: 1px solid #ddd;
+        }
+
+        #search-container.show {
+            display: block;
+        }
+
+        #search-input {
+            width: 100%;
+            padding: 8px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
         .beta-badge {
             background-color: #ffc107;
             color: #000;
@@ -464,6 +507,9 @@
         </div>
         <div class="controls">
             <div id="code-view">
+                <div id="search-container">
+                    <input type="text" id="search-input" placeholder="Search for blocks...">
+                </div>
                 <div id="blocklyDiv" class="blockly-workspace digital-education-safety-theme"></div>
             </div>
             <div id="assets-view" style="display: none;">
@@ -485,6 +531,7 @@
             <button id="preview-tab" class="nav-tab" title="Preview">✨</button>            
         </div>
         <div class="nav-section-right">
+            <button id="searchBlocksButton" class="btn btn-icon" title="Search Blocks">🔍</button>
             <button id="toggleToolboxButton" class="btn btn-icon" title="Toggle Toolbox">➕</button>
             <button id="runButton" class="btn btn-run btn-icon" title="Run">▶</button>
             <div class="dropdown-menu-container">
@@ -3999,7 +4046,8 @@ workspace_data: "${base64WorkspaceData}"
                 'scene_category': { 'colour': '#59C059' },      // Green for scene elements
                 'physics_category': { 'colour': '#A55B80' },    // Kept original for physics
                 'gameplay_category': { 'colour': '#FF6347' },   // Red for gameplay actions
-                'assets_category': { 'colour': '#FF8C1A' }      // Orange for assets
+                'assets_category': { 'colour': '#FF8C1A' },      // Orange for assets
+                'search_category': { 'colour': '#999999' }      // Grey for search results
             },
             'blockStyles': {
                 'logic_blocks': { 'colourPrimary': '#4C97FF', 'colourSecondary': '#6CA7FF', 'colourTertiary': '#3C87EF' },
@@ -4028,6 +4076,12 @@ workspace_data: "${base64WorkspaceData}"
             'fontStyle': { 'family': '"Helvetica Neue", "Arial", sans-serif', 'weight': '500', 'size': 11 }
         });
 
+
+        // --- Fix for Flyout Zooming ---
+        // Ensure blocks in the flyout do not zoom with the workspace
+        Blockly.Flyout.prototype.getFlyoutScale = function() {
+            return 1.0;
+        };
 
         const workspace = Blockly.inject('blocklyDiv', {
             toolbox: toolbox,
@@ -6666,6 +6720,81 @@ function ${generator.FUNCTION_NAME_PLACEHOLDER_}(c1, c2, ratio) {
             blocklyDiv.classList.toggle('toolbox-collapsed');
             Blockly.svgResize(workspace);
         });
+
+        const searchBlocksButton = document.getElementById('searchBlocksButton');
+        const searchContainer = document.getElementById('search-container');
+        const searchInput = document.getElementById('search-input');
+
+        searchBlocksButton.addEventListener('click', () => {
+            searchContainer.classList.toggle('show');
+            if (searchContainer.classList.contains('show')) {
+                searchInput.focus();
+            } else {
+                searchInput.value = '';
+                filterToolbox('');
+            }
+            Blockly.svgResize(workspace);
+        });
+
+        searchInput.addEventListener('input', (e) => {
+            filterToolbox(e.target.value);
+        });
+
+        function filterToolbox(searchTerm) {
+            searchTerm = searchTerm.toLowerCase().trim();
+            if (!searchTerm) {
+                workspace.updateToolbox(toolbox);
+                return;
+            }
+
+            const searchResults = [];
+            const findBlocks = (contents) => {
+                for (const item of contents) {
+                    if (item.kind === 'category') {
+                        findBlocks(item.contents || []);
+                    } else if (item.kind === 'block') {
+                        const type = item.type.toLowerCase();
+                        // Also try to find localized name or tooltip if possible,
+                        // but for now type is a good start.
+                        if (type.includes(searchTerm.replace(/ /g, '_'))) {
+                            searchResults.push(item);
+                        }
+                    }
+                }
+            };
+
+            findBlocks(toolbox.contents);
+
+            // Deduplicate search results
+            const uniqueResults = [];
+            const seenTypes = new Set();
+            for (const result of searchResults) {
+                if (!seenTypes.has(result.type)) {
+                    uniqueResults.push(result);
+                    seenTypes.add(result.type);
+                }
+            }
+
+            const searchToolbox = {
+                kind: 'categoryToolbox',
+                contents: [
+                    {
+                        kind: 'category',
+                        name: 'Search Results',
+                        categorystyle: 'search_category',
+                        contents: uniqueResults
+                    },
+                    ...toolbox.contents
+                ]
+            };
+
+            workspace.updateToolbox(searchToolbox);
+            // Select the Search Results category
+            const toolboxInstance = workspace.getToolbox();
+            if (toolboxInstance) {
+                toolboxInstance.selectItemByPosition(0);
+            }
+        }
 
         document.getElementById('undoButton').addEventListener('click', () => {
             workspace.undo(false);
