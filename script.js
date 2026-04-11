@@ -1,0 +1,6249 @@
+---
+---
+let sceneManager;
+function CustomLoadingScreen(/* variables needed, for example:*/ loadingUIText, loadingUIBackgroundColor, loadingUITextColor) {
+    //init the loader
+    this.loadingUIText = loadingUIText || "Loading...";
+    this.loadingUIBackgroundColor = loadingUIBackgroundColor || "black";
+    this.loadingUITextColor = loadingUITextColor || "white";
+}
+CustomLoadingScreen.prototype.displayLoadingUI = function () {
+    var loadingDiv = document.createElement("div");
+    loadingDiv.id = "customLoadingScreen";
+    const canvasContainer = document.querySelector('.canvas-container');
+    if (canvasContainer) {
+        loadingDiv.style.position = "absolute";
+        loadingDiv.style.top = "0";
+        loadingDiv.style.left = "0";
+        loadingDiv.style.width = "100%";
+        loadingDiv.style.height = "100%";
+        loadingDiv.style.backgroundColor = this.loadingUIBackgroundColor;
+        loadingDiv.style.color = this.loadingUITextColor;
+        loadingDiv.style.fontSize = "30px";
+        loadingDiv.style.display = "flex";
+        loadingDiv.style.justifyContent = "center";
+        loadingDiv.style.alignItems = "center";
+        loadingDiv.style.zIndex = "1001";
+        loadingDiv.innerHTML = this.loadingUIText;
+        canvasContainer.appendChild(loadingDiv);
+        this._loadingDiv = loadingDiv;
+    } else {
+        console.error("Canvas container not found for loading screen.");
+    }
+};
+CustomLoadingScreen.prototype.hideLoadingUI = function () {
+    if (this._loadingDiv) {
+        this._loadingDiv.parentNode.removeChild(this._loadingDiv);
+        this._loadingDiv = null;
+    }
+};
+
+// --- URL Sanitization ---
+function isValidAssetURL(url) {
+    if (typeof url !== 'string' || !url.trim().toLowerCase().startsWith('https://')) {
+        console.error('Invalid URL:', url, 'Only HTTPS URLs are allowed for assets.');
+        return false;
+    }
+    return true;
+}
+
+// --- Hero Overlay Logic ---
+document.addEventListener('DOMContentLoaded', () => {
+    const heroOverlay = document.getElementById('hero-overlay');
+    const startButton = document.getElementById('start-button');
+
+    // Make sure the elements exist before adding event listeners
+    if (heroOverlay && startButton) {
+        startButton.addEventListener('click', () => {
+            // It's possible sceneManager is not yet initialized when the DOM is ready,
+            // so we reference it via window scope inside the click handler.
+            if (window.sceneManager && window.sceneManager.audioContext && window.sceneManager.audioContext.state === 'suspended') {
+                window.sceneManager.audioContext.resume();
+            }
+
+            // Trigger fullscreen if in presentation mode
+            if (document.body.classList.contains('presentation-mode')) {
+                enterPresentationMode();
+            }
+
+            // Hide the overlay
+            heroOverlay.classList.add('hidden');
+
+            // Optional: completely remove the overlay from the DOM after the transition
+            setTimeout(() => {
+                heroOverlay.style.display = 'none';
+            }, 500); // Must match the CSS transition duration
+        });
+    }
+});
+
+class AssetManager {
+    constructor() {
+        this.db = null;
+        this.assets = [];
+        this.DB_NAME = 'AssetDB';
+        this.DB_VERSION = 1;
+        this.OBJECT_STORE_NAME = 'assets';
+        this.initPromise = null;
+    }
+
+    init() {
+        if (this.initPromise) {
+            return this.initPromise;
+        }
+
+        this.initPromise = new Promise((resolve, reject) => {
+            const request = indexedDB.open(this.DB_NAME, this.DB_VERSION);
+
+            request.onupgradeneeded = (event) => {
+                const db = event.target.result;
+                if (!db.objectStoreNames.contains(this.OBJECT_STORE_NAME)) {
+                    db.createObjectStore(this.OBJECT_STORE_NAME, { keyPath: 'name' });
+                }
+            };
+
+            request.onsuccess = (event) => {
+                this.db = event.target.result;
+                resolve();
+            };
+
+            request.onerror = (event) => {
+                console.error('IndexedDB error:', event.target.errorCode);
+                reject(event.target.errorCode);
+            };
+        });
+        return this.initPromise;
+    }
+
+    async addAsset(file) {
+        await this.init();
+        const data = file.type.startsWith('audio/') ? await file.arrayBuffer() : file;
+        const asset = {
+            name: file.name,
+            type: file.type,
+            data: data
+        };
+
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction([this.OBJECT_STORE_NAME], 'readwrite');
+            const store = transaction.objectStore(this.OBJECT_STORE_NAME);
+            const request = store.put(asset);
+
+            request.onsuccess = () => {
+                this.assets = this.assets.filter(a => a.name !== asset.name); // Remove old version if it exists
+                this.assets.push(asset);
+                resolve();
+            };
+            request.onerror = (event) => reject(event.target.error);
+        });
+    }
+
+    async addAssetFromURL(url) {
+        if (!isValidAssetURL(url)) {
+            return;
+        }
+        const proxyUrl = `https://proxy.fxio.workers.dev/corsproxy/?apiurl=${encodeURIComponent(url)}`;
+        try {
+            const response = await fetch(proxyUrl);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const blob = await response.blob();
+            const fileName = url.substring(url.lastIndexOf('/') + 1);
+
+            let mimeType = 'application/octet-stream';
+            const extension = fileName.split('.').pop().toLowerCase();
+            if (extension === 'glb' || extension === 'gltf') {
+                mimeType = `model/${extension}`;
+            } else if (['png', 'jpg', 'jpeg', 'gif'].includes(extension)) {
+                mimeType = `image/${extension}`;
+            } else if (['mp3', 'wav', 'ogg'].includes(extension)) {
+                mimeType = `audio/${extension}`;
+            }
+
+            const file = new File([blob], fileName, { type: mimeType });
+            return this.addAsset(file);
+        } catch (error) {
+            console.error('Failed to fetch asset from URL:', error);
+            throw error;
+        }
+    }
+
+    async getAsset(name) {
+        await this.init();
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction([this.OBJECT_STORE_NAME], 'readonly');
+            const store = transaction.objectStore(this.OBJECT_STORE_NAME);
+            const request = store.get(name);
+
+            request.onsuccess = (event) => resolve(event.target.result);
+            request.onerror = (event) => reject(event.target.error);
+        });
+    }
+
+    async getAllAssets() {
+        await this.init();
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction([this.OBJECT_STORE_NAME], 'readonly');
+            const store = transaction.objectStore(this.OBJECT_STORE_NAME);
+            const request = store.getAll();
+
+            request.onsuccess = (event) => resolve(event.target.result);
+            request.onerror = (event) => reject(event.target.error);
+        });
+    }
+
+    async deleteAsset(name) {
+        await this.init();
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction([this.OBJECT_STORE_NAME], 'readwrite');
+            const store = transaction.objectStore(this.OBJECT_STORE_NAME);
+            const request = store.delete(name);
+
+            request.onsuccess = () => {
+                this.assets = this.assets.filter(asset => asset.name !== name);
+                resolve();
+            };
+            request.onerror = (event) => reject(event.target.error);
+        });
+    }
+
+    async loadAssetsIntoCache() {
+        await this.init();
+        this.assets = await this.getAllAssets();
+    }
+}
+
+class ProjectManager {
+    constructor(assetManager, workspace, sceneManager) {
+        this.assetManager = assetManager;
+        this.workspace = workspace;
+        this.sceneManager = sceneManager;
+    }
+
+    async saveProject() {
+        try {
+            // 1. Get Workspace Data
+            const workspaceState = Blockly.serialization.workspaces.save(this.workspace);
+
+            // 2. Get Assets and convert to Base64
+            const assets = await this.assetManager.getAllAssets();
+            const serializableAssets = [];
+
+            for (const asset of assets) {
+                let dataB64;
+                if (asset.data instanceof Blob) { // For models, images
+                    dataB64 = await this._blobToBase64(asset.data);
+                } else if (asset.data instanceof ArrayBuffer) { // For audio
+                    dataB64 = this._arrayBufferToBase64(asset.data);
+                } else {
+                    console.warn(`Asset ${asset.name} has unknown data type, skipping serialization.`);
+                    continue;
+                }
+                serializableAssets.push({
+                    name: asset.name,
+                    type: asset.type,
+                    data: dataB64
+                });
+            }
+
+            // 3. Combine into a project object
+            const projectData = {
+                workspace: workspaceState,
+                assets: serializableAssets,
+                version: '1.0'
+            };
+
+            // 4. Create and trigger download
+            const jsonString = JSON.stringify(projectData, null, 2);
+            const blob = new Blob([jsonString], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `project-${Date.now()}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            console.log('Project saved successfully!');
+
+        } catch (error) {
+            console.error('Failed to save project:', error);
+            alert('Error saving project. See console for details.');
+        }
+    }
+
+    async publishProject() {
+        try {
+            // 1. Get Workspace Data
+            const workspaceState = Blockly.serialization.workspaces.save(this.workspace);
+
+            // 2. Get Assets and convert to Base64
+            const assets = await this.assetManager.getAllAssets();
+            const serializableAssets = [];
+
+            for (const asset of assets) {
+                let dataB64;
+                if (asset.data instanceof Blob) { // For models, images
+                    dataB64 = await this._blobToBase64(asset.data);
+                } else if (asset.data instanceof ArrayBuffer) { // For audio
+                    dataB64 = this._arrayBufferToBase64(asset.data);
+                } else {
+                    console.warn(`Asset ${asset.name} has unknown data type, skipping serialization.`);
+                    continue;
+                }
+                serializableAssets.push({
+                    name: asset.name,
+                    type: asset.type,
+                    data: dataB64
+                });
+            }
+
+            // 3. Combine into a project object
+            const projectData = {
+                workspace: workspaceState,
+                assets: serializableAssets,
+                version: '1.0'
+            };
+
+            // 4. Create Jekyll-compatible markdown file content
+            const jsonString = JSON.stringify(projectData, null, 2);
+            const base64WorkspaceData = btoa(jsonString); // web-safe base64 encoding
+            const uniqueId = `workspace-${Date.now()}`;
+            const markdownContent = `---
+layout: "default"
+title: "${uniqueId}"
+workspace_data: "${base64WorkspaceData}"
+---
+`;
+
+            // 5. Create and trigger download
+            const blob = new Blob([markdownContent], { type: 'text/markdown' });
+            const url = URL.createObjectURL(blob);
+
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${uniqueId}.md`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            console.log('Project published successfully!');
+            alert(`Project published as ${uniqueId}.md. Please add this file to the _workspaces directory in your project repository.`);
+
+        } catch (error) {
+            console.error('Failed to publish project:', error);
+            alert('Error publishing project. See console for details.');
+        }
+    }
+
+    // --- Helper methods for serialization ---
+
+    _arrayBufferToBase64(buffer) {
+        let binary = '';
+        const bytes = new Uint8Array(buffer);
+        const len = bytes.byteLength;
+        for (let i = 0; i < len; i++) {
+            binary += String.fromCharCode(bytes[i]);
+        }
+        return window.btoa(binary);
+    }
+
+    _blobToBase64(blob) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result.split(',')[1]); // Remove the data URI prefix
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+        });
+    }
+
+    async loadProjectData(projectData) {
+        if (!projectData.workspace || !projectData.assets) {
+            throw new Error('Invalid project data format.');
+        }
+
+        // 1. Clear current scene and assets
+        this.sceneManager.clear();
+        await this._clearAllAssets();
+        this.workspace.clear();
+
+        // 2. Load Assets
+        for (const asset of projectData.assets) {
+            const data = this._base64ToBlob(asset.data, asset.type);
+            await this.assetManager.addAsset(new File([data], asset.name, { type: asset.type }));
+        }
+        // The asset view needs to be re-rendered to show the new assets
+        loadAssetsIntoView();
+
+        // 3. Load Workspace
+        Blockly.serialization.workspaces.load(projectData.workspace, this.workspace);
+
+        // 4. Run the loaded project
+        doRun();
+
+        console.log('Project data loaded successfully!');
+    }
+
+    async loadProject() {
+        try {
+            const file = await this._selectFile();
+            const content = await this._readFile(file);
+            const projectData = JSON.parse(content);
+            await this.loadProjectData(projectData);
+        } catch (error) {
+            console.error('Failed to load project:', error);
+            alert('Error loading project. See console for details.');
+        }
+    }
+
+    _base64ToBlob(b64Data, contentType = '', sliceSize = 512) {
+        const byteCharacters = atob(b64Data);
+        const byteArrays = [];
+
+        for (let offset = 0; offset < byteCharacters.length; offset += sliceSize) {
+            const slice = byteCharacters.slice(offset, offset + sliceSize);
+            const byteNumbers = new Array(slice.length);
+            for (let i = 0; i < slice.length; i++) {
+                byteNumbers[i] = slice.charCodeAt(i);
+            }
+            const byteArray = new Uint8Array(byteNumbers);
+            byteArrays.push(byteArray);
+        }
+
+        return new Blob(byteArrays, { type: contentType });
+    }
+
+    async _clearAllAssets() {
+        const allAssets = await this.assetManager.getAllAssets();
+        for (const asset of allAssets) {
+            await this.assetManager.deleteAsset(asset.name);
+        }
+    }
+
+    _selectFile() {
+        return new Promise(resolve => {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.txt';
+            input.onchange = e => {
+                const file = e.target.files[0];
+                if (file) {
+                    resolve(file);
+                }
+            };
+            input.click();
+        });
+    }
+
+    _readFile(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsText(file);
+        });
+    }
+
+    async shareProject() {
+        try {
+            const workspaceState = Blockly.serialization.workspaces.save(this.workspace);
+            const assets = await this.assetManager.getAllAssets();
+            const serializableAssets = [];
+
+            for (const asset of assets) {
+                let dataB64;
+                if (asset.data instanceof Blob) {
+                    dataB64 = await this._blobToBase64(asset.data);
+                } else if (asset.data instanceof ArrayBuffer) {
+                    dataB64 = this._arrayBufferToBase64(asset.data);
+                } else {
+                    continue;
+                }
+                serializableAssets.push({
+                    name: asset.name,
+                    type: asset.type,
+                    data: dataB64
+                });
+            }
+
+            const projectData = {
+                workspace: workspaceState,
+                assets: serializableAssets,
+                version: '1.0'
+            };
+
+            const jsonString = JSON.stringify(projectData, null, 2);
+            const file = new File([jsonString], 'project.txt', { type: 'text/plain' });
+
+            if (navigator.share && navigator.canShare({ files: [file] })) {
+                await navigator.share({
+                    files: [file],
+                    title: 'My Project',
+                    text: 'Check out my project!',
+                });
+            } else {
+                this.saveProject();
+            }
+        } catch (error) {
+            console.error('Error sharing project:', error);
+            if (error.name !== 'AbortError') {
+                alert('Error sharing project. See console for details.');
+            }
+        }
+    }
+}
+
+// Initialize Blockly with Drag-and-Drop Enabled
+
+var toolbox = {
+    kind: 'categoryToolbox',
+    contents: [
+        {
+            kind: 'category',
+            name: 'Logic',
+            categorystyle: 'logic_category',
+            contents: [
+                {
+                    kind: 'block',
+                    type: 'controls_if',
+                },
+                {
+                    kind: 'block',
+                    type: 'controls_if',
+                    extraState: {
+                        hasElse: 'true',
+                    },
+                },
+                {
+                    kind: 'block',
+                    type: 'controls_if',
+                    extraState: {
+                        hasElse: 'true',
+                        elseIfCount: 1,
+                    },
+                },
+                {
+                    kind: 'block',
+                    type: 'logic_compare',
+                },
+                {
+                    kind: 'block',
+                    type: 'logic_operation',
+                },
+                {
+                    kind: 'block',
+                    type: 'logic_negate',
+                },
+                {
+                    kind: 'block',
+                    type: 'logic_boolean',
+                },
+                {
+                    kind: 'block',
+                    type: 'logic_null',
+                },
+                {
+                    kind: 'block',
+                    type: 'logic_ternary',
+                },
+                {
+                    kind: 'block',
+                    type: 'controls_repeat_ext',
+                    inputs: {
+                        TIMES: {
+                            block: {
+                                type: 'math_number',
+                                fields: {
+                                    NUM: 10,
+                                },
+                            },
+                        },
+                    },
+                },
+                {
+                    kind: 'block',
+                    type: 'controls_whileUntil',
+                },
+                {
+                    kind: 'block',
+                    type: 'controls_for',
+                    fields: {
+                        VAR: 'i',
+                    },
+                    inputs: {
+                        FROM: {
+                            block: {
+                                type: 'math_number',
+                                fields: {
+                                    NUM: 1,
+                                },
+                            },
+                        },
+                        TO: {
+                            block: {
+                                type: 'math_number',
+                                fields: {
+                                    NUM: 10,
+                                },
+                            },
+                        },
+                        BY: {
+                            block: {
+                                type: 'math_number',
+                                fields: {
+                                    NUM: 1,
+                                },
+                            },
+                        },
+                    },
+                },
+                {
+                    kind: 'block',
+                    type: 'controls_forEach',
+                },
+                {
+                    kind: 'block',
+                    type: 'controls_flow_statements',
+                },
+                {
+                    kind: 'block',
+                    type: 'select_object',
+                },
+                {
+                    kind: 'block',
+                    type: 'event_on_click',
+                },
+                {
+                    kind: 'block',
+                    type: 'event_every_frame',
+                },
+                {
+                    kind: 'block',
+                    type: 'action_rotate_continuously',
+                },
+            ],
+        },
+        {
+            kind: 'category',
+            name: 'GUI',
+            categorystyle: 'text_category',
+            contents: [
+                {
+                    kind: 'block',
+                    type: 'create_loading_screen',
+                },
+                {
+                    kind: 'block',
+                    type: 'show_loading_screen',
+                },
+                {
+                    kind: 'block',
+                    type: 'hide_loading_screen',
+                },
+                {
+                    kind: 'block',
+                    type: 'gui_create_text_block',
+                },
+                {
+                    kind: 'block',
+                    type: 'create_3d_text',
+                },
+                {
+                    kind: 'block',
+                    type: 'gui_set_text',
+                },
+                {
+                    kind: 'block',
+                    type: 'gui_create_input_text',
+                },
+                {
+                    kind: 'block',
+                    type: 'gui_get_input_text',
+                },
+                {
+                    kind: 'block',
+                    type: 'gui_create_button',
+                },
+                {
+                    kind: 'block',
+                    type: 'gui_create_image_from_url',
+                },
+                {
+                    kind: 'block',
+                    type: 'gui_create_image_from_asset',
+                },
+                {
+                    kind: 'block',
+                    type: 'event_on_gui_click',
+                },
+                {
+                    kind: 'block',
+                    type: 'create_popup',
+                },
+                {
+                    kind: 'block',
+                    type: 'show_popup',
+                },
+                {
+                    kind: 'block',
+                    type: 'hide_popup',
+                },
+                {
+                    kind: 'block',
+                    type: 'gui_set_popup_title',
+                },
+                {
+                    kind: 'block',
+                    type: 'gui_set_popup_image',
+                },
+                {
+                    kind: 'block',
+                    type: 'gui_set_popup_button_text',
+                },
+                {
+                    kind: 'block',
+                    type: 'gui_set_popup_text',
+                },
+                {
+                    kind: 'block',
+                    type: 'console_log',
+                },
+                {
+                    kind: 'block',
+                    type: 'console_warn',
+                },
+                {
+                    kind: 'block',
+                    type: 'console_error',
+                },
+                {
+                    kind: 'block',
+                    type: 'console_clear',
+                },
+                {
+                    kind: 'block',
+                    type: 'take_screenshot',
+                },
+            ]
+        },
+
+        {
+            kind: 'category',
+            name: 'Audio',
+            categorystyle: 'audio_category',
+            contents: [
+                {
+                    kind: 'block',
+                    type: 'play_sound_url',
+                },
+                {
+                    kind: 'block',
+                    type: 'play_note',
+                },
+            ]
+        },
+        {
+            kind: 'category',
+            name: 'Game',
+            categorystyle: 'logic_category',
+            contents: [
+                {
+                    kind: 'block',
+                    type: 'set_as_player',
+                },
+                {
+                    kind: 'block',
+                    type: 'player_jump',
+                },
+                {
+                    kind: 'block',
+                    type: 'player_move',
+                },
+                {
+                    kind: 'block',
+                    type: 'enable_physics',
+                },
+                {
+                    kind: 'block',
+                    type: 'apply_force',
+                },
+                {
+                    kind: 'block',
+                    type: 'set_physics_impostor',
+                },
+                {
+                    kind: 'block',
+                    type: 'on_button_press',
+                },
+                {
+                    kind: 'block',
+                    type: 'get_joystick_direction',
+                },
+                {
+                    kind: 'block',
+                    type: 'get_joystick_force',
+                }
+            ]
+        },
+        {
+            kind: 'category',
+            name: 'Objects',
+            categorystyle: 'motion_category',
+            contents: [
+                {
+                    kind: 'block',
+                    type: 'import_3d_file_url',
+                },
+                {
+                    kind: 'block',
+                    type: 'on_collision',
+                },
+                {
+                    kind: 'block',
+                    type: 'destroy_object',
+                },
+                {
+                    kind: 'block',
+                    type: 'set_visibility',
+                },
+                {
+                    kind: 'block',
+                    type: 'create_box',
+                },
+                {
+                    kind: 'block',
+                    type: 'create_sphere',
+                },
+                {
+                    kind: 'block',
+                    type: 'move_object',
+                },
+                {
+                    kind: 'block',
+                    type: 'change_object_color',
+                },
+                {
+                    kind: 'block',
+                    type: 'rotate_object',
+                },
+                {
+                    "kind": "block",
+                    "type": "position_model"
+                },
+                {
+                    "kind": "block",
+                    "type": "scale_object"
+                },
+                {
+                    "kind": "block",
+                    "type": "get_property"
+                },
+                {
+                    "kind": "block",
+                    "type": "set_metadata"
+                },
+                {
+                    "kind": "block",
+                    "type": "get_metadata"
+                },
+                {
+                    kind: 'block',
+                    type: 'animate_object',
+                },
+                {
+                    kind: 'block',
+                    type: 'animate_rotation',
+                },
+                {
+                    kind: 'block',
+                    type: 'animate_position',
+                },
+                {
+                    kind: 'block',
+                    type: 'animate_scale',
+                },
+                {
+                    "kind": "block",
+                    "type": "import_animation"
+                },
+                {
+                    "kind": "block",
+                    "type": "apply_animation"
+                },
+                {
+                    "kind": "block",
+                    "type": "play_animation"
+                },
+                {
+                    "kind": "block",
+                    "type": "stop_skeletal_animation"
+                },
+                {
+                    "kind": "block",
+                    "type": "play_animation_by_index"
+                },
+                {
+                    "kind": "block",
+                    "type": "set_pixelated_look"
+                },
+                {
+                    kind: 'block',
+                    type: 'asset_model',
+                },
+                {
+                    kind: 'block',
+                    type: 'asset_audio',
+                },
+                {
+                    kind: 'block',
+                    type: 'asset_image',
+                },
+                {
+                    kind: 'block',
+                    type: 'import_model_from_asset',
+                },
+                {
+                    kind: 'block',
+                    type: 'play_sound_from_asset',
+                },
+                {
+                    kind: 'block',
+                    type: 'set_texture_from_asset',
+                }
+            ]
+        },
+
+        {
+            kind: 'category',
+            name: 'Scene',
+            categorystyle: 'scene_category',
+            contents: [
+                {
+                    kind: 'block',
+                    type: 'create_camera',
+                },
+                {
+                    kind: 'block',
+                    type: 'set_isometric_camera',
+                },
+                {
+                    kind: 'block',
+                    type: 'point_camera_at_mesh'
+                },
+                {
+                    kind: 'block',
+                    type: 'create_camera',
+                },
+                {
+                    kind: 'block',
+                    type: 'set_isometric_camera',
+                },
+                {
+                    kind: 'block',
+                    type: 'set_fps_camera',
+                },
+                {
+                    kind: 'block',
+                    type: 'camera_follow',
+                },
+                {
+                    kind: 'block',
+                    type: 'camera_zoom',
+                },
+                {
+                    kind: 'block',
+                    type: 'create_ground',
+                },
+                {
+                    kind: 'block',
+                    type: 'set_ground_material',
+                },
+                {
+                    kind: 'block',
+                    type: 'set_ground_physics',
+                },
+                {
+                    kind: 'block',
+                    type: 'create_light',
+                },
+                {
+                    kind: 'block',
+                    type: 'set_gravity',
+                },
+                {
+                    kind: 'block',
+                    type: 'create_environment',
+                },
+                {
+                    kind: 'block',
+                    type: 'set_background',
+                },
+                {
+                    kind: 'block',
+                    type: 'set_background_image',
+                },
+                {
+                    kind: 'block',
+                    type: 'procedural_texture'
+                },
+                {
+                    kind: 'block',
+                    type: 'colour_picker'
+                }
+            ]
+        },
+        {
+            kind: 'category',
+            name: 'Utils',
+            categorystyle: 'colour_category',
+            contents: [
+                {
+                    kind: 'block',
+                    type: 'colour_picker',
+                },
+                {
+                    kind: 'block',
+                    type: 'colour_random',
+                },
+                {
+                    kind: 'block',
+                    type: 'colour_rgb',
+                },
+                {
+                    kind: 'block',
+                    type: 'colour_blend',
+                },
+                {
+                    kind: 'block',
+                    type: 'math_number',
+                    fields: {
+                        NUM: 123,
+                    },
+                },
+                {
+                    kind: 'block',
+                    type: 'math_arithmetic',
+                    fields: {
+                        OP: 'ADD',
+                    },
+                },
+                {
+                    kind: 'block',
+                    type: 'math_single',
+                    fields: {
+                        OP: 'ROOT',
+                    },
+                },
+                {
+                    kind: 'block',
+                    type: 'math_trig',
+                    fields: {
+                        OP: 'SIN',
+                    },
+                },
+                {
+                    kind: 'block',
+                    type: 'math_constant',
+                    fields: {
+                        CONSTANT: 'PI',
+                    },
+                },
+                {
+                    kind: 'block',
+                    type: 'math_number_property',
+                    extraState: '<mutation divisor_input="false"></mutation>',
+                    fields: {
+                        PROPERTY: 'EVEN',
+                    },
+                },
+                {
+                    kind: 'block',
+                    type: 'math_round',
+                    fields: {
+                        OP: 'ROUND',
+                    },
+                },
+                {
+                    kind: 'block',
+                    type: 'math_on_list',
+                    extraState: '<mutation op="SUM"></mutation>',
+                    fields: {
+                        OP: 'SUM',
+                    },
+                },
+                {
+                    kind: 'block',
+                    type: 'math_modulo',
+                },
+                {
+                    kind: 'block',
+                    type: 'math_constrain',
+                    inputs: {
+                        LOW: {
+                            block: {
+                                type: 'math_number',
+                                fields: {
+                                    NUM: 1,
+                                },
+                            },
+                        },
+                        HIGH: {
+                            block: {
+                                type: 'math_number',
+                                fields: {
+                                    NUM: 100,
+                                },
+                            },
+                        },
+                    },
+                },
+                {
+                    kind: 'block',
+                    type: 'math_random_int',
+                    inputs: {
+                        FROM: {
+                            block: {
+                                type: 'math_number',
+                                fields: {
+                                    NUM: 1,
+                                },
+                            },
+                        },
+                        TO: {
+                            block: {
+                                type: 'math_number',
+                                fields: {
+                                    NUM: 100,
+                                },
+                            },
+                        },
+                    },
+                },
+                {
+                    kind: 'block',
+                    type: 'math_random_float',
+                },
+                {
+                    kind: 'block',
+                    type: 'math_atan2',
+                },
+                {
+                    kind: 'block',
+                    type: 'parse_number_from',
+                },
+                {
+                    kind: 'block',
+                    type: 'text',
+                },
+                {
+                    kind: 'block',
+                    type: 'text_join',
+                },
+                {
+                    kind: 'block',
+                    type: 'text_append',
+                },
+                {
+                    kind: 'block',
+                    type: 'text_length',
+                },
+                {
+                    kind: 'block',
+                    type: 'text_isEmpty',
+                },
+                {
+                    kind: 'block',
+                    type: 'text_indexOf',
+                },
+                {
+                    kind: 'block',
+                    type: 'text_charAt',
+                },
+                {
+                    kind: 'block',
+                    type: 'text_getSubstring',
+                },
+                {
+                    kind: 'block',
+                    type: 'text_changeCase',
+                },
+                {
+                    kind: 'block',
+                    type: 'text_trim',
+                },
+                {
+                    kind: 'block',
+                    type: 'text_print',
+                },
+            ],
+        },
+        {
+            kind: 'category',
+            name: 'Lists',
+            categorystyle: 'list_category',
+            contents: [
+                {
+                    kind: 'block',
+                    type: 'lists_create_empty',
+                },
+                {
+                    kind: 'block',
+                    type: 'lists_create_with',
+                    extraState: {
+                        itemCount: 3,
+                    },
+                },
+                {
+                    kind: 'block',
+                    type: 'lists_repeat',
+                    inputs: {
+                        NUM: {
+                            block: {
+                                type: 'math_number',
+                                fields: {
+                                    NUM: 5,
+                                },
+                            },
+                        },
+                    },
+                },
+                {
+                    kind: 'block',
+                    type: 'lists_length',
+                },
+                {
+                    kind: 'block',
+                    type: 'lists_isEmpty',
+                },
+                {
+                    kind: 'block',
+                    type: 'lists_indexOf',
+                    fields: {
+                        END: 'FIRST',
+                    },
+                },
+                {
+                    kind: 'block',
+                    type: 'lists_getIndex',
+                    fields: {
+                        MODE: 'GET',
+                        WHERE: 'FROM_START',
+                    },
+                },
+                {
+                    kind: 'block',
+                    type: 'lists_setIndex',
+                    fields: {
+                        MODE: 'SET',
+                        WHERE: 'FROM_START',
+                    },
+                },
+            ],
+        },
+        {
+            kind: 'category',
+            name: 'Variables',
+            categorystyle: 'variable_category',
+            custom: 'VARIABLE',
+        },
+        {
+            kind: 'category',
+            name: 'Functions',
+            categorystyle: 'procedure_category',
+            custom: 'PROCEDURE',
+        },
+        {
+            kind: 'category',
+            name: 'Library',
+            expanded: 'false',
+            contents: [
+                {
+                    kind: 'category',
+                    name: 'Randomize',
+                    contents: [
+                        {
+                            kind: 'block',
+                            type: 'procedures_defnoreturn',
+                            extraState: {
+                                params: [
+                                    {
+                                        name: 'list',
+                                    },
+                                ],
+                            },
+                            icons: {
+                                comment: {
+                                    text: 'Describe this function...',
+                                    pinned: false,
+                                    height: 80,
+                                    width: 160,
+                                },
+                            },
+                            fields: {
+                                NAME: 'randomize',
+                            },
+                            inputs: {
+                                STACK: {
+                                    block: {
+                                        type: 'controls_for',
+                                        fields: {
+                                            VAR: {
+                                                name: 'x',
+                                            },
+                                        },
+                                        inputs: {
+                                            FROM: {
+                                                block: {
+                                                    type: 'math_number',
+                                                    fields: {
+                                                        NUM: 1,
+                                                    },
+                                                },
+                                            },
+                                            TO: {
+                                                block: {
+                                                    type: 'lists_length',
+                                                    inline: false,
+                                                    inputs: {
+                                                        VALUE: {
+                                                            block: {
+                                                                type: 'variables_get',
+                                                                fields: {
+                                                                    VAR: {
+                                                                        name: 'list',
+                                                                    },
+                                                                },
+                                                            },
+                                                        },
+                                                    },
+                                                },
+                                            },
+                                            BY: {
+                                                block: {
+                                                    type: 'math_number',
+                                                    fields: {
+                                                        NUM: 1,
+                                                    },
+                                                },
+                                            },
+                                            DO: {
+                                                block: {
+                                                    type: 'variables_set',
+                                                    inline: false,
+                                                    fields: {
+                                                        VAR: {
+                                                            name: 'y',
+                                                        },
+                                                    },
+                                                    inputs: {
+                                                        VALUE: {
+                                                            block: {
+                                                                type: 'math_random_int',
+                                                                inputs: {
+                                                                    FROM: {
+                                                                        block: {
+                                                                            type: 'math_number',
+                                                                            fields: {
+                                                                                NUM: 1,
+                                                                            },
+                                                                        },
+                                                                    },
+                                                                    TO: {
+                                                                        block: {
+                                                                            type: 'lists_length',
+                                                                            inline: false,
+                                                                            inputs: {
+                                                                                VALUE: {
+                                                                                    block: {
+                                                                                        type: 'variables_get',
+                                                                                        fields: {
+                                                                                            VAR: {
+                                                                                                name: 'list',
+                                                                                            },
+                                                                                        },
+                                                                                    },
+                                                                                },
+                                                                            },
+                                                                        },
+                                                                    },
+                                                                },
+                                                            },
+                                                        },
+                                                    },
+                                                    next: {
+                                                        block: {
+                                                            type: 'variables_set',
+                                                            inline: false,
+                                                            fields: {
+                                                                VAR: {
+                                                                    name: 'temp',
+                                                                },
+                                                            },
+                                                            inputs: {
+                                                                VALUE: {
+                                                                    block: {
+                                                                        type: 'lists_getIndex',
+                                                                        fields: {
+                                                                            MODE: 'GET',
+                                                                            WHERE: 'FROM_START',
+                                                                        },
+                                                                        inputs: {
+                                                                            VALUE: {
+                                                                                block: {
+                                                                                    type: 'variables_get',
+                                                                                    fields: {
+                                                                                        VAR: {
+                                                                                            name: 'list',
+                                                                                        },
+                                                                                    },
+                                                                                },
+                                                                            },
+                                                                            AT: {
+                                                                                block: {
+                                                                                    type: 'variables_get',
+                                                                                    fields: {
+                                                                                        VAR: {
+                                                                                            name: 'y',
+                                                                                        },
+                                                                                    },
+                                                                                },
+                                                                            },
+                                                                        },
+                                                                    },
+                                                                },
+                                                            },
+                                                            next: {
+                                                                block: {
+                                                                    type: 'lists_setIndex',
+                                                                    inline: false,
+                                                                    fields: {
+                                                                        MODE: 'SET',
+                                                                        WHERE: 'FROM_START',
+                                                                    },
+                                                                    inputs: {
+                                                                        LIST: {
+                                                                            block: {
+                                                                                type: 'variables_get',
+                                                                                fields: {
+                                                                                    VAR: {
+                                                                                        name: 'list',
+                                                                                    },
+                                                                                },
+                                                                            },
+                                                                        },
+                                                                        AT: {
+                                                                            block: {
+                                                                                type: 'variables_get',
+                                                                                fields: {
+                                                                                    VAR: {
+                                                                                        name: 'y',
+                                                                                    },
+                                                                                },
+                                                                            },
+                                                                        },
+                                                                        TO: {
+                                                                            block: {
+                                                                                type: 'lists_getIndex',
+                                                                                fields: {
+                                                                                    MODE: 'GET',
+                                                                                    WHERE: 'FROM_START',
+                                                                                },
+                                                                                inputs: {
+                                                                                    VALUE: {
+                                                                                        block: {
+                                                                                            type: 'variables_get',
+                                                                                            fields: {
+                                                                                                VAR: {
+                                                                                                    name: 'list',
+                                                                                                },
+                                                                                            },
+                                                                                        },
+                                                                                    },
+                                                                                    AT: {
+                                                                                        block: {
+                                                                                            type: 'variables_get',
+                                                                                            fields: {
+                                                                                                VAR: {
+                                                                                                    name: 'x',
+                                                                                                },
+                                                                                            },
+                                                                                        },
+                                                                                    },
+                                                                                },
+                                                                            },
+                                                                        },
+                                                                    },
+                                                                    next: {
+                                                                        block: {
+                                                                            type: 'lists_setIndex',
+                                                                            inline: false,
+                                                                            fields: {
+                                                                                MODE: 'SET',
+                                                                                WHERE: 'FROM_START',
+                                                                            },
+                                                                            inputs: {
+                                                                                LIST: {
+                                                                                    block: {
+                                                                                        type: 'variables_get',
+                                                                                        fields: {
+                                                                                            VAR: {
+                                                                                                name: 'list',
+                                                                                            },
+                                                                                        },
+                                                                                    },
+                                                                                },
+                                                                                AT: {
+                                                                                    block: {
+                                                                                        type: 'variables_get',
+                                                                                        fields: {
+                                                                                            VAR: {
+                                                                                                name: 'x',
+                                                                                            },
+                                                                                        },
+                                                                                    },
+                                                                                },
+                                                                                TO: {
+                                                                                    block: {
+                                                                                        type: 'variables_get',
+                                                                                        fields: {
+                                                                                            VAR: {
+                                                                                                name: 'temp',
+                                                                                            },
+                                                                                        },
+                                                                                    },
+                                                                                },
+                                                                            },
+                                                                        },
+                                                                    },
+                                                                },
+                                                            },
+                                                        },
+                                                    },
+                                                },
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                        {
+                            kind: 'category',
+                            name: 'Jabberwocky',
+                            contents: [
+                                {
+                                    kind: 'block',
+                                    type: 'text_print',
+                                    inputs: {
+                                        TEXT: {
+                                            block: {
+                                                type: 'text',
+                                                fields: {
+                                                    TEXT: "'Twas brillig, and the slithy toves",
+                                                },
+                                            },
+                                        },
+                                    },
+                                    next: {
+                                        block: {
+                                            type: 'text_print',
+                                            inputs: {
+                                                TEXT: {
+                                                    block: {
+                                                        type: 'text',
+                                                        fields: {
+                                                            TEXT: '  Did gyre and gimble in the wabe:',
+                                                        },
+                                                    },
+                                                },
+                                            },
+                                            next: {
+                                                block: {
+                                                    type: 'text_print',
+                                                    inputs: {
+                                                        TEXT: {
+                                                            block: {
+                                                                type: 'text',
+                                                                fields: {
+                                                                    TEXT: 'All mimsy were the borogroves,',
+                                                                },
+                                                            },
+                                                        },
+                                                    },
+                                                    next: {
+                                                        block: {
+                                                            type: 'text_print',
+                                                            inputs: {
+                                                                TEXT: {
+                                                                    block: {
+                                                                        type: 'text',
+                                                                        fields: {
+                                                                            TEXT: '  And the mome raths outgrabe.',
+                                                                        },
+                                                                    },
+                                                                },
+                                                            },
+                                                        },
+                                                    },
+                                                },
+                                            },
+                                        },
+                                    },
+                                },
+                                {
+                                    kind: 'block',
+                                    type: 'text_print',
+                                    inputs: {
+                                        TEXT: {
+                                            block: {
+                                                type: 'text',
+                                                fields: {
+                                                    TEXT: '"Beware the Jabberwock, my son!',
+                                                },
+                                            },
+                                        },
+                                    },
+                                    next: {
+                                        block: {
+                                            type: 'text_print',
+                                            inputs: {
+                                                TEXT: {
+                                                    block: {
+                                                        type: 'text',
+                                                        fields: {
+                                                            TEXT: '  The jaws that bite, the claws that catch!',
+                                                        },
+                                                    },
+                                                },
+                                            },
+                                            next: {
+                                                block: {
+                                                    type: 'text_print',
+                                                    inputs: {
+                                                        TEXT: {
+                                                            block: {
+                                                                type: 'text',
+                                                                fields: {
+                                                                    TEXT: 'Beware the Jubjub bird, and shun',
+                                                                },
+                                                            },
+                                                        },
+                                                    },
+                                                    next: {
+                                                        block: {
+                                                            type: 'text_print',
+                                                            inputs: {
+                                                                TEXT: {
+                                                                    block: {
+                                                                        type: 'text',
+                                                                        fields: {
+                                                                            TEXT: '  The frumious Bandersnatch!"',
+                                                                        },
+                                                                    },
+                                                                },
+                                                            },
+                                                        },
+                                                    },
+                                                },
+                                            },
+                                        },
+                                    },
+                                },
+                            ],
+                        },
+                    ],
+                },
+            ],
+        }
+    ]
+};
+
+class BabylonSceneManager {
+    constructor(canvas) {
+        this.initAudioEngine();
+        this.canvas = canvas;
+        this.engine = new BABYLON.Engine(this.canvas, true);
+        this.scene = new BABYLON.Scene(this.engine);
+        this.objects = {};
+        this.materials = {};
+        this.sounds = [];
+        this.player = null;
+        this.moveDirection = new BABYLON.Vector3(0, 0, 0);
+        this.playerSpeed = 5;
+        this.perFrameFunctions = [];
+        this.buttonPressActions = {};
+        this.inputState = { keys: {} };
+        this.joystick_state = {
+            up: false,
+            down: false,
+            left: false,
+            right: false,
+            pressed: false,
+            angle: 0,
+            force: 0
+        };
+        this.joystickManager = null;
+        this.inputMap = {
+            ' ': 'A',
+            'a': 'Left',
+            'd': 'Right',
+            'w': 'Up',
+            's': 'Down'
+        };
+        this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        this.uiElements = [];
+        this.inactivityTimer = null;
+        this.uiManager = new UIManager(this.scene);
+        this.processedCollisions = new Set();
+        this.background = null;
+        this.backgroundLayer = null;
+
+        this.initScene();
+        this.initInputListeners();
+        this.initJoystick();
+        this.initAutoHide();
+        this.runRenderLoop();
+
+    }
+
+    pauseEngine() {
+        this.engine.stopRenderLoop();
+    }
+
+    resumeEngine() {
+        this.runRenderLoop();
+    }
+
+    createPopup(name, title, options) {
+        return this.uiManager.createPopup(name, title, options);
+    }
+
+    showPopup(target) {
+        this.uiManager.showPopup(target);
+        this.pauseEngine();
+    }
+
+    hidePopup(target) {
+        this.uiManager.hidePopup(target);
+        this.resumeEngine();
+    }
+
+    setPopupTitle(target, title) {
+        let popup = null;
+        if (typeof target === 'string') {
+            popup = this.uiManager.getControlByName(target);
+        } else if (target && target.name) { // It's an object, presumably the popup container
+            popup = target;
+        }
+
+        if (popup && popup.children && popup.children.length > 0) {
+            const panel = popup.children[0]; // Assumes the panel is the first child
+            const titleControl = panel.getChildByName(`${popup.name}_title`);
+            if (titleControl) {
+                titleControl.text = title;
+            }
+        }
+    }
+
+    setPopupImage(target, imageUrl) {
+        let popup = null;
+        if (typeof target === 'string') {
+            popup = this.uiManager.getControlByName(target);
+        } else if (target && target.name) {
+            popup = target;
+        }
+
+        if (popup && popup.children && popup.children.length > 0) {
+            const panel = popup.children[0];
+            const imageControl = panel.getChildByName(`${popup.name}_image`);
+            if (imageControl) {
+                imageControl.source = imageUrl;
+            }
+        }
+    }
+
+    setPopupButtonText(target, buttonName, text) {
+        let popup = null;
+        if (typeof target === 'string') {
+            popup = this.uiManager.getControlByName(target);
+        } else if (target && target.name) {
+            popup = target;
+        }
+
+        if (popup && popup.children && popup.children.length > 0) {
+            const panel = popup.children[0];
+            const buttonControl = panel.getChildByName(buttonName);
+            if (buttonControl && buttonControl.textBlock) {
+                buttonControl.textBlock.text = text;
+            }
+        }
+    }
+
+    setPopupText(target, text) {
+        let popup = null;
+        if (typeof target === 'string') {
+            popup = this.uiManager.getControlByName(target);
+        } else if (target && target.name) {
+            popup = target;
+        }
+
+        if (popup && popup.children && popup.children.length > 0) {
+            const panel = popup.children[0];
+            let textControl = panel.getChildByName(`${popup.name}_text`);
+            if (textControl) {
+                textControl.text = text;
+            } else {
+                const textBlock = new BABYLON.GUI.TextBlock(`${popup.name}_text`, text);
+                textBlock.resizeToFit = true;
+                textBlock.color = "white";
+                textBlock.fontSize = 24;
+                textBlock.paddingBottom = "20px";
+                panel.addControl(textBlock);
+            }
+        }
+    }
+
+    async initAudioEngine() {
+        if (this.audioEngine && this.sounds.length > 0) {
+            this.sounds.forEach(sound => {
+
+                console.log("stopping sound");
+                sound.stop(); // Set default volume
+            });
+            this.audioEngine.dispose();
+        }
+        this.audioEngine = await BABYLON.CreateAudioEngineAsync();
+    }
+
+    initJoystick() {
+        const joystickZone = document.getElementById('joystick-zone');
+
+        // Only initialize the joystick if the touch UI is likely active (based on CSS media queries).
+        if (joystickZone && window.matchMedia('(max-width: 768px)').matches) {
+            this.joystickManager = nipplejs.create({
+                zone: joystickZone,
+                mode: 'dynamic',
+                color: 'grey',
+                size: 120,
+                fadeTime: 0
+            });
+
+            this.joystickManager.on('added', (evt, nipple) => {
+                // Detach camera controls when the joystick is active to prevent conflicts
+                if (this.scene.activeCamera) {
+                    this.scene.activeCamera.detachControl(this.canvas);
+                }
+
+                nipple.on('move', (evt, data) => {
+                    const angle = data.angle.radian;
+                    const force = data.force;
+
+                    this.joystick_state.angle = data.angle.degree;
+                    this.joystick_state.force = data.force;
+
+                    // Reset states
+                    this.joystick_state.up = false;
+                    this.joystick_state.down = false;
+                    this.joystick_state.left = false;
+                    this.joystick_state.right = false;
+
+                    if (force > 0.5) { // Threshold to prevent accidental movement
+                        if (angle > Math.PI * 0.25 && angle < Math.PI * 0.75) {
+                            this.joystick_state.up = true;
+                        } else if (angle > Math.PI * 1.25 && angle < Math.PI * 1.75) {
+                            this.joystick_state.down = true;
+                        } else if (angle > Math.PI * 0.75 && angle < Math.PI * 1.25) {
+                            this.joystick_state.left = true;
+                        } else if (angle < Math.PI * 0.25 || angle > Math.PI * 1.75) {
+                            this.joystick_state.right = true;
+                        }
+                    }
+                });
+
+                nipple.on('start', () => {
+                    this.joystick_state.pressed = true;
+                });
+
+                nipple.on('end', () => {
+                    this.joystick_state.up = false;
+                    this.joystick_state.down = false;
+                    this.joystick_state.left = false;
+                    this.joystick_state.right = false;
+                    this.joystick_state.pressed = false;
+                    this.joystick_state.angle = 0;
+                    this.joystick_state.force = 0;
+
+                    // Re-attach camera controls when the joystick is released
+                    if (this.scene.activeCamera) {
+                        this.scene.activeCamera.attachControl(this.canvas, true);
+                    }
+                });
+            });
+
+            this.joystickManager.on('removed', (evt, nipple) => {
+                nipple.off('start move end');
+            });
+        }
+    }
+
+    initAutoHide() {
+        this.uiElements = document.querySelectorAll('.interactive-ui');
+        const canvasContainer = document.querySelector('.canvas-container');
+
+        const resetTimer = () => {
+            this.uiElements.forEach(el => el.classList.remove('hidden'));
+            clearTimeout(this.inactivityTimer);
+            this.inactivityTimer = setTimeout(() => {
+                this.uiElements.forEach(el => el.classList.add('hidden'));
+            }, 3000); // Hide after 3 seconds of inactivity
+        };
+
+        // Initial call to start the timer
+        resetTimer();
+
+        // Reset timer on user interaction
+        canvasContainer.addEventListener('mousemove', resetTimer, false);
+        canvasContainer.addEventListener('touchstart', resetTimer, { passive: true });
+        canvasContainer.addEventListener('click', resetTimer, false);
+    }
+
+    // High-level API for cleaner code generation
+    createBox(name, x, y, z) {
+        const boxMesh = BABYLON.MeshBuilder.CreateBox(name, {}, this.scene);
+        boxMesh.position.set(x, y, z);
+        this.objects[name] = boxMesh;
+        return boxMesh;
+    }
+
+    createSphere(name, x, y, z) {
+        const sphereMesh = BABYLON.MeshBuilder.CreateSphere(name, { diameter: 1 }, this.scene);
+        sphereMesh.position.set(x, y, z);
+        this.objects[name] = sphereMesh;
+        return sphereMesh;
+    }
+
+    async createText(name, text, fontUrl, size = 1, resolution = 16, depth = 0.5) {
+        if (!isValidAssetURL(fontUrl)) {
+            return null;
+        }
+        try {
+            const response = await fetch(fontUrl);
+            if (!response.ok) {
+                throw new Error(`Failed to fetch font data from ${fontUrl}`);
+            }
+            const fontData = await response.json();
+
+            const textMesh = BABYLON.MeshBuilder.CreateText(name, text, fontData, {
+                size: size,
+                resolution: resolution,
+                depth: depth
+            }, this.scene);
+
+            if (textMesh) {
+                this.objects[name] = textMesh;
+                // Center the mesh pivot
+                const boundingInfo = textMesh.getHierarchyBoundingVectors();
+                const center = boundingInfo.max.add(boundingInfo.min).scale(0.5);
+                textMesh.setPivotPoint(center);
+                return textMesh;
+            }
+            return null;
+        } catch (error) {
+            console.error('Error creating 3D text:', error);
+            return null;
+        }
+    }
+
+    scale(target, x, y, z) {
+        let name;
+        if (typeof target === 'string') {
+            name = target;
+        } else if (target && typeof target === 'object' && target.name) {
+            name = target.name;
+        }
+
+        if (name && this.objects[name]) {
+            this.objects[name].scaling = new BABYLON.Vector3(x, y, z);
+        }
+    }
+
+    async importModel(name, url, x, y, z) {
+        if (!isValidAssetURL(url)) {
+            return null;
+        }
+        try {
+            // Load model using SceneLoader
+            const result = await BABYLON.SceneLoader.ImportMeshAsync(null, '', url, this.scene);
+            if (result.meshes.length > 0) {
+                const rootMesh = result.meshes[0];
+                rootMesh.name = name;
+                if (x !== undefined && y !== undefined && z !== undefined) {
+                    rootMesh.position = new BABYLON.Vector3(x, y, z);
+                }
+
+                // If it's a VRM model, normalize its height to a sane default
+                if (url.toLowerCase().endsWith('.vrm')) {
+                    const boundingInfo = rootMesh.getHierarchyBoundingVectors(true);
+                    const height = boundingInfo.max.y - boundingInfo.min.y;
+                    if (height > 0.001) { // Avoid division by zero or tiny values
+                        const targetHeight = 2.0;
+                        const scale = targetHeight / height;
+                        rootMesh.scaling = new BABYLON.Vector3(scale, scale, scale);
+                    }
+                }
+
+                if (result.animationGroups && result.animationGroups.length > 0) {
+                    rootMesh.animationGroups = result.animationGroups;
+                }
+
+                this.objects[name] = rootMesh;
+                return rootMesh;
+            }
+        } catch (error) {
+            console.error(`Failed to load model from URL: ${url}`, error);
+        }
+        return null;
+    }
+
+    async importRobloxAvatar(name, userId, x = 0, y = 0, z = 0) {
+        try {
+            const getProxiedUrl = (url) => `https://proxy.fxio.workers.dev/corsproxy/?apiurl=${encodeURIComponent(url)}`;
+
+            let thumbData = null;
+            const tryEndpoints = [
+                `https://apis.roblox.com/thumbnails/v1/users/avatar-3d?userId=${userId}`,
+                `https://thumbnails.roblox.com/v1/users/avatar-3d?userId=${userId}`,
+                `https://www.roblox.com/avatar-thumbnail-3d/json?userId=${userId}`
+            ];
+
+            for (const url of tryEndpoints) {
+                try {
+                    const response = await fetch(getProxiedUrl(url));
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data && (data.imageUrl || data.url || (data.obj && data.mtl))) {
+                            thumbData = data;
+                            break;
+                        }
+                    }
+                } catch (e) {
+                    console.warn(`Endpoint ${url} failed:`, e.message);
+                }
+            }
+
+            if (!thumbData) {
+                throw new Error("Avatar not ready or not found");
+            }
+
+            let manifest = null;
+            const manifestUrl = thumbData.imageUrl || thumbData.url;
+
+            if (thumbData.obj && thumbData.mtl) {
+                manifest = thumbData;
+            } else if (manifestUrl) {
+                const manifestResponse = await fetch(getProxiedUrl(manifestUrl));
+                manifest = await manifestResponse.json();
+                if (manifest.contents && typeof manifest.contents === "string") {
+                    try {
+                        manifest = JSON.parse(manifest.contents);
+                    } catch (e) { }
+                }
+            }
+
+            if (!manifest || !manifest.obj) {
+                throw new Error("Could not retrieve avatar manifest");
+            }
+
+            const getCDNUrl = (hash) => {
+                let i = 31;
+                for (let t = 0; t < 38; t++) i ^= hash[t].charCodeAt(0);
+                return `https://t${(i % 8).toString()}.rbxcdn.com/${hash}`;
+            };
+
+            const fetchAsset = async (hash, isBinary = false) => {
+                const primaryUrl = getCDNUrl(hash);
+                try {
+                    const res = await fetch(getProxiedUrl(primaryUrl));
+                    if (res.ok) {
+                        const data = isBinary ? await res.blob() : await res.text();
+                        if (isBinary || !data.includes("<Error>")) return data;
+                    }
+                } catch (e) {}
+
+                for (let s = 0; s < 8; s++) {
+                    const fallbackUrl = `https://t${s}.rbxcdn.com/${hash}`;
+                    try {
+                        const res = await fetch(getProxiedUrl(fallbackUrl));
+                        if (res.ok) {
+                            const data = isBinary ? await res.blob() : await res.text();
+                            if (isBinary || !data.includes("<Error>")) return data;
+                        }
+                    } catch (e) {}
+                }
+                throw new Error(`Could not fetch asset ${hash}`);
+            };
+
+            const objText = await fetchAsset(manifest.obj);
+            const mtlText = await fetchAsset(manifest.mtl);
+
+            const textureMap = {};
+            if (manifest.textures) {
+                for (const texHash of manifest.textures) {
+                    try {
+                        const blob = await fetchAsset(texHash, true);
+                        const dataUrl = await new Promise((resolve) => {
+                            const reader = new FileReader();
+                            reader.onloadend = () => resolve(reader.result);
+                            reader.readAsDataURL(blob);
+                        });
+                        textureMap[texHash] = dataUrl;
+                    } catch (e) {
+                        console.warn(`Failed to fetch texture ${texHash}`, e);
+                    }
+                }
+            }
+
+            const mtlData = {};
+            let currentMat = null;
+            mtlText.split("\n").forEach((line) => {
+                const parts = line.trim().split(/\s+/);
+                if (parts[0] === "newmtl") {
+                    currentMat = parts[1];
+                    mtlData[currentMat] = {};
+                } else if (currentMat && parts.length >= 2) {
+                    if (parts[0] === "map_Kd") mtlData[currentMat].texture = parts[1];
+                    if (parts[0] === "Kd") mtlData[currentMat].color = new BABYLON.Color3(parseFloat(parts[1]), parseFloat(parts[2]), parseFloat(parts[3]));
+                }
+            });
+
+            const cleanObjText = objText.replace(/^mtllib\s+.+$/gm, "");
+            const objBlob = new Blob([cleanObjText], { type: "text/plain" });
+            const objUrl = URL.createObjectURL(objBlob);
+
+            const result = await BABYLON.SceneLoader.ImportMeshAsync(null, "", objUrl, this.scene, null, ".obj");
+            if (result.meshes.length > 0) {
+                const avatarRoot = new BABYLON.Mesh(name, this.scene);
+                result.meshes.forEach((mesh) => {
+                    if (!mesh.parent) mesh.parent = avatarRoot;
+                    if (mesh.material) {
+                        const matName = Object.keys(mtlData).find((k) => mesh.material.name.includes(k)) || mesh.material.name;
+                        const data = mtlData[matName];
+                        if (data) {
+                            if (data.texture && textureMap[data.texture]) {
+                                mesh.material.diffuseTexture = new BABYLON.Texture(textureMap[data.texture], this.scene);
+                            }
+                            if (data.color) {
+                                mesh.material.diffuseColor = data.color;
+                            }
+                        }
+                        mesh.material.alpha = 1.0;
+                        mesh.material.transparencyMode = BABYLON.Material.MATERIAL_OPAQUE;
+                        mesh.material.backFaceCulling = false;
+                    }
+                });
+
+                const boundingInfo = avatarRoot.getHierarchyBoundingVectors(true);
+                const height = boundingInfo.max.y - boundingInfo.min.y;
+                if (height > 0.001) {
+                    const targetHeight = 2.0;
+                    const scale = targetHeight / height;
+                    avatarRoot.scaling = new BABYLON.Vector3(scale, scale, scale);
+
+                    const center = boundingInfo.max.add(boundingInfo.min).scale(0.5);
+                    avatarRoot.position.x = x - center.x * scale;
+                    avatarRoot.position.y = y - boundingInfo.min.y * scale;
+                    avatarRoot.position.z = z - center.z * scale;
+                } else {
+                    avatarRoot.position = new BABYLON.Vector3(x, y, z);
+                }
+
+                this.objects[name] = avatarRoot;
+                return avatarRoot;
+            }
+        } catch (error) {
+            console.error("Failed to import Roblox avatar:", error);
+        }
+        return null;
+    }
+
+    enablePhysics(target, mass, impostorType = 'BoxImpostor') {
+        let originalMesh;
+        if (typeof target === 'string') {
+            originalMesh = this._getMesh(target);
+        } else if (target && typeof target === 'object') {
+            originalMesh = target;
+        }
+
+        if (!originalMesh) {
+            console.warn("enablePhysics: Target object not found.", target);
+            return;
+        }
+        const name = originalMesh.name;
+
+        // Prevent applying physics twice to the same logical object
+        if (originalMesh.physicsImpostor || (originalMesh.parent && originalMesh.parent.physicsImpostor)) {
+            return;
+        }
+
+        const meshesWithGeometry = [originalMesh, ...originalMesh.getDescendants(false)].filter(m => m.geometry);
+
+        if (meshesWithGeometry.length === 0) {
+            console.warn(`enablePhysics: Object '${name}' has no geometry.`);
+            return;
+        }
+
+        // A mesh is considered "complex" if it has descendants with geometry.
+        // Primitives created by createBox/createSphere do not have descendants.
+        const isComplex = originalMesh.getDescendants(false).some(d => d.geometry);
+
+        if (isComplex) {
+            // 1. Calculate bounding box of the entire hierarchy.
+            const boundingInfo = originalMesh.getHierarchyBoundingVectors(true);
+            const size = boundingInfo.max.subtract(boundingInfo.min);
+
+            // Use a small epsilon for dimensions to prevent zero-sized impostors which cannon.js dislikes.
+            const epsilon = 0.001;
+            if (size.x < epsilon) size.x = epsilon;
+            if (size.y < epsilon) size.y = epsilon;
+            if (size.z < epsilon) size.z = epsilon;
+
+            // 2. Create an invisible box mesh that will be the new physics body.
+            const impostorBox = BABYLON.MeshBuilder.CreateBox(`${name}_impostor`, {
+                width: size.x,
+                height: size.y,
+                depth: size.z
+            }, this.scene);
+
+            // 3. Position the new box at the center of the model's bounding box.
+            const center = boundingInfo.max.add(boundingInfo.min).scale(0.5);
+            impostorBox.position.copyFrom(center);
+            impostorBox.visibility = 0;
+            const impostor = BABYLON.PhysicsImpostor[impostorType];
+            impostorBox.physicsImpostor = new BABYLON.PhysicsImpostor(impostorBox, impostor, { mass: mass, restitution: 0.9 }, this.scene);
+            originalMesh.setParent(impostorBox);
+
+            // 7. Update the scene's object map to point to the new physics root.
+            // Rename the physics root to the original name for consistency in subsequent block calls.
+            impostorBox.name = name;
+            this.objects[name] = impostorBox;
+
+        } else {
+            // It's a simple mesh (like a primitive), apply physics directly to it.
+            const impostor = BABYLON.PhysicsImpostor[impostorType];
+            originalMesh.physicsImpostor = new BABYLON.PhysicsImpostor(originalMesh, impostor, { mass: mass, restitution: 0.9 }, this.scene);
+        }
+    }
+
+    _getPhysicsImpostor(target) {
+        let mesh = this._getMesh(target);
+        if (!mesh) {
+            return null;
+        }
+        // If the mesh itself has an impostor, it's a simple object.
+        if (mesh.physicsImpostor) {
+            return mesh.physicsImpostor;
+        }
+        // If the mesh's parent has an impostor, it's part of a complex object.
+        if (mesh.parent && mesh.parent.physicsImpostor) {
+            return mesh.parent.physicsImpostor;
+        }
+        return null;
+    }
+
+    move(target, x, y, z) {
+        let mesh = this._getMesh(target);
+        if (mesh) {
+            mesh.position.set(x, y, z);
+        }
+    }
+
+    rotate(target, x, y, z) {
+        let mesh = this._getMesh(target);
+        if (mesh) {
+            mesh.rotation.set(x * (Math.PI / 180), y * (Math.PI / 180), z * (Math.PI / 180));
+        }
+    }
+    changeColor(target, color) {
+        let mesh = this._getMesh(target);
+        if (mesh) {
+            if (!mesh.material) {
+                mesh.material = new BABYLON.StandardMaterial(mesh.name + "_material", this.scene);
+            }
+            if (mesh.material.diffuseColor) {
+                mesh.material.diffuseColor = BABYLON.Color3.FromHexString(color);
+            }
+        }
+    }
+
+    onCollision(target1, target2, callback) {
+        const impostor1 = this._getPhysicsImpostor(target1);
+
+        if (!impostor1) {
+            console.warn("onCollision: target1 is not a valid physics object.", target1);
+            return;
+        }
+
+        const collisionCallback = (main, collided) => {
+            const ids = [main.object.uniqueId, collided.object.uniqueId].sort();
+            const collisionKey = `${ids[0]}-${ids[1]}`;
+
+            if (this.processedCollisions.has(collisionKey)) {
+                return;
+            }
+            this.processedCollisions.add(collisionKey);
+
+            // Find the original visible mesh that corresponds to the collided impostor.
+            // If the impostor is the object itself, it will be returned.
+            // If the impostor is a parent, we find the child that is registered in `this.objects`.
+            const collidedMesh = Object.values(this.objects).find(
+                o => o === collided.object || (o.parent && o.parent === collided.object)
+            );
+
+            callback(collidedMesh || collided.object);
+        };
+
+        if (!Array.isArray(target2)) {
+            const impostor2 = this._getPhysicsImpostor(target2);
+            if (impostor2) {
+                impostor1.registerOnPhysicsCollide(impostor2, collisionCallback);
+            } else {
+                console.warn("onCollision: target2 is not a valid physics object.", target2);
+            }
+        } else {
+            const targetImpostors = target2
+                .map(item => this._getPhysicsImpostor(item))
+                .filter(impostor => impostor != null);
+
+            if (targetImpostors.length > 0) {
+                impostor1.registerOnPhysicsCollide(targetImpostors, collisionCallback);
+            } else {
+                console.warn("onCollision: target2 list contains no valid physics objects.", target2);
+            }
+        }
+    }
+
+    onClick(name, callback) {
+        let targetMesh = this.objects[name];
+        if (targetMesh) {
+            if (!targetMesh.actionManager) {
+                targetMesh.actionManager = new BABYLON.ActionManager(this.scene);
+            }
+            targetMesh.actionManager.registerAction(
+                new BABYLON.ExecuteCodeAction(BABYLON.ActionManager.OnPickTrigger, () => callback(targetMesh))
+            );
+        }
+    }
+
+    everyFrame(name, callback) {
+        let targetMesh = this.objects[name];
+        if (targetMesh) {
+            this.perFrameFunctions.push({
+                targetMesh: targetMesh,
+                func: (thisMesh, deltaTime) => callback(thisMesh, deltaTime)
+            });
+        }
+    }
+
+    playerJump(force) {
+        if (this.player && this.player.physicsImpostor) {
+            const verticalVelocity = this.player.physicsImpostor.getLinearVelocity().y;
+            if (Math.abs(verticalVelocity) < 0.1) { // Simple ground check
+                this.player.physicsImpostor.applyImpulse(new BABYLON.Vector3(0, force, 0), this.player.getAbsolutePosition());
+            }
+        }
+    }
+
+    playerMove(direction, speed) {
+        if (this.player) {
+            if (speed !== undefined) {
+                this.playerSpeed = speed;
+            }
+            switch (direction) {
+                case 'FORWARD': this.moveDirection.z += 1; break;
+                case 'BACKWARD': this.moveDirection.z -= 1; break;
+                case 'LEFT': this.moveDirection.x -= 1; break;
+                case 'RIGHT': this.moveDirection.x += 1; break;
+            }
+        }
+    }
+
+    createGround(name, width, height) {
+        const groundMesh = BABYLON.MeshBuilder.CreateGround(name, { width: width, height: height }, this.scene);
+        this.objects[name] = groundMesh;
+        this.setGroundPhysics(name); // Automatically add physics
+        return groundMesh;
+    }
+
+    setGroundPhysics(name) {
+        if (this.objects[name]) {
+            this.objects[name].physicsImpostor = new BABYLON.PhysicsImpostor(this.objects[name], BABYLON.PhysicsImpostor.PlaneImpostor, { mass: 0, restitution: 0.9 }, this.scene);
+        }
+    }
+
+    setGravity(x, y, z) {
+        const physicsEngine = this.scene.getPhysicsEngine();
+        if (physicsEngine) {
+            physicsEngine.setGravity(new BABYLON.Vector3(x, y, z));
+        }
+    }
+
+    createLight(name, x, y, z) {
+        const light = new BABYLON.PointLight(name, new BABYLON.Vector3(x, y, z), this.scene);
+        return light;
+    }
+
+    setAsPlayer(target) {
+        let name;
+        if (typeof target === 'string') {
+            name = target;
+        } else if (target && typeof target === 'object' && target.name) {
+            name = target.name;
+        }
+        if (this.objects[name]) {
+            this.player = this.objects[name];
+        }
+    }
+
+    cameraFollow(target) {
+        let mesh = null;
+        if (typeof target === 'string') {
+            mesh = this.objects[target];
+        } else if (target && typeof target === 'object') {
+            // Assumes target is a mesh object
+            mesh = target;
+        }
+
+        if (mesh && this.scene.activeCamera) {
+            this.scene.activeCamera.lockedTarget = mesh;
+        }
+    }
+
+    cameraZoom(value) {
+        if (this.scene.activeCamera && typeof this.scene.activeCamera.radius === 'number') {
+            this.scene.activeCamera.radius = Math.max(1, this.scene.activeCamera.radius - value);
+        }
+    }
+
+    takeScreenshot() {
+        const camera = this.scene.activeCamera;
+        if (!camera) return;
+
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+
+        // Temporarily adjust orthographic camera aspect ratio if needed
+        let oldOrtho = null;
+        if (camera.mode === BABYLON.Camera.ORTHOGRAPHIC_CAMERA) {
+            oldOrtho = {
+                left: camera.orthoLeft,
+                right: camera.orthoRight,
+                top: camera.orthoTop,
+                bottom: camera.orthoBottom
+            };
+            const aspectRatio = width / height;
+            const orthoSize = 10;
+            camera.orthoLeft = -orthoSize * aspectRatio;
+            camera.orthoRight = orthoSize * aspectRatio;
+            camera.orthoBottom = -orthoSize;
+            camera.orthoTop = orthoSize;
+        }
+
+        BABYLON.Tools.CreateScreenshot(this.engine, camera, { width: width * 2, height: height * 2 }, (data) => {
+            // Restore orthographic camera parameters
+            if (oldOrtho) {
+                camera.orthoLeft = oldOrtho.left;
+                camera.orthoRight = oldOrtho.right;
+                camera.orthoTop = oldOrtho.top;
+                camera.orthoBottom = oldOrtho.bottom;
+            }
+
+            // Create a formatted timestamp (e.g., 2026-01-17_12-00-00)
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+            const fileName = `engine_${timestamp}.png`;
+
+            const link = document.createElement('a');
+            link.setAttribute('download', fileName);
+            link.setAttribute('href', data);
+
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            console.log(`Downloaded: ${fileName}`);
+        });
+    }
+
+    setSamplingMode(target, mode) {
+        const mesh = this._getMesh(target);
+        if (!mesh) return;
+
+        const samplingMode = mode.toLowerCase() === 'nearest' ? BABYLON.Texture.NEAREST_SAMPLINGMODE : BABYLON.Texture.BILINEAR_SAMPLINGMODE;
+
+        const meshes = [mesh, ...mesh.getDescendants(false)];
+        meshes.forEach(m => {
+            if (m.material) {
+                const textures = [m.material.diffuseTexture, m.material.albedoTexture].filter(t => t != null);
+                textures.forEach(tex => {
+                    if (tex.updateSamplingMode) {
+                        tex.updateSamplingMode(samplingMode);
+                    } else {
+                        tex.samplingMode = samplingMode;
+                    }
+                });
+            }
+        });
+    }
+
+    playAnimationByIndex(target, index, loop = true) {
+        const mesh = this._getMesh(target);
+        if (!mesh) return;
+
+        if (mesh.animationGroups && mesh.animationGroups.length > index) {
+            mesh.animationGroups.forEach(ag => ag.stop());
+            mesh.animationGroups[index].start(loop);
+        } else {
+            console.warn(`Animation index ${index} not found on mesh ${mesh.name}`);
+        }
+    }
+
+    setBackgroundImage(url) {
+        if (!isValidAssetURL(url)) return;
+        this._clearBackground();
+        this.backgroundLayer = new BABYLON.Layer("backgroundLayer", url, this.scene, true);
+        this.background = 'layer';
+    }
+
+    setFpsCamera(target) {
+        let mesh = null;
+        if (typeof target === 'string') {
+            mesh = this.objects[target];
+        } else if (target && typeof target === 'object') {
+            mesh = target;
+        }
+
+        if (!mesh) {
+            console.warn("setFpsCamera: Target object not found.");
+            return;
+        }
+
+        // Dispose of the old camera
+        if (this.scene.activeCamera) {
+            this.scene.activeCamera.dispose();
+        }
+
+        // Create a new UniversalCamera
+        const camera = new BABYLON.UniversalCamera("fpsCamera", new BABYLON.Vector3(0, 1.6, 0), this.scene);
+        camera.attachControl(this.canvas, true);
+
+        // Parent the camera to the mesh
+        camera.parent = mesh;
+
+        // Set the active camera
+        this.scene.activeCamera = camera;
+    }
+
+    setIsometricCamera() {
+        let camera = this.scene.activeCamera;
+        if (camera) {
+            // If the current camera is a UniversalCamera (like our FPS one),
+            // we need to dispose it and create a new ArcRotateCamera for isometric view.
+            if (camera instanceof BABYLON.UniversalCamera) {
+                camera.dispose();
+                camera = new BABYLON.ArcRotateCamera('Camera', Math.PI / 2, Math.PI / 4, 10, BABYLON.Vector3.Zero(), this.scene);
+                camera.attachControl(this.canvas, true);
+                this.scene.activeCamera = camera;
+            }
+            camera.mode = BABYLON.Camera.ORTHOGRAPHIC_CAMERA;
+            const aspectRatio = this.engine.getRenderingCanvas().width / this.engine.getRenderingCanvas().height;
+            const orthoSize = 10;
+            camera.orthoLeft = -orthoSize * aspectRatio;
+            camera.orthoRight = orthoSize * aspectRatio;
+            camera.orthoBottom = -orthoSize;
+            camera.orthoTop = orthoSize;
+            camera.alpha = BABYLON.Tools.ToRadians(45);
+            camera.beta = BABYLON.Tools.ToRadians(45); // Classic isometric angle
+            camera.radius = 20;
+            camera.setTarget(BABYLON.Vector3.Zero());
+
+            // Detach controls to lock the camera angle
+            camera.detachControl(this.canvas);
+        }
+    }
+
+    setVisibility(target, visible) {
+        const mesh = this._getMesh(target);
+        if (mesh) {
+            mesh.isVisible = visible;
+            mesh.getChildMeshes().forEach(m => m.isVisible = visible);
+        }
+    }
+
+    destroyObject(target) {
+        const mesh = this._getMesh(target);
+        if (mesh) {
+            mesh.dispose();
+            let name;
+            if (typeof target === 'string') {
+                name = target;
+            } else if (target && typeof target === 'object' && target.name) {
+                name = target.name;
+            }
+            if (name && this.objects[name]) {
+                delete this.objects[name];
+            }
+        }
+    }
+
+    onButtonPress(button, callback) {
+        if (!this.buttonPressActions[button]) {
+            this.buttonPressActions[button] = [];
+        }
+        this.buttonPressActions[button].push(callback);
+    }
+
+
+    async playSound(url) {
+        if (!isValidAssetURL(url)) {
+            return;
+        }
+        // Create a new sound and play it.
+
+        if (!this.audioEngine) {
+            return;
+        }
+
+        let sound = await BABYLON.CreateStreamingSoundAsync("sound", url);
+
+        this.sounds.push(sound);
+
+        await this.audioEngine.unlockAsync();
+
+        sound.play();
+    }
+
+    async playSoundAsset(name, assetManager) {
+        let asset = await assetManager.getAsset(name);
+        if (asset && asset.data instanceof ArrayBuffer) {
+            this.playSound(URL.createObjectURL(new Blob([asset.data])));
+        }
+    }
+
+    playNote(frequency, duration) {
+        if (!this.audioContext) return;
+        const oscillator = this.audioContext.createOscillator();
+        const gainNode = this.audioContext.createGain();
+
+        oscillator.connect(gainNode);
+        gainNode.connect(this.audioContext.destination);
+
+        oscillator.type = 'sine'; // 'sine', 'square', 'sawtooth', 'triangle'
+        oscillator.frequency.value = frequency;
+
+        // Fade out to avoid clicking
+        gainNode.gain.setValueAtTime(1, this.audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, this.audioContext.currentTime + duration);
+
+        oscillator.start(this.audioContext.currentTime);
+        oscillator.stop(this.audioContext.currentTime + duration);
+    }
+
+    initInputListeners() {
+        window.addEventListener('keydown', (event) => {
+            this.inputState.keys[event.key.toLowerCase()] = true;
+        });
+        window.addEventListener('keyup', (event) => {
+            this.inputState.keys[event.key.toLowerCase()] = false;
+        });
+    }
+
+    initScene() {
+        const camera = new BABYLON.ArcRotateCamera('Camera', Math.PI / 2, Math.PI / 4, 10, BABYLON.Vector3.Zero(), this.scene);
+        camera.attachControl(this.canvas, true);
+
+        // Smooth navigation
+        // TODO: Via blocks
+        camera.inertia = 0.2;
+        camera.wheelPrecision = 10;
+
+        const light = new BABYLON.HemisphericLight('light', new BABYLON.Vector3(1, 1, 0), this.scene);
+        const physicsPlugin = new BABYLON.CannonJSPlugin();
+        this.scene.enablePhysics(new BABYLON.Vector3(0, -9.8, 0), physicsPlugin);
+    }
+
+    runRenderLoop() {
+        let lastTime = performance.now();
+        this.engine.runRenderLoop(() => {
+            this.processedCollisions.clear();
+            const currentTime = performance.now();
+            const deltaTime = currentTime - lastTime;
+            lastTime = currentTime;
+
+            // Reset movement direction at the start of the frame
+            this.moveDirection.set(0, 0, 0);
+
+            // Handle continuous button presses via input map
+            for (const key in this.inputState.keys) {
+                if (this.inputState.keys[key]) { // If the physical key is pressed
+                    const button = this.inputMap[key]; // Find the logical button
+                    if (button && this.buttonPressActions[button]) {
+                        this.buttonPressActions[button].forEach(action => action());
+                    }
+                }
+            }
+
+            // Handle joystick state
+            if (this.joystick_state.left && this.buttonPressActions['Left']) {
+                this.buttonPressActions['Left'].forEach(action => action());
+            }
+            if (this.joystick_state.right && this.buttonPressActions['Right']) {
+                this.buttonPressActions['Right'].forEach(action => action());
+            }
+            if (this.joystick_state.up && this.buttonPressActions['Up']) {
+                this.buttonPressActions['Up'].forEach(action => action());
+            }
+            if (this.joystick_state.down && this.buttonPressActions['Down']) {
+                this.buttonPressActions['Down'].forEach(action => action());
+            }
+
+            // Apply calculated movement
+            if (this.player && this.player.physicsImpostor) {
+                const currentVelocity = this.player.physicsImpostor.getLinearVelocity();
+                let newVelocity = new BABYLON.Vector3(0, currentVelocity.y, 0);
+
+                if (this.moveDirection.lengthSquared() > 0) {
+                    const camera = this.scene.activeCamera;
+                    let finalMoveDirection;
+
+                    // If we have a camera, adjust movement to be camera-relative
+                    if (camera) {
+                        // Get camera's forward and right vectors on the horizontal plane
+                        const cameraForward = camera.getForwardRay(1).direction;
+                        const forward = new BABYLON.Vector3(cameraForward.x, 0, cameraForward.z).normalize();
+                        const right = new BABYLON.Vector3(forward.z, 0, -forward.x);
+
+                        // Calculate the final move direction based on camera orientation
+                        // Z input moves along the camera's forward, X input moves along its right
+                        finalMoveDirection = forward.scale(this.moveDirection.z).add(right.scale(this.moveDirection.x));
+                    } else {
+                        // Fallback to original behavior if no camera
+                        finalMoveDirection = this.moveDirection.clone();
+                    }
+
+                    // Normalize to prevent faster diagonal movement and apply speed
+                    if (finalMoveDirection.lengthSquared() > 0) {
+                        const normalizedMove = finalMoveDirection.normalize().scale(this.playerSpeed);
+                        newVelocity.x = normalizedMove.x;
+                        newVelocity.z = normalizedMove.z;
+                    }
+
+                } else {
+                    // If no input, stop horizontal movement
+                    newVelocity.x = 0;
+                    newVelocity.z = 0;
+                }
+
+                this.player.physicsImpostor.setLinearVelocity(newVelocity);
+            }
+
+            this.perFrameFunctions.forEach(task => {
+                if (task.targetMesh && !task.targetMesh.isDisposed() && typeof task.func === 'function') {
+                    try {
+                        task.func(task.targetMesh, deltaTime);
+                    } catch (e) {
+                        console.error(`Error executing per-frame function for mesh ${task.targetMesh.name}:`, e);
+                    }
+                }
+            });
+            this.scene.render();
+        });
+    }
+
+    clear() {
+        if (this.joystickManager) {
+            this.joystickManager.destroy();
+            this.joystickManager = null;
+        }
+        this.uiManager.clear();
+        this.scene.dispose();
+        this.scene = new BABYLON.Scene(this.engine);
+        this.initScene();
+        this.uiManager = new UIManager(this.scene); // Re-initialize UIManager for the new scene
+        this.objects = {};
+        this.materials = {};
+
+        // Dispose all sounds
+        for (let i = 0; i < this.sounds.length; i++) {
+            this.sounds[i].dispose();
+        }
+        this.sounds = [];
+
+        this.player = null;
+        this.perFrameFunctions = [];
+        this.buttonPressActions = {};
+        this.inputState = { keys: {} }; // Reset state on clear
+    }
+
+    dispose() {
+        if (this.joystickManager) {
+            this.joystickManager.destroy();
+            this.joystickManager = null;
+        }
+        this.uiManager.dispose();
+        this.scene.dispose();
+        this.engine.dispose();
+    }
+
+    getMeshNames() {
+        return Object.keys(this.objects);
+    }
+
+    _getMesh(target) {
+        let name;
+        if (typeof target === 'string') {
+            name = target;
+        } else if (target && typeof target === 'object' && target.name) {
+            name = target.name;
+        }
+        return this.objects[name];
+    }
+
+    getProperty(target, property) {
+        if (!target || !property) {
+            return null;
+        }
+        // Special handling for UI controls, which are not in the main 'objects' list
+        if (typeof target === 'string' && this.uiManager.controls[target]) {
+            target = this.uiManager.controls[target];
+        }
+
+        const propertyPath = property.split('.');
+        let current = target;
+
+        for (let i = 0; i < propertyPath.length; i++) {
+            if (current === null || current === undefined || typeof current[propertyPath[i]] === 'undefined') {
+                return null;
+            }
+            current = current[propertyPath[i]];
+        }
+        return current;
+    }
+
+    getMetadata(target, key) {
+        const mesh = this._getMesh(target);
+        if (!mesh || !mesh.metadata || typeof mesh.metadata[key] === 'undefined') {
+            return null;
+        }
+        return mesh.metadata[key];
+    }
+
+    setMetadata(target, key, value) {
+        const mesh = this._getMesh(target);
+        if (!mesh) return;
+
+        if (!mesh.metadata) {
+            mesh.metadata = {};
+        }
+        mesh.metadata[key] = value;
+    }
+
+    animateProperty(target, property, from, to, duration, loop, loopMode) {
+        const mesh = this._getMesh(target);
+        if (!mesh) return;
+
+        const frameRate = 30;
+        const totalFrames = frameRate * duration;
+
+        // Determine the data type of the property
+        let propertyType;
+        const propertyPath = property.split('.');
+        let temp = mesh;
+        for (let i = 0; i < propertyPath.length; i++) {
+            if (temp[propertyPath[i]] === undefined) {
+                console.error("Invalid property path");
+                return;
+            }
+            temp = temp[propertyPath[i]];
+        }
+
+        if (typeof temp === 'number') {
+            propertyType = BABYLON.Animation.ANIMATIONTYPE_FLOAT;
+        } else if (temp instanceof BABYLON.Vector3) {
+            propertyType = BABYLON.Animation.ANIMATIONTYPE_VECTOR3;
+        } else if (temp instanceof BABYLON.Color3) {
+            propertyType = BABYLON.Animation.ANIMATIONTYPE_COLOR3;
+        } else {
+            console.error("Unsupported animation property type");
+            return;
+        }
+
+        const bjsLoopMode = BABYLON.Animation.ANIMATIONLOOPMODE_CYCLE;
+
+        const animation = new BABYLON.Animation(
+            "animation",
+            property,
+            frameRate,
+            propertyType,
+            bjsLoopMode
+        );
+
+        const keys = [];
+        keys.push({ frame: 0, value: from });
+        keys.push({ frame: totalFrames, value: to });
+        if (loopMode === 'PINGPONG') {
+            keys.push({ frame: totalFrames * 2, value: from });
+        }
+
+        animation.setKeys(keys);
+
+        // Stop any previous animations on the same property before starting a new one
+        this.scene.stopAnimation(mesh, property);
+
+        const endFrame = loopMode === 'PINGPONG' ? totalFrames * 2 : totalFrames;
+        this.scene.beginDirectAnimation(mesh, [animation], 0, endFrame, loop);
+    }
+
+    async importAnimation(url) {
+        if (!isValidAssetURL(url)) {
+            return null;
+        }
+        try {
+            // Note: LoadAssetContainerAsync is better for animations as it doesn't add to scene automatically.
+            const container = await BABYLON.SceneLoader.LoadAssetContainerAsync("", url, this.scene);
+            if (container.animationGroups.length > 0) {
+                const animationGroup = container.animationGroups[0];
+                animationGroup.stop(); // Stop by default
+                // We don't add meshes to the scene, just return the animation group
+                return animationGroup;
+            }
+        } catch (error) {
+            console.error(`Failed to load animation from URL: ${url}`, error);
+        }
+        return null;
+    }
+
+    applyAnimation(animationGroup, target) {
+        const mesh = this._getMesh(target);
+        if (mesh && animationGroup) {
+            // Target the animation to the mesh's skeleton
+            animationGroup.targetedAnimations.forEach(anim => {
+                const targetNode = this.scene.getBoneByName(anim.target.name) || this.scene.getTransformNodeByName(anim.target.name);
+                if(targetNode) {
+                    anim.target = targetNode;
+                }
+            });
+            mesh.animationGroups = mesh.animationGroups || [];
+            mesh.animationGroups.push(animationGroup);
+        }
+    }
+
+    playAnimation(target, from, to, loop) {
+        const mesh = this._getMesh(target);
+        if (mesh && mesh.animationGroups && mesh.animationGroups.length > 0) {
+            mesh.animationGroups.forEach(ag => {
+                ag.start(loop, 1.0, from, to);
+            });
+        }
+    }
+
+    stopSkeletalAnimation(target) {
+        const mesh = this._getMesh(target);
+        if (mesh && mesh.animationGroups) {
+            mesh.animationGroups.forEach(ag => ag.stop());
+        }
+    }
+
+    stopPropertyAnimation(target) {
+        const mesh = this._getMesh(target);
+        if (mesh) {
+            this.scene.stopAnimation(mesh);
+        }
+    }
+
+    animateRotation(target, x, y, z, duration, loop, loopMode) {
+        const mesh = this._getMesh(target);
+        if (!mesh) return;
+
+        // Ensure the mesh is using quaternions for rotation
+        if (!mesh.rotationQuaternion) {
+            mesh.rotationQuaternion = BABYLON.Quaternion.FromEulerVector(mesh.rotation);
+        }
+
+        const frameRate = 30;
+        const totalFrames = frameRate * duration;
+
+        const animation = new BABYLON.Animation(
+            "rotationAnimation",
+            "rotationQuaternion",
+            frameRate,
+            BABYLON.Animation.ANIMATIONTYPE_QUATERNION,
+            BABYLON.Animation.ANIMATIONLOOPMODE_CYCLE
+        );
+
+        const startRotation = mesh.rotationQuaternion;
+        const endRotation = BABYLON.Quaternion.FromEulerAngles(
+            BABYLON.Tools.ToRadians(x),
+            BABYLON.Tools.ToRadians(y),
+            BABYLON.Tools.ToRadians(z)
+        );
+
+        const keys = [];
+        keys.push({ frame: 0, value: startRotation });
+        keys.push({ frame: totalFrames, value: endRotation });
+        if (loopMode === 'PINGPONG') {
+            keys.push({ frame: totalFrames * 2, value: startRotation });
+        }
+
+        animation.setKeys(keys);
+
+        // Use shortest path for quaternion interpolation
+        animation.useShortestPath = true;
+
+        this.scene.stopAnimation(mesh, "rotationQuaternion");
+
+        const endFrame = loopMode === 'PINGPONG' ? totalFrames * 2 : totalFrames;
+        this.scene.beginDirectAnimation(mesh, [animation], 0, endFrame, loop);
+    }
+
+    animatePosition(target, x, y, z, duration, loop, loopMode) {
+        const mesh = this._getMesh(target);
+        if (!mesh) return;
+
+        const frameRate = 30;
+        const totalFrames = frameRate * duration;
+
+        const animation = new BABYLON.Animation(
+            "positionAnimation",
+            "position",
+            frameRate,
+            BABYLON.Animation.ANIMATIONTYPE_VECTOR3,
+            BABYLON.Animation.ANIMATIONLOOPMODE_CYCLE
+        );
+
+        const startPosition = mesh.position;
+        const endPosition = new BABYLON.Vector3(x, y, z);
+
+        const keys = [];
+        keys.push({ frame: 0, value: startPosition });
+        keys.push({ frame: totalFrames, value: endPosition });
+        if (loopMode === 'PINGPONG') {
+            keys.push({ frame: totalFrames * 2, value: startPosition });
+        }
+
+        animation.setKeys(keys);
+
+        this.scene.stopAnimation(mesh, "position");
+
+        const endFrame = loopMode === 'PINGPONG' ? totalFrames * 2 : totalFrames;
+        this.scene.beginDirectAnimation(mesh, [animation], 0, endFrame, loop);
+    }
+
+    animateScale(target, x, y, z, duration, loop, loopMode) {
+        const mesh = this._getMesh(target);
+        if (!mesh) return;
+
+        const frameRate = 30;
+        const totalFrames = frameRate * duration;
+
+        const animation = new BABYLON.Animation(
+            "scaleAnimation",
+            "scaling",
+            frameRate,
+            BABYLON.Animation.ANIMATIONTYPE_VECTOR3,
+            BABYLON.Animation.ANIMATIONLOOPMODE_CYCLE
+        );
+
+        const startScale = mesh.scaling;
+        const endScale = new BABYLON.Vector3(x, y, z);
+
+        const keys = [];
+        keys.push({ frame: 0, value: startScale });
+        keys.push({ frame: totalFrames, value: endScale });
+        if (loopMode === 'PINGPONG') {
+            keys.push({ frame: totalFrames * 2, value: startScale });
+        }
+
+        animation.setKeys(keys);
+
+        this.scene.stopAnimation(mesh, "scaling");
+
+        const endFrame = loopMode === 'PINGPONG' ? totalFrames * 2 : totalFrames;
+        this.scene.beginDirectAnimation(mesh, [animation], 0, endFrame, loop);
+    }
+
+    createEnvironment(options) {
+        this._clearBackground();
+        this.environmentHelper = this.scene.createDefaultEnvironment(options);
+    }
+
+    setBackground(backgroundInput) {
+        this._clearBackground();
+
+        // Check if the input is a hex color
+        if (/^#([0-9A-F]{3}){1,2}$/i.test(backgroundInput)) {
+            this.scene.clearColor = BABYLON.Color3.FromHexString(backgroundInput);
+            this.background = 'color';
+        } else {
+            // Assume it's a texture name
+            const skybox = BABYLON.MeshBuilder.CreateBox("skyBox", { size: 1000.0 }, this.scene);
+            const skyboxMaterial = new BABYLON.StandardMaterial("skyBoxMaterial", this.scene);
+            skyboxMaterial.backFaceCulling = false;
+            skyboxMaterial.disableLighting = true;
+
+            skybox.infiniteDistance = true;
+
+            let texture;
+            switch (backgroundInput) {
+                case 'brick':
+                    texture = new BABYLON.BrickProceduralTexture("brickTexture", 512, this.scene);
+                    texture.numberOfBricksHeight = 6;
+                    texture.numberOfBricksWidth = 10;
+                    //skyboxMaterial.diffuseTexture = texture;
+                    break;
+                case 'grass':
+                    texture = new BABYLON.GrassProceduralTexture("grassTexture", 256, this.scene);
+                    //skyboxMaterial.ambientTexture = texture;
+                    break;
+                case 'road':
+                    texture = new BABYLON.BrickProceduralTexture("roadTexture", 512, this.scene);
+                    //skyboxMaterial.diffuseTexture = texture;
+                    break;
+                case 'wood':
+                    texture = new BABYLON.WoodProceduralTexture("woodTexture", 1024, this.scene);
+                    texture.ampScale = 80.0;
+                    //skyboxMaterial.diffuseTexture = texture;
+                    break;
+                case 'marble':
+                    texture = new BABYLON.MarbleProceduralTexture("marbleTexture", 512, this.scene);
+                    texture.numberOfTilesHeight = 5;
+                    texture.numberOfTilesWidth = 5;
+                    //skyboxMaterial.ambientTexture = texture;
+                    break;
+                case 'fire':
+                    texture = new BABYLON.FireProceduralTexture("fireTexture", 256, this.scene);
+                    //skyboxMaterial.diffuseTexture = texture;
+                    //skyboxMaterial.opacityTexture = texture;
+                    break;
+                case 'clouds':
+                    texture = new BABYLON.CloudProceduralTexture("cloudTexture", 1024, this.scene);
+                    //skyboxMaterial.emissiveTexture = texture;
+                    //skyboxMaterial.backFaceCulling = false;
+                    //skyboxMaterial.emissiveTexture.coordinatesMode = BABYLON.Texture.SKYBOX_MODE;
+                    break;
+                default:
+                    console.warn(`Unknown background texture: ${backgroundInput}`);
+                    skybox.dispose(); // clean up the created skybox
+                    return;
+            }
+
+            skyboxMaterial.reflectionTexture = texture;
+            skyboxMaterial.reflectionTexture.coordinatesMode = BABYLON.Texture.SKYBOX_MODE;
+            skybox.material = skyboxMaterial;
+            this.background = skybox;
+        }
+    }
+
+    _clearBackground() {
+        if (this.background) {
+            if (this.background.dispose) {
+                this.background.dispose();
+            }
+            this.background = null;
+        }
+        if (this.backgroundLayer) {
+            this.backgroundLayer.dispose();
+            this.backgroundLayer = null;
+        }
+        if (this.environmentHelper) {
+            this.environmentHelper.dispose();
+            this.environmentHelper = null;
+        }
+        // Reset clear color to default, Babylon's default is cornflower blue, let's use it
+        this.scene.clearColor = new BABYLON.Color4(100 / 255, 149 / 255, 237 / 255, 1);
+    }
+}
+
+class UIManager {
+    constructor(scene) {
+        this.scene = scene;
+        this.advancedTexture = BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI("UI", true, this.scene);
+        this.controls = {};
+        this.assetUrls = {};
+    }
+
+    createText(name, text, options = {}) {
+        const textBlock = new BABYLON.GUI.TextBlock(name, text);
+        textBlock.resizeToFit = true;
+        textBlock.color = options.color || "white";
+        textBlock.fontSize = options.fontSize || 24;
+        textBlock.top = options.top || "0px";
+        textBlock.left = options.left || "0px";
+        textBlock.horizontalAlignment = options.horizontalAlignment !== undefined ? options.horizontalAlignment : BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_CENTER;
+        textBlock.verticalAlignment = options.verticalAlignment !== undefined ? options.verticalAlignment : BABYLON.GUI.Control.VERTICAL_ALIGNMENT_CENTER;
+        this.advancedTexture.addControl(textBlock);
+        this.controls[name] = textBlock;
+        return textBlock;
+    }
+
+    setText(name, text) {
+        if (this.controls[name] && this.controls[name].text !== undefined) {
+            this.controls[name].text = text;
+        }
+    }
+
+    createInput(name, options = {}) {
+        const inputText = new BABYLON.GUI.InputText(name);
+        inputText.width = options.width || "200px";
+        inputText.height = options.height || "40px";
+        inputText.color = options.color || "white";
+        inputText.background = options.background || "grey";
+        inputText.top = options.top || "0px";
+        inputText.left = options.left || "0px";
+        inputText.horizontalAlignment = options.horizontalAlignment !== undefined ? options.horizontalAlignment : BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_CENTER;
+        inputText.verticalAlignment = options.verticalAlignment !== undefined ? options.verticalAlignment : BABYLON.GUI.Control.VERTICAL_ALIGNMENT_CENTER;
+        this.advancedTexture.addControl(inputText);
+        this.controls[name] = inputText;
+        return inputText;
+    }
+
+    getInputText(name) {
+        if (this.controls[name] && this.controls[name].text !== undefined) {
+            return this.controls[name].text;
+        }
+        return "";
+    }
+
+
+    createButton(name, text, options = {}) {
+        const button = BABYLON.GUI.Button.CreateSimpleButton(name, text);
+        button.width = options.width || "150px";
+        button.height = options.height || "40px";
+        button.color = options.color || "white";
+        button.background = options.background || "green";
+        button.top = options.top || "0px";
+        button.left = options.left || "0px";
+        button.horizontalAlignment = options.horizontalAlignment !== undefined ? options.horizontalAlignment : BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_CENTER;
+        button.verticalAlignment = options.verticalAlignment !== undefined ? options.verticalAlignment : BABYLON.GUI.Control.VERTICAL_ALIGNMENT_CENTER;
+        this.advancedTexture.addControl(button);
+        this.controls[name] = button;
+        return button;
+    }
+
+    createImage(name, url, options = {}) {
+        if (!isValidAssetURL(url)) {
+            return null;
+        }
+        const image = new BABYLON.GUI.Image(name, url);
+        image.width = options.width || "100px";
+        image.height = options.height || "100px";
+        image.top = options.top || "0px";
+        image.left = options.left || "0px";
+        image.horizontalAlignment = options.horizontalAlignment !== undefined ? options.horizontalAlignment : BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_CENTER;
+        image.verticalAlignment = options.verticalAlignment !== undefined ? options.verticalAlignment : BABYLON.GUI.Control.VERTICAL_ALIGNMENT_CENTER;
+        this.advancedTexture.addControl(image);
+        this.controls[name] = image;
+        return image;
+    }
+
+    createImageFromAsset(name, asset, options = {}) {
+        if (this.controls[name]) {
+            this.controls[name].dispose();
+        }
+
+        if (this.assetUrls[name]) {
+            URL.revokeObjectURL(this.assetUrls[name]);
+        }
+
+        const url = URL.createObjectURL(asset.data);
+        this.assetUrls[name] = url; // Store the URL
+        const image = new BABYLON.GUI.Image(name, url);
+
+        // Set properties
+        Object.keys(options).forEach(key => {
+            if (key in image) {
+                image[key] = options[key];
+            }
+        });
+
+        this.advancedTexture.addControl(image);
+        this.controls[name] = image;
+
+        return image;
+    }
+
+    onControlClick(name, callback) {
+        if (this.controls[name]) {
+            this.controls[name].onPointerClickObservable.add(callback);
+        }
+    }
+
+    getControlByName(name) {
+        return this.controls[name];
+    }
+
+    createPopup(name, title, options = {}) {
+        if (this.controls[name]) {
+            console.warn(`Popup with name "${name}" already exists. Creation ignored.`);
+            return;
+        }
+
+        // Create a full-screen, semi-transparent container
+        const container = new BABYLON.GUI.Rectangle(name);
+        container.width = "100%";
+        container.height = "100%";
+        container.thickness = 0; // No border
+        container.background = "rgba(0, 0, 0, 0.7)";
+        container.isVisible = false; // Initially hidden
+        this.advancedTexture.addControl(container);
+        this.controls[name] = container;
+
+        // Create a stack panel for vertical alignment of content
+        const panel = new BABYLON.GUI.StackPanel();
+        panel.width = "80%";
+        panel.maxWidth = "500px";
+        container.addControl(panel);
+
+        // Add Image if provided
+        if (options.image) {
+            const image = new BABYLON.GUI.Image(`${name}_image`, options.image);
+            image.width = "150px";
+            image.height = "150px";
+            image.paddingBottom = "20px";
+            panel.addControl(image);
+        }
+
+        // Add Title
+        const titleBlock = new BABYLON.GUI.TextBlock(`${name}_title`, title);
+        titleBlock.resizeToFit = true;
+        titleBlock.color = "white";
+        titleBlock.fontSize = 32;
+        titleBlock.paddingBottom = "20px";
+        panel.addControl(titleBlock);
+
+        // Add Text if provided
+        if (options.text) {
+            const textBlock = new BABYLON.GUI.TextBlock(`${name}_text`, options.text);
+            textBlock.resizeToFit = true;
+            textBlock.color = "white";
+            textBlock.fontSize = 24;
+            textBlock.paddingBottom = "20px";
+            panel.addControl(textBlock);
+        }
+
+        // Add Button 1 if text is provided
+        if (options.button1_text) {
+            const button1_name = options.button1_name || `${name}_button1`;
+            const button1 = BABYLON.GUI.Button.CreateSimpleButton(button1_name, options.button1_text);
+            button1.width = "200px";
+            button1.height = "50px";
+            button1.color = "white";
+            button1.background = "green";
+            button1.paddingBottom = "10px";
+            panel.addControl(button1);
+            this.controls[button1_name] = button1;
+        }
+
+        // Add Button 2 if text is provided
+        if (options.button2_text) {
+            const button2_name = options.button2_name || `${name}_button2`;
+            const button2 = BABYLON.GUI.Button.CreateSimpleButton(button2_name, options.button2_text);
+            button2.width = "200px";
+            button2.height = "50px";
+            button2.color = "white";
+            button2.background = "blue";
+            panel.addControl(button2);
+            this.controls[button2_name] = button2;
+        }
+
+        return container;
+    }
+
+    showPopup(target) {
+        let control = null;
+        if (typeof target === 'string') {
+            control = this.controls[target];
+        } else if (target && typeof target.isVisible !== 'undefined') {
+            control = target;
+        }
+
+        if (control) {
+            control.isVisible = true;
+        } else {
+            console.warn(`Popup not found.`);
+        }
+    }
+
+    hidePopup(target) {
+        let control = null;
+        if (typeof target === 'string') {
+            control = this.controls[target];
+        } else if (target && typeof target.isVisible !== 'undefined') {
+            control = target;
+        }
+
+        if (control) {
+            control.isVisible = false;
+        } else {
+            console.warn(`Popup not found.`);
+        }
+    }
+
+    clear() {
+        // Dispose all controls
+        for (const name in this.controls) {
+            this.controls[name].dispose();
+        }
+        this.controls = {};
+
+        // Revoke all created asset URLs
+        for (const name in this.assetUrls) {
+            URL.revokeObjectURL(this.assetUrls[name]);
+        }
+        this.assetUrls = {};
+    }
+
+    dispose() {
+        this.clear();
+        this.advancedTexture.dispose();
+    }
+}
+
+// Define a custom theme for Digital Education Safety
+Blockly.Themes.DigitalEducationSafety = Blockly.Theme.defineTheme('digital-education-safety', {
+    'base': Blockly.Themes.Classic,
+    'categoryStyles': {
+        'logic_category': { 'colour': '#4C97FF' },      // A vibrant blue for logic
+        'loop_category': { 'colour': '#FFBF00' },       // A bright yellow for loops, like Scratch
+        'math_category': { 'colour': '#59C059' },       // A friendly green for math
+        'text_category': { 'colour': '#9966FF' },       // A gentle purple for text
+        'list_category': { 'colour': '#FF6680' },       // A distinct pink/red for lists
+        'colour_category': { 'colour': '#CF63CF' },
+        'variable_category': { 'colour': '#FF8C1A' },   // A bold orange for variables
+        'procedure_category': { 'colour': '#FF6347' },  // Tomato red for functions
+        'audio_category': { 'colour': '#5B80A5' },      // Kept the original, can be changed
+        'motion_category': { 'colour': '#4C97FF' },     // Blue for motion/objects
+        'scene_category': { 'colour': '#59C059' },      // Green for scene elements
+        'physics_category': { 'colour': '#A55B80' },    // Kept original for physics
+        'gameplay_category': { 'colour': '#FF6347' },   // Red for gameplay actions
+        'assets_category': { 'colour': '#FF8C1A' }      // Orange for assets
+    },
+    'blockStyles': {
+        'logic_blocks': { 'colourPrimary': '#4C97FF', 'colourSecondary': '#6CA7FF', 'colourTertiary': '#3C87EF' },
+        'loop_blocks': { 'colourPrimary': '#FFBF00', 'colourSecondary': '#FFD44C', 'colourTertiary': '#E6AC00' },
+        'math_blocks': { 'colourPrimary': '#59C059', 'colourSecondary': '#73C873', 'colourTertiary': '#4FAA4F' },
+        'text_blocks': { 'colourPrimary': '#9966FF', 'colourSecondary': '#AD85FF', 'colourTertiary': '#8A4DFF' },
+        'list_blocks': { 'colourPrimary': '#FF6680', 'colourSecondary': '#FF8095', 'colourTertiary': '#FF4D6A' },
+        'variable_blocks': { 'colourPrimary': '#FF8C1A', 'colourSecondary': '#FFA347', 'colourTertiary': '#E67E00' },
+        'procedure_blocks': { 'colourPrimary': '#FF6347', 'colourSecondary': '#FF7D66', 'colourTertiary': '#E65A40' },
+        'motion_blocks': { 'colourPrimary': '#4C97FF', 'colourSecondary': '#6CA7FF', 'colourTertiary': '#3C87EF' },
+        'scene_blocks': { 'colourPrimary': '#59C059', 'colourSecondary': '#73C873', 'colourTertiary': '#4FAA4F' },
+        'physics_blocks': { 'colourPrimary': '#A55B80', 'colourSecondary': '#B57B90', 'colourTertiary': '#954B70' },
+        'gameplay_blocks': { 'colourPrimary': '#FF6347', 'colourSecondary': '#FF7D66', 'colourTertiary': '#E65A40' },
+        'assets_blocks': { 'colourPrimary': '#FF8C1A', 'colourSecondary': '#FFA347', 'colourTertiary': '#E67E00' }
+    },
+    'componentStyles': {
+        'workspaceBackgroundColour': '#F9F9F9',
+        'toolboxBackgroundColour': '#FFFFFF',
+        'toolboxForegroundColour': '#585858',
+        'flyoutBackgroundColour': '#F0F0F0',
+        'flyoutForegroundColour': '#424242',
+        'scrollbarColour': '#D4D4D4',
+        'insertionMarkerColour': '#FFCC00',
+        'insertionMarkerOpacity': 0.5
+    },
+    'fontStyle': { 'family': '"Helvetica Neue", "Arial", sans-serif', 'weight': '500', 'size': 11 }
+});
+
+
+const workspace = Blockly.inject('blocklyDiv', {
+    toolbox: toolbox,
+    theme: Blockly.Themes.DigitalEducationSafety,
+    undoStack: true,
+    redoStack: true,
+    renderer: 'zelos',
+    horizontalLayout: true,
+    toolboxPosition: 'end',
+    zoom: {
+        controls: true,
+        wheel: true,
+        startScale: 0.8,
+        maxScale: 3,
+        minScale: 0,
+        scaleSpeed: 1.2,
+        pinch: true
+    },
+    trashcan: true
+});
+window.workspace = workspace;
+
+function getModelAssets() {
+    const modelOptions = assetManager.assets
+        .filter(asset => asset.type.startsWith('model/') || asset.name.endsWith('.glb') || asset.name.endsWith('.gltf'))
+        .map(asset => [asset.name, asset.name]);
+    return modelOptions.length > 0 ? modelOptions : [['none', 'NONE']];
+}
+
+function getAudioAssets() {
+    const audioOptions = assetManager.assets
+        .filter(asset => asset.type.startsWith('audio/'))
+        .map(asset => [asset.name, asset.name]);
+    return audioOptions.length > 0 ? audioOptions : [['none', 'NONE']];
+}
+
+function getImageAssets() {
+    const imageOptions = assetManager.assets
+        .filter(asset => asset.type.startsWith('image/'))
+        .map(asset => [asset.name, asset.name]);
+    return imageOptions.length > 0 ? imageOptions : [['none', 'NONE']];
+}
+
+Blockly.Blocks['asset_model'] = {
+    init: function () {
+        this.appendDummyInput()
+            .appendField("model asset")
+            .appendField(new Blockly.FieldDropdown(getModelAssets), "ASSET");
+        this.setOutput(true, "String");
+        this.setColour('#A55B5B');
+        this.setTooltip("Selects a model asset.");
+        this.setHelpUrl("");
+    }
+};
+
+Blockly.Blocks['asset_audio'] = {
+    init: function () {
+        this.appendDummyInput()
+            .appendField("audio asset")
+            .appendField(new Blockly.FieldDropdown(getAudioAssets), "ASSET");
+        this.setOutput(true, "String");
+        this.setColour('#A55B5B');
+        this.setTooltip("Selects an audio asset.");
+        this.setHelpUrl("");
+    }
+};
+
+Blockly.Blocks['asset_image'] = {
+    init: function () {
+        this.appendDummyInput()
+            .appendField("image asset")
+            .appendField(new Blockly.FieldDropdown(getImageAssets), "ASSET");
+        this.setOutput(true, "String");
+        this.setColour('#A55B5B');
+        this.setTooltip("Selects an image asset.");
+        this.setHelpUrl("");
+    }
+};
+
+Blockly.defineBlocksWithJsonArray([
+    {
+        "type": "take_screenshot",
+        "message0": "take screenshot",
+        "previousStatement": null,
+        "nextStatement": null,
+        "colour": "#5BA55B",
+        "tooltip": "Takes a screenshot of the current view and downloads it.",
+        "helpUrl": ""
+    },
+    {
+        "type": "set_pixelated_look",
+        "message0": "set pixelated look on %1",
+        "args0": [
+            {
+                "type": "input_value",
+                "name": "OBJECT"
+            }
+        ],
+        "previousStatement": null,
+        "nextStatement": null,
+        "colour": "#4C97FF",
+        "tooltip": "Sets the sampling mode of all textures on the object to Nearest to achieve a pixelated look.",
+        "helpUrl": ""
+    },
+    {
+        "type": "set_background_image",
+        "message0": "set background image from URL %1",
+        "args0": [
+            {
+                "type": "input_value",
+                "name": "URL",
+                "check": "String"
+            }
+        ],
+        "previousStatement": null,
+        "nextStatement": null,
+        "colour": "#59C059",
+        "tooltip": "Sets the scene background to an image from the specified URL.",
+        "helpUrl": ""
+    },
+    {
+        "type": "play_animation_by_index",
+        "message0": "play animation index %1 on %2 loop %3",
+        "args0": [
+            {
+                "type": "input_value",
+                "name": "INDEX",
+                "check": "Number"
+            },
+            {
+                "type": "input_value",
+                "name": "OBJECT"
+            },
+            {
+                "type": "field_checkbox",
+                "name": "LOOP",
+                "checked": true
+            }
+        ],
+        "inputsInline": true,
+        "previousStatement": null,
+        "nextStatement": null,
+        "colour": "#FF6347",
+        "tooltip": "Plays an animation from the model by its index.",
+        "helpUrl": ""
+    },
+    {
+        "type": "import_model_from_asset",
+        "message0": "import model from asset %1 as %2",
+        "args0": [
+            {
+                "type": "input_value",
+                "name": "ASSET",
+                "check": "String"
+            },
+            {
+                "type": "field_variable",
+                "name": "VAR",
+                "variable": "model"
+            }
+        ],
+        "previousStatement": null,
+        "nextStatement": null,
+        "colour": "%{BKY_MATH_HUE}",
+        "tooltip": "Imports a model from the asset manager.",
+        "helpUrl": ""
+    },
+    {
+        "type": "play_sound_from_asset",
+        "message0": "play sound from asset %1",
+        "args0": [
+            {
+                "type": "input_value",
+                "name": "ASSET",
+                "check": "String"
+            }
+        ],
+        "previousStatement": null,
+        "nextStatement": null,
+        "colour": "%{BKY_AUDIO_HUE}",
+        "tooltip": "Plays a sound from the asset manager.",
+        "helpUrl": ""
+    },
+    {
+        "type": "set_texture_from_asset",
+        "message0": "set texture of %1 to asset %2",
+        "args0": [
+            {
+                "type": "input_value",
+                "name": "OBJECT"
+            },
+            {
+                "type": "input_value",
+                "name": "ASSET",
+                "check": "String"
+            }
+        ],
+        "previousStatement": null,
+        "nextStatement": null,
+        "colour": "%{BKY_MATH_HUE}",
+        "tooltip": "Sets the texture of an object from an image asset.",
+        "helpUrl": ""
+    },
+    {
+        "type": "position_model",
+        "message0": "position model %1 at X %2 Y %3 Z %4",
+        "args0": [
+            {
+                "type": "input_value",
+                "name": "MODEL"
+            },
+            {
+                "type": "input_value",
+                "name": "X"
+            },
+            {
+                "type": "input_value",
+                "name": "Y"
+            },
+            {
+                "type": "input_value",
+                "name": "Z"
+            }
+        ],
+        "inputsInline": true,
+        "previousStatement": null,
+        "nextStatement": null,
+        "colour": 160,
+        "tooltip": "Sets the position of the model to the specified X, Y, and Z coordinates",
+        "helpUrl": ""
+    },
+    {
+        "type": "point_camera_at_mesh",
+        "message0": "point camera at mesh %1",
+        "args0": [
+            {
+                "type": "field_variable",
+                "name": "MESH",
+                "variable": "mesh"
+            }
+        ],
+        "inputsInline": true,
+        "previousStatement": null,
+        "nextStatement": null,
+        "colour": 230,
+        "tooltip": "Points the camera at the specified mesh",
+        "helpUrl": ""
+    },
+    {
+        type: 'import_3d_file_url',
+        message0: 'Import model URL %1\r\n',
+        args0: [
+            {
+                type: 'field_input',
+                name: 'MODEL_URL',
+                text: 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/main/2.0/Duck/glTF-Binary/Duck.glb',
+            }
+        ],
+        message1: 'Place at X %1 Y %2 Z %3',
+        args1: [
+            {
+                type: 'field_number',
+                name: 'POS_X',
+                value: 0,
+            },
+            {
+                type: 'field_number',
+                name: 'POS_Y',
+                value: 0,
+            },
+            {
+                type: 'field_number',
+                name: 'POS_Z',
+                value: 0,
+            },
+        ],
+        colour: 160,
+        tooltip: 'Imports a 3D file from a URL and executes actions on success.',
+        output: "Mesh",
+        helpUrl: '',
+        extensions: [
+            'set_max_display_length',
+        ],
+    },
+    {
+        type: 'set_isometric_camera',
+        message0: 'Set camera to isometric view',
+        args0: [],
+        previousStatement: null,
+        nextStatement: null,
+        colour: 160,
+        tooltip: 'Sets the active camera to an isometric angle pointing at the origin.',
+        helpUrl: '',
+    },
+    {
+        type: 'set_fps_camera',
+        message0: 'set first-person camera on %1',
+        args0: [
+            {
+                type: 'input_value',
+                name: 'OBJECT',
+            },
+        ],
+        previousStatement: null,
+        nextStatement: null,
+        colour: 160,
+        tooltip: 'Attaches a first-person camera to the specified object.',
+        helpUrl: '',
+    },
+    {
+        type: 'create_box',
+        message0: 'Create box named %1 at x %2 y %3 z %4',
+        args0: [
+            { "type": "input_value", "name": "NAME", "check": "String" },
+            { type: 'input_value', name: 'X', check: 'Number' },
+            { type: 'input_value', name: 'Y', check: 'Number' },
+            { type: 'input_value', name: 'Z', check: 'Number' },
+        ],
+        "inputsInline": true,
+        output: "Mesh",
+        colour: 160,
+        tooltip: 'Creates a box at the specified position and returns it.',
+    },
+    {
+        type: 'create_sphere',
+        message0: 'Create sphere at x %1 y %2 z %3',
+        args0: [
+            { type: 'input_value', name: 'X', check: 'Number' },
+            { type: 'input_value', name: 'Y', check: 'Number' },
+            { type: 'input_value', name: 'Z', check: 'Number' },
+        ],
+        "inputsInline": true,
+        output: "Mesh",
+        colour: 160,
+        tooltip: 'Creates a sphere at the specified position and returns it.',
+    },
+    {
+        "type": "create_3d_text",
+        "message0": "create 3D text %1 named %2",
+        "args0": [
+            { "type": "input_value", "name": "TEXT", "check": "String" },
+            { "type": "input_value", "name": "NAME", "check": "String" },
+        ],
+        "message1": "font URL %1",
+        "args1": [
+            { "type": "field_input", "name": "FONT_URL", "text": "https://assets.babylonjs.com/fonts/Droid Sans_Bold.json" }
+        ],
+        "output": "Mesh",
+        "colour": 160,
+        "inputsInline": false,
+        "tooltip": "Creates a 3D text mesh.",
+        "helpUrl": ""
+    },
+    {
+        "type": "scale_object",
+        "message0": "scale object %1 by x %2 y %3 z %4",
+        "args0": [
+            { "type": "input_value", "name": "OBJECT" },
+            { "type": "input_value", "name": "X", "check": "Number" },
+            { "type": "input_value", "name": "Y", "check": "Number" },
+            { "type": "input_value", "name": "Z", "check": "Number" }
+        ],
+        "inputsInline": true,
+        "previousStatement": null,
+        "nextStatement": null,
+        "colour": 210,
+        "tooltip": "Scales an object."
+    },
+    {
+        "type": "get_property",
+        "message0": "get property %1 of object %2",
+        "args0": [
+            {
+                "type": "input_value",
+                "name": "PROPERTY",
+                "check": "String"
+            },
+            {
+                "type": "input_value",
+                "name": "OBJECT"
+            }
+        ],
+        "output": null,
+        "colour": 230,
+        "tooltip": "Gets a property from an object.",
+        "helpUrl": ""
+    },
+    {
+        "type": "set_metadata",
+        "message0": "set metadata key %1 on object %2 to value %3",
+        "args0": [
+            { "type": "input_value", "name": "KEY", "check": "String" },
+            { "type": "input_value", "name": "OBJECT" },
+            { "type": "input_value", "name": "VALUE" }
+        ],
+        "inputsInline": true,
+        "previousStatement": null,
+        "nextStatement": null,
+        "colour": 230,
+        "tooltip": "Sets a metadata key-value pair on an object."
+    },
+    {
+        "type": "get_metadata",
+        "message0": "get metadata key %1 from object %2",
+        "args0": [
+            { "type": "input_value", "name": "KEY", "check": "String" },
+            { "type": "input_value", "name": "OBJECT" }
+        ],
+        "output": null,
+        "colour": 230,
+        "tooltip": "Gets a metadata value from an object by its key."
+    },
+    {
+        type: 'move_object',
+        message0: 'Move object %1 to x %2 y %3 z %4',
+        args0: [
+            { type: 'input_value', name: 'NAME' },
+            { type: 'input_value', name: 'X', check: 'Number' },
+            { type: 'input_value', name: 'Y', check: 'Number' },
+            { type: 'input_value', name: 'Z', check: 'Number' },
+        ],
+        "inputsInline": true,
+        previousStatement: null,
+        nextStatement: null,
+        colour: 210,
+        tooltip: 'Moves an object to the specified position',
+    },
+    {
+        type: 'create_light',
+        message0: 'Create light named %1 at x %2 y %3 z %4',
+        args0: [
+            { type: 'field_input', name: 'NAME', text: 'light' },
+            { type: 'input_value', name: 'X', check: 'Number' },
+            { type: 'input_value', name: 'Y', check: 'Number' },
+            { type: 'input_value', name: 'Z', check: 'Number' },
+        ],
+        "inputsInline": true,
+        previousStatement: null,
+        nextStatement: null,
+        colour: 65,
+        tooltip: 'Creates a light at the specified position',
+    },
+    {
+        type: 'change_object_color',
+        message0: 'Change color of %1 to %2',
+        args0: [
+            { type: 'input_value', name: 'NAME' },
+            { type: 'input_value', name: 'COLOR' },
+        ],
+        "inputsInline": true,
+        previousStatement: null,
+        nextStatement: null,
+        colour: 210,
+        tooltip: 'Changes the color of the specified object',
+    },
+    {
+        type: 'rotate_object',
+        message0: 'Rotate %1 by x %2 y %3 z %4 degrees',
+        args0: [
+            { type: 'input_value', name: 'NAME' },
+            { type: 'input_value', name: 'X', check: 'Number' },
+            { type: 'input_value', name: 'Y', check: 'Number' },
+            { type: 'input_value', name: 'Z', check: 'Number' },
+        ],
+        "inputsInline": true,
+        previousStatement: null,
+        nextStatement: null,
+        colour: 120,
+        tooltip: 'Rotates an object by the specified angles',
+    },
+    {
+        "type": "animate_object",
+        "message0": "animate property %1 of %2",
+        "args0": [
+            {
+                "type": "field_dropdown",
+                "name": "PROPERTY",
+                "options": [
+                    ["visibility", "visibility"]
+                ]
+            },
+            {
+                "type": "input_value",
+                "name": "OBJECT"
+            }
+        ],
+        "message1": "from %1 to %2 over %3 seconds",
+        "args1": [
+            { "type": "input_value", "name": "FROM", "check": "Number" },
+            { "type": "input_value", "name": "TO", "check": "Number" },
+            { "type": "input_value", "name": "DURATION", "check": "Number" }
+        ],
+        "message2": "loop %1",
+        "args2": [
+            {
+                "type": "field_dropdown",
+                "name": "LOOP",
+                "options": [
+                    ["no", "NO"],
+                    ["yes", "YES"],
+                    ["ping-pong", "PINGPONG"]
+                ]
+            }
+        ],
+        "inputsInline": false,
+        "previousStatement": null,
+        "nextStatement": null,
+        "colour": 300,
+        "tooltip": "Animates a property of an object over a duration."
+    },
+    {
+        "type": "import_animation",
+        "message0": "import animation from url %1 as %2",
+        "args0": [
+            {
+                type: 'field_input',
+                name: 'URL',
+                text: 'https://cdn.digitaleducationsafety.org/assets/models/animations/run_forward.fbx',
+            },
+            { "type": "field_variable", "name": "VAR", "variable": "animation" }
+        ],
+        "previousStatement": null,
+        "nextStatement": null,
+        "colour": "%{BKY_MOTION_HUE}",
+        "tooltip": "Imports a skeletal animation from a URL (.fbx)."
+    },
+    {
+        "type": "apply_animation",
+        "message0": "apply animation %1 to model %2",
+        "args0": [
+            { "type": "input_value", "name": "ANIMATION" },
+            { "type": "input_value", "name": "MODEL" }
+        ],
+        "inputsInline": true,
+        "previousStatement": null,
+        "nextStatement": null,
+        "colour": "%{BKY_MOTION_HUE}",
+        "tooltip": "Applies an imported animation to a model."
+    },
+    {
+        "type": "play_animation",
+        "message0": "play animation on %1 from frame %2 to %3 loop %4",
+        "args0": [
+            { "type": "input_value", "name": "MODEL" },
+            { "type": "input_value", "name": "FROM", "check": "Number" },
+            { "type": "input_value", "name": "TO", "check": "Number" },
+            { "type": "field_checkbox", "name": "LOOP", "checked": true }
+        ],
+        "inputsInline": true,
+        "previousStatement": null,
+        "nextStatement": null,
+        "colour": "%{BKY_MOTION_HUE}",
+        "tooltip": "Plays a skeletal animation on a model."
+    },
+    {
+        "type": "stop_skeletal_animation",
+        "message0": "stop skeletal animation on %1",
+        "args0": [
+            { "type": "input_value", "name": "OBJECT" }
+        ],
+        "inputsInline": true,
+        "previousStatement": null,
+        "nextStatement": null,
+        "colour": 300,
+        "tooltip": "Stops skeletal animations on the specified object."
+    },
+    {
+        "type": "stop_animation",
+        "message0": "stop property animation on %1",
+        "args0": [
+            {
+                "type": "input_value",
+                "name": "OBJECT"
+            }
+        ],
+        "inputsInline": true,
+        "previousStatement": null,
+        "nextStatement": null,
+        "colour": 300,
+        "tooltip": "Stops all property animations (e.g., position, rotation, scale) on the specified object."
+    },
+    {
+        "type": "animate_rotation",
+        "message0": "animate rotation of %1 to x %2 y %3 z %4 degrees over %5 seconds",
+        "args0": [
+            { "type": "input_value", "name": "OBJECT" },
+            { "type": "input_value", "name": "X", "check": "Number" },
+            { "type": "input_value", "name": "Y", "check": "Number" },
+            { "type": "input_value", "name": "Z", "check": "Number" },
+            { "type": "input_value", "name": "DURATION", "check": "Number" }
+        ],
+        "message1": "loop %1",
+        "args1": [
+            {
+                "type": "field_dropdown",
+                "name": "LOOP",
+                "options": [["no", "NO"], ["yes", "YES"], ["ping-pong", "PINGPONG"]]
+            }
+        ],
+        "inputsInline": false,
+        "previousStatement": null,
+        "nextStatement": null,
+        "colour": 300,
+        "tooltip": "Animates the rotation of an object."
+    },
+    {
+        "type": "animate_position",
+        "message0": "animate position of %1 to x %2 y %3 z %4 over %5 seconds",
+        "args0": [
+            { "type": "input_value", "name": "OBJECT" },
+            { "type": "input_value", "name": "X", "check": "Number" },
+            { "type": "input_value", "name": "Y", "check": "Number" },
+            { "type": "input_value", "name": "Z", "check": "Number" },
+            { "type": "input_value", "name": "DURATION", "check": "Number" }
+        ],
+        "message1": "loop %1",
+        "args1": [
+            {
+                "type": "field_dropdown",
+                "name": "LOOP",
+                "options": [["no", "NO"], ["yes", "YES"], ["ping-pong", "PINGPONG"]]
+            }
+        ],
+        "inputsInline": false,
+        "previousStatement": null,
+        "nextStatement": null,
+        "colour": 300,
+        "tooltip": "Animates the position of an object."
+    },
+    {
+        "type": "animate_scale",
+        "message0": "animate scale of %1 to x %2 y %3 z %4 over %5 seconds",
+        "args0": [
+            { "type": "input_value", "name": "OBJECT" },
+            { "type": "input_value", "name": "X", "check": "Number" },
+            { "type": "input_value", "name": "Y", "check": "Number" },
+            { "type": "input_value", "name": "Z", "check": "Number" },
+            { "type": "input_value", "name": "DURATION", "check": "Number" }
+        ],
+        "message1": "loop %1",
+        "args1": [
+            {
+                "type": "field_dropdown",
+                "name": "LOOP",
+                "options": [["no", "NO"], ["yes", "YES"], ["ping-pong", "PINGPONG"]]
+            }
+        ],
+        "inputsInline": false,
+        "previousStatement": null,
+        "nextStatement": null,
+        "colour": 300,
+        "tooltip": "Animates the scale of an object."
+    },
+    {
+        type: 'enable_physics',
+        message0: 'Enable physics on %1 with mass %2 and impostor %3',
+        args0: [
+            { type: 'input_value', name: 'NAME' },
+            { type: 'input_value', name: 'MASS', check: 'Number' },
+            {
+                type: 'field_dropdown',
+                name: 'IMPOSTOR',
+                options: [
+                    ['Box', 'BABYLON.PhysicsImpostor.BoxImpostor'],
+                    ['Sphere', 'BABYLON.PhysicsImpostor.SphereImpostor'],
+                    ['Cylinder', 'BABYLON.PhysicsImpostor.CylinderImpostor'],
+                    ['Plane', 'BABYLON.PhysicsImpostor.PlaneImpostor'],
+                    ['Mesh', 'BABYLON.PhysicsImpostor.MeshImpostor']
+                ],
+            },
+        ],
+        "inputsInline": true,
+        previousStatement: null,
+        nextStatement: null,
+        colour: 120,
+        tooltip: 'Enables physics on the specified object with the given mass',
+    },
+    {
+        type: 'apply_force',
+        message0: 'Apply force to %1 x: %2 y: %3 z: %4 at point x: %5 y: %6 z: %7',
+        args0: [
+            { type: 'field_input', name: 'NAME', text: 'object' },
+            { type: 'input_value', name: 'FX', check: 'Number' },
+            { type: 'input_value', name: 'FY', check: 'Number' },
+            { type: 'input_value', name: 'FZ', check: 'Number' },
+            { type: 'input_value', name: 'PX', check: 'Number' },
+            { type: 'input_value', name: 'PY', check: 'Number' },
+            { type: 'input_value', name: 'PZ', check: 'Number' },
+        ],
+        "inputsInline": false,
+        previousStatement: null,
+        nextStatement: null,
+        colour: 120,
+        tooltip: 'Applies a force to the specified object at a given point',
+    },
+    {
+        type: 'set_gravity',
+        message0: 'Set scene gravity to x: %1 y: %2 z: %3',
+        args0: [
+            { type: 'input_value', name: 'GX', check: 'Number' },
+            { type: 'input_value', name: 'GY', check: 'Number' },
+            { type: 'input_value', name: 'GZ', check: 'Number' },
+        ],
+        "inputsInline": true,
+        previousStatement: null,
+        nextStatement: null,
+        colour: 120,
+        tooltip: 'Sets the gravity for the entire scene',
+    },
+    {
+        type: 'set_physics_impostor',
+        message0: 'Set physics impostor for %1 to %2',
+        args0: [
+            { type: 'field_input', name: 'NAME', text: 'object' },
+            {
+                type: 'field_dropdown',
+                name: 'IMPOSTOR',
+                options: [
+                    ['Box', 'BABYLON.PhysicsImpostor.BoxImpostor'],
+                    ['Sphere', 'BABYLON.PhysicsImpostor.SphereImpostor'],
+                    ['Plane', 'BABYLON.PhysicsImpostor.PlaneImpostor'],
+                    ['Mesh', 'BABYLON.PhysicsImpostor.MeshImpostor']
+                ],
+            },
+        ],
+        "inputsInline": true,
+        previousStatement: null,
+        nextStatement: null,
+        colour: 120,
+        tooltip: 'Sets the physics impostor type for the specified object',
+    },
+    {
+        type: 'create_camera',
+        message0: 'Create camera named %1 and save as %2',
+        args0: [
+            { type: 'field_input', name: 'NAME', text: 'camera' },
+            {
+                type: 'field_variable',
+                name: 'MODEL_VAR',
+                variable: 'camera',
+            },
+        ],
+        "inputsInline": true,
+        previousStatement: null,
+        nextStatement: null,
+        colour: 180,
+        tooltip: 'Creates a scene camera',
+    },
+    {
+        type: 'create_ground',
+        message0: 'Create ground with width %1 and height %2',
+        args0: [
+            { type: 'input_value', name: 'WIDTH', check: 'Number' },
+            { type: 'input_value', name: 'HEIGHT', check: 'Number' }
+        ],
+        "inputsInline": true,
+        output: "Mesh",
+        colour: 180,
+        tooltip: 'Creates a ground mesh with specified width and height',
+    },
+    {
+        type: 'set_ground_material',
+        message0: 'Set material %1 on ground %2',
+        args0: [
+            { type: 'field_input', name: 'MATERIAL', text: 'material' },
+            { type: 'field_input', name: 'NAME', text: 'ground' },
+        ],
+        "inputsInline": true,
+        previousStatement: null,
+        nextStatement: null,
+        colour: 180,
+        tooltip: 'Sets a material on the specified ground object',
+    },
+    {
+        type: 'set_ground_physics',
+        message0: 'Enable physics on ground %1 with impostor %2',
+        args0: [
+            { type: 'field_input', name: 'NAME', text: 'ground' },
+            {
+                type: 'field_dropdown',
+                name: 'IMPOSTOR',
+                options: [
+                    ['Plane', 'BABYLON.PhysicsImpostor.PlaneImpostor'],
+                    ['Box', 'BABYLON.PhysicsImpostor.BoxImpostor'],
+                ],
+            },
+        ],
+        "inputsInline": true,
+        previousStatement: null,
+        nextStatement: null,
+        colour: 180,
+        tooltip: 'Enables physics on the ground object with the selected impostor',
+    },
+    // Scripting Blocks
+    {
+        "type": "select_object",
+        "message0": "object named %1",
+        "args0": [
+            {
+                "type": "field_input",
+                "name": "OBJECT_NAME",
+                "text": "myObject" // Default text
+            }
+        ],
+        "output": "String", // Outputs the object name/ID as a string
+        "colour": "%{BKY_LOGIC_HUE}", // Using logic hue for now
+        "tooltip": "Selects an object from the scene by its name.",
+        "helpUrl": ""
+    },
+    // Phase 2 Blockly Blocks
+    {
+        "type": "event_on_click",
+        "message0": "when %1 is clicked %2 do %3",
+        "args0": [
+            {
+                "type": "input_value",
+                "name": "OBJECT_SELECTOR",
+                "check": "String"
+            },
+            {
+                "type": "input_dummy"
+            },
+            {
+                "type": "input_statement",
+                "name": "DO_CODE"
+            }
+        ],
+        "previousStatement": null,
+        "nextStatement": null,
+        "colour": "%{BKY_LOOPS_HUE}",
+        "tooltip": "Executes code when the specified object is clicked.",
+        "helpUrl": ""
+    },
+    {
+        "type": "event_every_frame",
+        "message0": "for %1 every frame %2 do %3",
+        "args0": [
+            {
+                "type": "input_value",
+                "name": "OBJECT_SELECTOR",
+                "check": "String"
+            },
+            {
+                "type": "input_dummy"
+            },
+            {
+                "type": "input_statement",
+                "name": "DO_CODE"
+            }
+        ],
+        "previousStatement": null,
+        "nextStatement": null,
+        "colour": "%{BKY_LOOPS_HUE}",
+        "tooltip": "Executes code for the specified object every frame.",
+        "helpUrl": ""
+    },
+    {
+        "type": "action_rotate_continuously",
+        "message0": "rotate object %1 continuously by x %2 y %3 z %4 deg/sec",
+        "args0": [
+            { type: 'input_value', name: 'NAME' },
+            {
+                "type": "input_value",
+                "name": "ROTATE_X_SPEED",
+                "check": "Number"
+            },
+            {
+                "type": "input_value",
+                "name": "ROTATE_Y_SPEED",
+                "check": "Number"
+            },
+            {
+                "type": "input_value",
+                "name": "ROTATE_Z_SPEED",
+                "check": "Number"
+            }
+        ],
+        "inputsInline": false,
+        "previousStatement": null,
+        "nextStatement": null,
+        "colour": "%{BKY_MATH_HUE}",
+        "tooltip": "Continuously rotates the object. Use inside an 'every frame' block for the target object.",
+        "helpUrl": ""
+    },
+    // Controller Block
+    {
+        "type": "on_button_press",
+        "message0": "on %1 button pressed %2 do %3",
+        "args0": [
+            {
+                "type": "field_dropdown",
+                "name": "BUTTON",
+                "options": [
+                    ["A", "A"],
+                    ["B", "B"],
+                    ["Left", "Left"],
+                    ["Right", "Right"],
+                    ["Up", "Up"],
+                    ["Down", "Down"]
+                ]
+            },
+            {
+                "type": "input_dummy"
+            },
+            {
+                "type": "input_statement",
+                "name": "DO"
+            }
+        ],
+        "previousStatement": null,
+        "nextStatement": null,
+        "colour": "%{BKY_LOOPS_HUE}",
+        "tooltip": "Executes code when a controller button is pressed.",
+        "helpUrl": ""
+    },
+    {
+        "type": "get_joystick_direction",
+        "message0": "joystick direction",
+        "output": "Number",
+        "colour": "%{BKY_LOGIC_HUE}",
+        "tooltip": "Gets the current direction of the joystick in degrees.",
+        "helpUrl": ""
+    },
+    {
+        "type": "get_joystick_force",
+        "message0": "joystick force",
+        "output": "Number",
+        "colour": "%{BKY_LOGIC_HUE}",
+        "tooltip": "Gets the current force of the joystick (0 to 1).",
+        "helpUrl": ""
+    },
+    {
+        "type": "player_jump",
+        "message0": "make player jump with force %1",
+        "args0": [
+            {
+                "type": "input_value",
+                "name": "FORCE",
+                "check": "Number"
+            }
+        ],
+        "previousStatement": null,
+        "nextStatement": null,
+        "colour": "#4C97FF",
+        "tooltip": "Makes the player character jump.",
+        "helpUrl": ""
+    },
+    {
+        "type": "player_move",
+        "message0": "move player with speed %1 in direction %2",
+        "args0": [
+            {
+                "type": "input_value",
+                "name": "SPEED",
+                "check": "Number"
+            },
+            {
+                "type": "field_dropdown",
+                "name": "DIRECTION",
+                "options": [
+                    ["forward", "FORWARD"],
+                    ["backward", "BACKWARD"],
+                    ["left", "LEFT"],
+                    ["right", "RIGHT"]
+                ]
+            }
+        ],
+        "previousStatement": null,
+        "nextStatement": null,
+        "colour": "#4C97FF",
+        "tooltip": "Moves the player character in a direction.",
+        "helpUrl": ""
+    },
+    // Gameplay Blocks
+    {
+        "type": "on_collision",
+        "message0": "when %1 collides with %2 %3 do %4",
+        "args0": [
+            {
+                "type": "input_value",
+                "name": "OBJECT1",
+                "check": ["String", "Mesh"]
+            },
+            {
+                "type": "input_value",
+                "name": "OBJECT2",
+                "check": ["Array", "String", "Mesh"]
+            },
+            {
+                "type": "input_dummy"
+            },
+            {
+                "type": "input_statement",
+                "name": "DO"
+            }
+        ],
+        "previousStatement": null,
+        "nextStatement": null,
+        "colour": "#5BA55B",
+        "tooltip": "Executes code when two objects collide. Can check against a single object or a list of objects.",
+        "helpUrl": "",
+        "extraState": {
+            "hasCollidedObjectVar": true
+        }
+    },
+    {
+        "type": "destroy_object",
+        "message0": "destroy object %1",
+        "args0": [
+            {
+                "type": "input_value",
+                "name": "OBJECT"
+            }
+        ],
+        "previousStatement": null,
+        "nextStatement": null,
+        "colour": "#5BA55B",
+        "tooltip": "Destroys the specified object.",
+        "helpUrl": ""
+    },
+    {
+        "type": "set_visibility",
+        "message0": "set visibility of %1 to %2",
+        "args0": [
+            {
+                "type": "input_value",
+                "name": "OBJECT"
+            },
+            {
+                "type": "field_checkbox",
+                "name": "VISIBLE",
+                "checked": true
+            }
+        ],
+        "previousStatement": null,
+        "nextStatement": null,
+        "colour": "#4C97FF",
+        "tooltip": "Sets whether the object is visible or hidden.",
+        "helpUrl": ""
+    },
+        "tooltip": "Destroys the specified object.",
+        "helpUrl": ""
+    },
+    {
+        "type": "set_as_player",
+        "message0": "set %1 as player",
+        "args0": [
+            {
+                "type": "input_value",
+                "name": "OBJECT"
+            }
+        ],
+        "previousStatement": null,
+        "nextStatement": null,
+        "colour": "#4C97FF",
+        "tooltip": "Designates the specified object as the player character.",
+        "helpUrl": ""
+    },
+    {
+        "type": "camera_follow",
+        "message0": "make camera follow %1",
+        "args0": [
+            {
+                "type": "input_value",
+                "name": "OBJECT",
+                "check": "String"
+            }
+        ],
+        "previousStatement": null,
+        "nextStatement": null,
+        "colour": "#A55B80",
+        "tooltip": "Makes the camera follow the specified object.",
+        "helpUrl": ""
+    },
+    {
+        "type": "camera_zoom",
+        "message0": "zoom camera by %1",
+        "args0": [
+            {
+                "type": "input_value",
+                "name": "ZOOM",
+                "check": "Number"
+            }
+        ],
+        "previousStatement": null,
+        "nextStatement": null,
+        "colour": "#A55B80",
+        "tooltip": "Zooms the camera in or out.",
+        "helpUrl": ""
+    },
+    {
+        "type": "play_sound_url",
+        "message0": "play sound from URL %1",
+        "args0": [
+            {
+                "type": "field_input",
+                "name": "URL",
+                "text": "https://example.com/sound.mp3"
+            }
+        ],
+        "previousStatement": null,
+        "nextStatement": null,
+        "colour": "#5B80A5",
+        "tooltip": "Plays a sound from a URL.",
+        "helpUrl": ""
+    },
+    {
+        "type": "play_note",
+        "message0": "play note %1 for %2 seconds",
+        "args0": [
+            {
+                "type": "field_dropdown",
+                "name": "NOTE",
+                "options": [
+                    ["C4", "261.63"],
+                    ["D4", "293.66"],
+                    ["E4", "329.63"],
+                    ["F4", "349.23"],
+                    ["G4", "392.00"],
+                    ["A4", "440.00"],
+                    ["B4", "493.88"]
+                ]
+            },
+            {
+                "type": "input_value",
+                "name": "DURATION",
+                "check": "Number"
+            }
+        ],
+        "previousStatement": null,
+        "nextStatement": null,
+        "colour": "#5B80A5",
+        "tooltip": "Plays a musical note for a given duration.",
+        "helpUrl": ""
+    },
+    // GUI Blocks
+    {
+        "type": "gui_create_text_block",
+        "message0": "create text block named %1 with text %2",
+        "args0": [
+            { "type": "field_input", "name": "NAME", "text": "myText" },
+            { "type": "input_value", "name": "TEXT", "check": "String" }
+        ],
+        "message1": "align horizontal %1 vertical %2",
+        "args1": [
+            {
+                "type": "field_dropdown", "name": "H_ALIGN",
+                "options": [["left", "0"], ["right", "1"], ["center", "2"]]
+            },
+            {
+                "type": "field_dropdown", "name": "V_ALIGN",
+                "options": [["top", "0"], ["bottom", "1"], ["center", "2"]]
+            }
+        ],
+        "message2": "at top %1 left %2",
+        "args2": [
+            { "type": "input_value", "name": "TOP", "check": "String" },
+            { "type": "input_value", "name": "LEFT", "check": "String" }
+        ],
+        "inputsInline": false,
+        "previousStatement": null,
+        "nextStatement": null,
+        "colour": "#5B80A5",
+        "tooltip": "Creates a new text block in the GUI with positioning.",
+        "helpUrl": ""
+    },
+    {
+        "type": "gui_set_text",
+        "message0": "set text of GUI element %1 to %2",
+        "args0": [
+            { "type": "field_input", "name": "NAME", "text": "myText" },
+            { "type": "input_value", "name": "TEXT", "check": "String" }
+        ],
+        "previousStatement": null,
+        "nextStatement": null,
+        "colour": "#5B80A5",
+        "tooltip": "Sets the text of an existing GUI text block.",
+        "helpUrl": ""
+    },
+    {
+        "type": "gui_create_input_text",
+        "message0": "create input field named %1",
+        "args0": [
+            { "type": "field_input", "name": "NAME", "text": "myInput" }
+        ],
+        "message1": "align horizontal %1 vertical %2",
+        "args1": [
+            {
+                "type": "field_dropdown", "name": "H_ALIGN",
+                "options": [["left", "0"], ["right", "1"], ["center", "2"]]
+            },
+            {
+                "type": "field_dropdown", "name": "V_ALIGN",
+                "options": [["top", "0"], ["bottom", "1"], ["center", "2"]]
+            }
+        ],
+        "message2": "at top %1 left %2",
+        "args2": [
+            { "type": "input_value", "name": "TOP", "check": "String" },
+            { "type": "input_value", "name": "LEFT", "check": "String" }
+        ],
+        "inputsInline": false,
+        "previousStatement": null,
+        "nextStatement": null,
+        "colour": "#5B80A5",
+        "tooltip": "Creates a new input text field in the GUI with positioning.",
+        "helpUrl": ""
+    },
+    {
+        "type": "gui_get_input_text",
+        "message0": "get text from input field %1",
+        "args0": [
+            { "type": "field_input", "name": "NAME", "text": "myInput" }
+        ],
+        "output": "String",
+        "colour": "#5B80A5",
+        "tooltip": "Gets the text from a GUI input field.",
+        "helpUrl": ""
+    },
+    {
+        "type": "gui_create_button",
+        "message0": "create button named %1 with text %2",
+        "args0": [
+            { "type": "field_input", "name": "NAME", "text": "myButton" },
+            { "type": "input_value", "name": "TEXT", "check": "String" }
+        ],
+        "inputsInline": true,
+        "previousStatement": null,
+        "nextStatement": null,
+        "colour": "#5B80A5",
+        "tooltip": "Creates a new button in the GUI.",
+        "helpUrl": ""
+    },
+    {
+        "type": "gui_create_image_from_url",
+        "message0": "create image named %1 from URL %2",
+        "args0": [
+            { "type": "field_input", "name": "NAME", "text": "myImage" },
+            { "type": "input_value", "name": "URL", "check": "String" }
+        ],
+        "inputsInline": true,
+        "previousStatement": null,
+        "nextStatement": null,
+        "colour": "#5B80A5",
+        "tooltip": "Creates a new image in the GUI from a URL.",
+        "helpUrl": ""
+    },
+    {
+        "type": "gui_create_image_from_asset",
+        "message0": "create image named %1 from asset %2",
+        "args0": [
+            { "type": "field_input", "name": "NAME", "text": "myImage" },
+            { "type": "input_value", "name": "ASSET", "check": "String" }
+        ],
+        "previousStatement": null,
+        "nextStatement": null,
+        "colour": "#5B80A5",
+        "tooltip": "Creates a new image in the GUI from an asset.",
+        "helpUrl": ""
+    },
+    {
+        "type": "event_on_gui_click",
+        "message0": "when GUI element %1 is clicked %2 do %3",
+        "args0": [
+            { "type": "field_input", "name": "NAME", "text": "myButton" },
+            { "type": "input_dummy" },
+            { "type": "input_statement", "name": "DO" }
+        ],
+        "previousStatement": null,
+        "nextStatement": null,
+        "colour": "%{BKY_LOOPS_HUE}",
+        "tooltip": "Executes code when the specified GUI element is clicked.",
+        "helpUrl": ""
+    },
+    // Console Blocks
+    {
+        "type": "console_log",
+        "message0": "console log %1",
+        "args0": [
+            {
+                "type": "input_value",
+                "name": "VALUE"
+            }
+        ],
+        "previousStatement": null,
+        "nextStatement": null,
+        "colour": "#5B80A5",
+        "tooltip": "Logs a value to the browser console.",
+        "helpUrl": ""
+    },
+    {
+        "type": "console_warn",
+        "message0": "console warn %1",
+        "args0": [
+            {
+                "type": "input_value",
+                "name": "VALUE"
+            }
+        ],
+        "previousStatement": null,
+        "nextStatement": null,
+        "colour": "#A5745B",
+        "tooltip": "Logs a warning to the browser console.",
+        "helpUrl": ""
+    },
+    {
+        "type": "console_error",
+        "message0": "console error %1",
+        "args0": [
+            {
+                "type": "input_value",
+                "name": "VALUE"
+            }
+        ],
+        "previousStatement": null,
+        "nextStatement": null,
+        "colour": "#A55B5B",
+        "tooltip": "Logs an error to the browser console.",
+        "helpUrl": ""
+    },
+    {
+        "type": "console_clear",
+        "message0": "console clear",
+        "previousStatement": null,
+        "nextStatement": null,
+        "colour": "#4C97FF",
+        "tooltip": "Clears the browser console.",
+        "helpUrl": ""
+    },
+    {
+        "type": "parse_number_from",
+        "message0": "parse number from %1",
+        "args0": [
+            {
+                "type": "input_value",
+                "name": "STRING",
+                "check": "String"
+            }
+        ],
+        "output": "Number",
+        "colour": "%{BKY_MATH_HUE}",
+        "tooltip": "Converts a string to a number.",
+        "helpUrl": ""
+    },
+    {
+        "type": "create_environment",
+        "message0": "Create environment with skybox %1 ground %2",
+        "args0": [
+            {
+                "type": "field_checkbox",
+                "name": "ENABLE_SKYBOX",
+                "checked": true
+            },
+            {
+                "type": "field_checkbox",
+                "name": "ENABLE_GROUND",
+                "checked": true
+            }
+        ],
+        "previousStatement": null,
+        "nextStatement": null,
+        "colour": 180,
+        "tooltip": "Creates a skybox and ground for the scene.",
+        "helpUrl": ""
+    },
+    {
+        "type": "create_loading_screen",
+        "message0": "create loading screen with text %1",
+        "args0": [
+            {
+                "type": "input_value",
+                "name": "TEXT",
+                "check": "String"
+            }
+        ],
+        "message1": "background color %1",
+        "args1": [
+            {
+                "type": "field_colour",
+                "name": "BG_COLOR",
+                "colour": "#000000"
+            }
+        ],
+        "message2": "text color %1",
+        "args2": [
+            {
+                "type": "field_colour",
+                "name": "TEXT_COLOR",
+                "colour": "#ffffff"
+            }
+        ],
+        "previousStatement": null,
+        "nextStatement": null,
+        "colour": 180,
+        "tooltip": "Creates a custom loading screen.",
+    },
+    {
+        "type": "show_loading_screen",
+        "message0": "show loading screen",
+        "previousStatement": null,
+        "nextStatement": null,
+        "colour": 180,
+        "tooltip": "Shows the custom loading screen.",
+    },
+    {
+        "type": "hide_loading_screen",
+        "message0": "hide loading screen",
+        "previousStatement": null,
+        "nextStatement": null,
+        "colour": 180,
+        "tooltip": "Hides the custom loading screen.",
+    },
+    {
+        "type": "set_background",
+        "message0": "set background to %1",
+        "args0": [
+            {
+                "type": "input_value",
+                "name": "BACKGROUND"
+            }
+        ],
+        "previousStatement": null,
+        "nextStatement": null,
+        "colour": 180,
+        "tooltip": "Sets the scene background to a color or procedural texture.",
+        "helpUrl": ""
+    },
+    {
+        "type": "procedural_texture",
+        "message0": "procedural texture %1",
+        "args0": [
+            {
+                "type": "field_dropdown",
+                "name": "TEXTURE",
+                "options": [
+                    ["wood", "wood"],
+                    ["marble", "marble"],
+                    ["fire", "fire"],
+                    ["road", "road"],
+                    ["brick", "brick"],
+                    ["grass", "grass"],
+                    ["clouds", "clouds"]
+                ]
+            }
+        ],
+        "output": "String",
+        "colour": 180,
+        "tooltip": "Selects a procedural texture for the background.",
+        "helpUrl": ""
+    },
+    {
+        "type": "create_popup",
+        "message0": "create popup with title %1",
+        "args0": [
+            { "type": "input_value", "name": "TITLE", "check": "String" }
+        ],
+        "message1": "text %1 image URL %2",
+        "args1": [
+            { "type": "input_value", "name": "TEXT", "check": "String" },
+            { "type": "input_value", "name": "IMAGE", "check": "String" }
+        ],
+        "message2": "button 1 name %1 text %2",
+        "args2": [
+            { "type": "input_value", "name": "BUTTON1_NAME", "check": "String" },
+            { "type": "input_value", "name": "BUTTON1_TEXT", "check": "String" }
+        ],
+        "message3": "button 2 name %1 text %2",
+        "args3": [
+            { "type": "input_value", "name": "BUTTON2_NAME", "check": "String" },
+            { "type": "input_value", "name": "BUTTON2_TEXT", "check": "String" }
+        ],
+        "output": "Rectangle",
+        "colour": "#5B80A5",
+        "tooltip": "Creates a popup with a title, an optional image, text, and up to two buttons.",
+        "helpUrl": ""
+    },
+    {
+        "type": "show_popup",
+        "message0": "show popup %1",
+        "args0": [
+            { "type": "input_value", "name": "NAME", "check": ["String", "Rectangle"] }
+        ],
+        "previousStatement": null,
+        "nextStatement": null,
+        "colour": "#5B80A5",
+        "tooltip": "Shows the specified popup and pauses the game.",
+        "helpUrl": ""
+    },
+    {
+        "type": "hide_popup",
+        "message0": "hide popup %1",
+        "args0": [
+            { "type": "input_value", "name": "NAME", "check": ["String", "Rectangle"] }
+        ],
+        "previousStatement": null,
+        "nextStatement": null,
+        "colour": "#5B80A5",
+        "tooltip": "Hides the specified popup and resumes the game.",
+        "helpUrl": ""
+    },
+    {
+        "type": "gui_set_popup_title",
+        "message0": "in popup %1 set title to %2",
+        "args0": [
+            { "type": "input_value", "name": "POPUP_NAME", "check": ["String", "Rectangle"] },
+            { "type": "input_value", "name": "TITLE", "check": "String" }
+        ],
+        "previousStatement": null,
+        "nextStatement": null,
+        "colour": "#5B80A5",
+        "tooltip": "Sets the title of an existing popup.",
+        "helpUrl": ""
+    },
+    {
+        "type": "gui_set_popup_image",
+        "message0": "in popup %1 set image to URL %2",
+        "args0": [
+            { "type": "input_value", "name": "POPUP_NAME", "check": ["String", "Rectangle"] },
+            { "type": "input_value", "name": "IMAGE_URL", "check": "String" }
+        ],
+        "previousStatement": null,
+        "nextStatement": null,
+        "colour": "#5B80A5",
+        "tooltip": "Sets the image of an existing popup from a URL.",
+        "helpUrl": ""
+    },
+    {
+        "type": "gui_set_popup_button_text",
+        "message0": "in popup %1 set button %2 text to %3",
+        "args0": [
+            { "type": "input_value", "name": "POPUP_NAME", "check": ["String", "Rectangle"] },
+            { "type": "input_value", "name": "BUTTON_NAME", "check": "String" },
+            { "type": "input_value", "name": "TEXT", "check": "String" }
+        ],
+        "previousStatement": null,
+        "nextStatement": null,
+        "colour": "#5B80A5",
+        "tooltip": "Sets the text of a button in an existing popup.",
+        "helpUrl": ""
+    },
+    {
+        "type": "gui_set_popup_text",
+        "message0": "in popup %1 set text to %2",
+        "args0": [
+            { "type": "input_value", "name": "POPUP_NAME", "check": "String" },
+            { "type": "input_value", "name": "TEXT", "check": "String" }
+        ],
+        "previousStatement": null,
+        "nextStatement": null,
+        "colour": "#5B80A5",
+        "tooltip": "Sets the main text of an existing popup.",
+        "helpUrl": ""
+    }
+]);
+
+{
+    javascript.javascriptGenerator.forBlock['create_popup'] = function (block, generator) {
+        const title = generator.valueToCode(block, 'TITLE', generator.ORDER_ATOMIC) || "''";
+        const text = generator.valueToCode(block, 'TEXT', generator.ORDER_ATOMIC) || "''";
+        const image = generator.valueToCode(block, 'IMAGE', generator.ORDER_ATOMIC) || "null";
+        const button1Name = generator.valueToCode(block, 'BUTTON1_NAME', generator.ORDER_ATOMIC) || "''";
+        const button1Text = generator.valueToCode(block, 'BUTTON1_TEXT', generator.ORDER_ATOMIC) || "''";
+        const button2Name = generator.valueToCode(block, 'BUTTON2_NAME', generator.ORDER_ATOMIC) || "''";
+        const button2Text = generator.valueToCode(block, 'BUTTON2_TEXT', generator.ORDER_ATOMIC) || "''";
+
+        // Get the parent block, which should be a variables_set block
+        const parentBlock = block.getParent();
+        let variableName = 'myPopup'; // Default name
+        if (parentBlock && parentBlock.type === 'variables_set') {
+            variableName = parentBlock.getVarModels()[0].name;
+        }
+
+        const options = `{
+            text: ${text},
+            image: ${image},
+            button1_name: ${button1Name} || \`\${'${variableName}'}_button1\`,
+            button1_text: ${button1Text},
+            button2_name: ${button2Name} || \`\${'${variableName}'}_button2\`,
+            button2_text: ${button2Text}
+        }`;
+        const code = `sceneManager.createPopup('${variableName}', ${title}, ${options})`;
+        return [code, generator.ORDER_ATOMIC];
+    };
+
+    javascript.javascriptGenerator.forBlock['show_popup'] = function (block, generator) {
+        const name = generator.valueToCode(block, 'NAME', generator.ORDER_ATOMIC) || "''";
+        return `sceneManager.showPopup(${name});\n`;
+    };
+
+    javascript.javascriptGenerator.forBlock['hide_popup'] = function (block, generator) {
+        const name = generator.valueToCode(block, 'NAME', generator.ORDER_ATOMIC) || "''";
+        return `sceneManager.hidePopup(${name});\n`;
+    };
+
+    javascript.javascriptGenerator.forBlock['gui_set_popup_title'] = function(block, generator) {
+        const popupName = generator.valueToCode(block, 'POPUP_NAME', generator.ORDER_ATOMIC) || "''";
+        const title = generator.valueToCode(block, 'TITLE', generator.ORDER_ATOMIC) || "''";
+        return `sceneManager.setPopupTitle(${popupName}, ${title});\n`;
+    };
+
+    javascript.javascriptGenerator.forBlock['gui_set_popup_image'] = function(block, generator) {
+        const popupName = generator.valueToCode(block, 'POPUP_NAME', generator.ORDER_ATOMIC) || "''";
+        const imageUrl = generator.valueToCode(block, 'IMAGE_URL', generator.ORDER_ATOMIC) || "''";
+        return `sceneManager.setPopupImage(${popupName}, ${imageUrl});\n`;
+    };
+
+    javascript.javascriptGenerator.forBlock['gui_set_popup_button_text'] = function(block, generator) {
+        const popupName = generator.valueToCode(block, 'POPUP_NAME', generator.ORDER_ATOMIC) || "''";
+        const buttonName = generator.valueToCode(block, 'BUTTON_NAME', generator.ORDER_ATOMIC) || "''";
+        const text = generator.valueToCode(block, 'TEXT', generator.ORDER_ATOMIC) || "''";
+        return `sceneManager.setPopupButtonText(${popupName}, ${buttonName}, ${text});\n`;
+    };
+
+    javascript.javascriptGenerator.forBlock['gui_set_popup_text'] = function(block, generator) {
+        const popupName = generator.valueToCode(block, 'POPUP_NAME', generator.ORDER_ATOMIC) || "''";
+        const text = generator.valueToCode(block, 'TEXT', generator.ORDER_ATOMIC) || "''";
+        return `sceneManager.setPopupText(${popupName}, ${text});\n`;
+    };
+
+    javascript.javascriptGenerator.forBlock['show_loading_screen'] = function (block, generator) {
+        return `
+            if (sceneManager.engine.loadingScreen) {
+                sceneManager.engine.displayLoadingUI();
+            } else {
+                 console.warn("Show loading screen block used, but no loading screen was created. Please use the create loading screen block first.");
+            };
+        `;
+    };
+
+    javascript.javascriptGenerator.forBlock['hide_loading_screen'] = function (block, generator) {
+        return 'sceneManager.engine.hideLoadingUI();\n';
+    };
+
+    javascript.javascriptGenerator.forBlock['create_loading_screen'] = function (block, generator) {
+        const text = generator.valueToCode(block, 'TEXT', generator.ORDER_ATOMIC) || "'Loading...'";
+        const bgColor = block.getFieldValue('BG_COLOR');
+        const textColor = block.getFieldValue('TEXT_COLOR');
+        return `
+            var loadingScreen = new CustomLoadingScreen(${text}, '${bgColor}', '${textColor}');
+            sceneManager.engine.loadingScreen = loadingScreen;
+        `;
+    };
+
+    // --- Scripting Block Generators ---
+    javascript.javascriptGenerator.forBlock['event_on_click'] = function (block, generator) {
+        const objectName = generator.valueToCode(block, 'OBJECT_SELECTOR', generator.ORDER_ATOMIC) || 'null';
+        const doCode = generator.statementToCode(block, 'DO_CODE');
+        const callback = `function(thisMesh) {\n${doCode}\n}`;
+        return `sceneManager.onClick(${objectName}, ${callback});\n`;
+    };
+
+    javascript.javascriptGenerator.forBlock['event_every_frame'] = function (block, generator) {
+        const objectName = generator.valueToCode(block, 'OBJECT_SELECTOR', generator.ORDER_ATOMIC) || 'null';
+        const doCode = generator.statementToCode(block, 'DO_CODE');
+        const callback = `function(${objectName}) {\n${doCode}\n}`;
+        return `sceneManager.everyFrame(${objectName}, ${callback});\n`;
+    };
+
+    javascript.javascriptGenerator.forBlock['action_rotate_continuously'] = function (block, generator) {
+        const name = generator.valueToCode(block, 'NAME', generator.ORDER_ATOMIC) || null;
+        const rotateXSpeed = generator.valueToCode(block, 'ROTATE_X_SPEED', generator.ORDER_ATOMIC) || 0;
+        const rotateYSpeed = generator.valueToCode(block, 'ROTATE_Y_SPEED', generator.ORDER_ATOMIC) || 0;
+        const rotateZSpeed = generator.valueToCode(block, 'ROTATE_Z_SPEED', generator.ORDER_ATOMIC) || 0;
+
+        return `
+if (${name}) {
+    ${name}.rotation.x += (${rotateXSpeed} * (Math.PI / 180)) * (sceneManager.engine.getDeltaTime() / 1000);
+    ${name}.rotation.y += (${rotateYSpeed} * (Math.PI / 180)) * (sceneManager.engine.getDeltaTime() / 1000);
+    ${name}.rotation.z += (${rotateZSpeed} * (Math.PI / 180)) * (sceneManager.engine.getDeltaTime() / 1000);
+}
+`;
+    };
+
+    javascript.javascriptGenerator.forBlock['select_object'] = function (block, generator) {
+        const objectName = block.getFieldValue('OBJECT_NAME');
+        return [`'${objectName}'`, generator.ORDER_ATOMIC];
+    };
+
+    // --- Player and Camera Block Generators ---
+    javascript.javascriptGenerator.forBlock['set_as_player'] = function (block, generator) {
+        const objectName = generator.valueToCode(block, 'OBJECT', generator.ORDER_ATOMIC) || 'null';
+        return `sceneManager.setAsPlayer(${objectName});\n`;
+    };
+
+    javascript.javascriptGenerator.forBlock['camera_follow'] = function (block, generator) {
+        const objectName = generator.valueToCode(block, 'OBJECT', generator.ORDER_ATOMIC) || 'null';
+        return `sceneManager.cameraFollow(${objectName});\n`;
+    };
+
+    javascript.javascriptGenerator.forBlock['camera_zoom'] = function (block, generator) {
+        const zoomValue = generator.valueToCode(block, 'ZOOM', generator.ORDER_ATOMIC) || 0;
+        return `sceneManager.cameraZoom(${zoomValue});\n`;
+    };
+
+    // --- Gameplay Block Generators ---
+    javascript.javascriptGenerator.forBlock['on_collision'] = function (block, generator) {
+        const obj1 = generator.valueToCode(block, 'OBJECT1', generator.ORDER_ATOMIC) || 'null';
+        const obj2 = generator.valueToCode(block, 'OBJECT2', generator.ORDER_ATOMIC) || 'null';
+        const doCode = generator.statementToCode(block, 'DO');
+
+        // The 'collided_object' variable is made available within the 'DO' statement.
+        // We need to ensure that the variable is properly declared and scoped.
+        const collidedObjectVar = generator.nameDB_.getName('collided_object', Blockly.VARIABLE_CATEGORY_NAME);
+        const callback = `async function(${collidedObjectVar}) {
+            // This function will be called with the collided object.
+            // We can then execute the DO code.
+            ${doCode}
+        }`;
+        // The generated code should call the onCollision method with the callback.
+        return `sceneManager.onCollision(${obj1}, ${obj2}, ${callback});\n`;
+    };
+
+    javascript.javascriptGenerator.forBlock['destroy_object'] = function (block, generator) {
+        const objectName = generator.valueToCode(block, 'OBJECT', generator.ORDER_ATOMIC) || 'null';
+        return `sceneManager.destroyObject(${objectName});\n`;
+    };
+    javascript.javascriptGenerator.forBlock['set_visibility'] = function (block, generator) {
+        const objectName = generator.valueToCode(block, 'OBJECT', generator.ORDER_ATOMIC) || 'null';
+        const visible = block.getFieldValue('VISIBLE') === 'TRUE';
+        return `sceneManager.setVisibility(${objectName}, ${visible});\n`;
+    };
+
+    // --- Controller Block Generator ---
+    javascript.javascriptGenerator.forBlock['on_button_press'] = function (block, generator) {
+        const button = block.getFieldValue('BUTTON');
+        const doCode = generator.statementToCode(block, 'DO');
+        const callback = `function() {\n${doCode}\n}`;
+        return `sceneManager.onButtonPress('${button}', ${callback});\n`;
+    };
+
+    javascript.javascriptGenerator.forBlock['get_joystick_direction'] = function (block, generator) {
+        return ['sceneManager.joystick_state.angle', generator.ORDER_ATOMIC];
+    };
+
+    javascript.javascriptGenerator.forBlock['get_joystick_force'] = function (block, generator) {
+        return ['sceneManager.joystick_state.force', generator.ORDER_ATOMIC];
+    };
+
+    javascript.javascriptGenerator.forBlock['player_jump'] = function (block, generator) {
+        const force = generator.valueToCode(block, 'FORCE', generator.ORDER_ATOMIC) || '5';
+        return `sceneManager.playerJump(${force});\n`;
+    };
+
+    javascript.javascriptGenerator.forBlock['player_move'] = function (block, generator) {
+        const speed = generator.valueToCode(block, 'SPEED', generator.ORDER_ATOMIC) || '1';
+        const direction = block.getFieldValue('DIRECTION');
+        return `sceneManager.playerMove('${direction}', ${speed});\n`;
+    };
+
+    // --- Simplified JavaScript Generators ---
+    javascript.javascriptGenerator.forBlock['position_model'] = function (block, generator) {
+        const modelVar = generator.valueToCode(block, 'MODEL', generator.ORDER_ATOMIC) || 'null';
+        const x = generator.valueToCode(block, 'X', generator.ORDER_ATOMIC) || '0';
+        const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || '0';
+        const z = generator.valueToCode(block, 'Z', generator.ORDER_ATOMIC) || '0';
+        return `sceneManager.move(${modelVar}, ${x}, ${y}, ${z});\n`;
+    };
+
+    javascript.javascriptGenerator.forBlock['create_camera'] = function (block, generator) {
+        const name = block.getFieldValue('NAME');
+        // This block is now mostly for semantic purpose, as camera is initialized.
+        // We can consider removing it or making it switch between camera types.
+        return `// Camera is managed by the sceneManager\n`;
+    };
+
+    javascript.javascriptGenerator.forBlock['point_camera_at_mesh'] = function (block, generator) {
+        const meshVar = generator.nameDB_.getName(block.getFieldValue('MESH'), Blockly.Variables.NAME_TYPE);
+        return `sceneManager.cameraFollow(${meshVar}.name);\n`;
+    };
+
+    javascript.javascriptGenerator.forBlock['import_3d_file_url'] = function (block, generator) {
+        const modelUrl = block.getFieldValue('MODEL_URL');
+        const posX = block.getFieldValue('POS_X');
+        const posY = block.getFieldValue('POS_Y');
+        const posZ = block.getFieldValue('POS_Z');
+        const modelVarName = javascript.javascriptGenerator.nameDB_.getDistinctName(Blockly.utils.idGenerator.genUid(), Blockly.Variables.NameType);
+
+        let code;
+        const robloxMatch = modelUrl.match(/roblox\.com\/(?:users|users\/profile)\/(\d+)/i);
+        if (robloxMatch) {
+            const userId = robloxMatch[1];
+            code = `await sceneManager.importRobloxAvatar('${modelVarName}', ${userId}, ${posX}, ${posY}, ${posZ})`;
+        } else {
+            code = `await sceneManager.importModel('${modelVarName}', '${modelUrl}', ${posX}, ${posY}, ${posZ})`;
+        }
+        return [code, generator.ORDER_ATOMIC];
+    };
+
+    javascript.javascriptGenerator.forBlock['set_isometric_camera'] = function (block, generator) {
+        return `sceneManager.setIsometricCamera();\n`;
+    };
+
+    javascript.javascriptGenerator.forBlock['set_fps_camera'] = function (block, generator) {
+        const object = generator.valueToCode(block, 'OBJECT', generator.ORDER_ATOMIC) || 'null';
+        return `sceneManager.setFpsCamera(${object});\n`;
+    };
+
+    javascript.javascriptGenerator.forBlock['create_ground'] = function (block, generator) {
+        const name = javascript.javascriptGenerator.nameDB_.getDistinctName(Blockly.utils.idGenerator.genUid(), Blockly.Variables.NameType);
+        const width = generator.valueToCode(block, 'WIDTH', generator.ORDER_ATOMIC) || 10;
+        const height = generator.valueToCode(block, 'HEIGHT', generator.ORDER_ATOMIC) || 10;
+        const code = `sceneManager.createGround('${name}', ${width}, ${height});\n`;
+        return [code, generator.ORDER_ATOMIC];
+    };
+
+    javascript.javascriptGenerator.forBlock['set_ground_material'] = function (block, generator) {
+        // This block is less relevant now, could be replaced with a generic color/texture block.
+        return `// Material settings can be adjusted with changeColor or future texture blocks.\n`;
+    };
+
+    javascript.javascriptGenerator.forBlock['set_ground_physics'] = function (block, generator) {
+        const name = block.getFieldValue('NAME');
+        return `sceneManager.setGroundPhysics('${name}');\n`;
+    };
+
+    javascript.javascriptGenerator.forBlock['create_box'] = function (block, generator) {
+        const name = generator.valueToCode(block, 'NAME', generator.ORDER_ATOMIC) || "'myBox'";
+        const x = generator.valueToCode(block, 'X', generator.ORDER_ATOMIC) || 0;
+        const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || 0;
+        const z = generator.valueToCode(block, 'Z', generator.ORDER_ATOMIC) || 0;
+        const code = `sceneManager.createBox(${name}, ${x}, ${y}, ${z})`;
+        return [code, generator.ORDER_ATOMIC];
+    };
+
+    javascript.javascriptGenerator.forBlock['create_sphere'] = function (block, generator) {
+        const name = javascript.javascriptGenerator.nameDB_.getDistinctName(Blockly.utils.idGenerator.genUid(), Blockly.Variables.NameType);
+        const x = generator.valueToCode(block, 'X', generator.ORDER_ATOMIC) || 0;
+        const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || 0;
+        const z = generator.valueToCode(block, 'Z', generator.ORDER_ATOMIC) || 0;
+        const code = `sceneManager.createSphere('${name}', ${x}, ${y}, ${z})`;
+        return [code, generator.ORDER_ATOMIC];
+    };
+
+    javascript.javascriptGenerator.forBlock['create_3d_text'] = function (block, generator) {
+        const text = generator.valueToCode(block, 'TEXT', generator.ORDER_ATOMIC) || "''";
+        const name = generator.valueToCode(block, 'NAME', generator.ORDER_ATOMIC) || "'myText'";
+        const fontUrl = block.getFieldValue('FONT_URL');
+        const code = `await sceneManager.createText(${name}, ${text}, '${fontUrl}')`;
+        return [code, generator.ORDER_ATOMIC];
+    };
+
+    javascript.javascriptGenerator.forBlock['scale_object'] = function (block, generator) {
+        const object = generator.valueToCode(block, 'OBJECT', generator.ORDER_ATOMIC) || 'null';
+        const x = generator.valueToCode(block, 'X', generator.ORDER_ATOMIC) || 1;
+        const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || 1;
+        const z = generator.valueToCode(block, 'Z', generator.ORDER_ATOMIC) || 1;
+        return `sceneManager.scale(${object}, ${x}, ${y}, ${z});\n`;
+    };
+
+    javascript.javascriptGenerator.forBlock['get_property'] = function (block, generator) {
+        const object = generator.valueToCode(block, 'OBJECT', generator.ORDER_ATOMIC) || 'null';
+        const property = generator.valueToCode(block, 'PROPERTY', generator.ORDER_ATOMIC) || "''";
+        const code = `sceneManager.getProperty(${object}, ${property})`;
+        return [code, generator.ORDER_ATOMIC];
+    };
+
+    javascript.javascriptGenerator.forBlock['set_metadata'] = function (block, generator) {
+        const key = generator.valueToCode(block, 'KEY', generator.ORDER_ATOMIC) || "''";
+        const object = generator.valueToCode(block, 'OBJECT', generator.ORDER_ATOMIC) || 'null';
+        const value = generator.valueToCode(block, 'VALUE', generator.ORDER_ATOMIC) || 'null';
+        return `sceneManager.setMetadata(${object}, ${key}, ${value});\n`;
+    };
+
+    javascript.javascriptGenerator.forBlock['get_metadata'] = function (block, generator) {
+        const key = generator.valueToCode(block, 'KEY', generator.ORDER_ATOMIC) || "''";
+        const object = generator.valueToCode(block, 'OBJECT', generator.ORDER_ATOMIC) || 'null';
+        const code = `sceneManager.getMetadata(${object}, ${key})`;
+        return [code, generator.ORDER_ATOMIC];
+    };
+
+    javascript.javascriptGenerator.forBlock['move_object'] = function (block, generator) {
+        const name = generator.valueToCode(block, 'NAME', generator.ORDER_ATOMIC) || 'null';
+        const x = generator.valueToCode(block, 'X', generator.ORDER_ATOMIC) || 0;
+        const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || 0;
+        const z = generator.valueToCode(block, 'Z', generator.ORDER_ATOMIC) || 0;
+        return `sceneManager.move(${name}, ${x}, ${y}, ${z});\n`;
+    };
+
+    javascript.javascriptGenerator.forBlock['create_light'] = function (block, generator) {
+        const name = block.getFieldValue('NAME');
+        const x = generator.valueToCode(block, 'X', generator.ORDER_ATOMIC) || 0;
+        const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || 0;
+        const z = generator.valueToCode(block, 'Z', generator.ORDER_ATOMIC) || 0;
+        return `sceneManager.createLight('${name}', ${x}, ${y}, ${z});\n`;
+    };
+
+    javascript.javascriptGenerator.forBlock['change_object_color'] = function (block, generator) {
+        const name = generator.valueToCode(block, 'NAME', generator.ORDER_ATOMIC) || 'null';
+        const color = generator.valueToCode(block, 'COLOR', generator.ORDER_ATOMIC) || "''";
+        return `sceneManager.changeColor(${name}, ${color});\n`;
+    };
+
+    javascript.javascriptGenerator.forBlock['rotate_object'] = function (block, generator) {
+        const name = generator.valueToCode(block, 'NAME', generator.ORDER_ATOMIC) || 'null';
+        const x = generator.valueToCode(block, 'X', generator.ORDER_ATOMIC) || 0;
+        const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || 0;
+        const z = generator.valueToCode(block, 'Z', generator.ORDER_ATOMIC) || 0;
+        return `sceneManager.rotate(${name}, ${x}, ${y}, ${z});\n`;
+    };
+
+    javascript.javascriptGenerator.forBlock['animate_object'] = function (block, generator) {
+        const object = generator.valueToCode(block, 'OBJECT', generator.ORDER_ATOMIC) || 'null';
+        const property = block.getFieldValue('PROPERTY');
+        const from = generator.valueToCode(block, 'FROM', generator.ORDER_ATOMIC) || 0;
+        const to = generator.valueToCode(block, 'TO', generator.ORDER_ATOMIC) || 0;
+        const duration = generator.valueToCode(block, 'DURATION', generator.ORDER_ATOMIC) || 1;
+        const loop = block.getFieldValue('LOOP');
+
+        let loopBool = false;
+        let loopMode = 'CYCLE'; // Default string
+
+        if (loop === 'YES') {
+            loopBool = true;
+        } else if (loop === 'PINGPONG') {
+            loopBool = true;
+            loopMode = 'PINGPONG';
+        }
+
+        return `sceneManager.animateProperty(${object}, '${property}', ${from}, ${to}, ${duration}, ${loopBool}, '${loopMode}');\n`;
+    };
+
+    javascript.javascriptGenerator.forBlock['import_animation'] = function(block, generator) {
+        const url = block.getFieldValue('URL');
+        const varName = generator.nameDB_.getName(block.getFieldValue('VAR'), Blockly.Variables.NAME_TYPE);
+        return `var ${varName} = await sceneManager.importAnimation('${url}');\n`;
+    };
+
+    javascript.javascriptGenerator.forBlock['apply_animation'] = function(block, generator) {
+        const anim = generator.valueToCode(block, 'ANIMATION', generator.ORDER_ATOMIC) || 'null';
+        const model = generator.valueToCode(block, 'MODEL', generator.ORDER_ATOMIC) || 'null';
+        return `sceneManager.applyAnimation(${anim}, ${model});\n`;
+    };
+
+    javascript.javascriptGenerator.forBlock['play_animation'] = function(block, generator) {
+        const model = generator.valueToCode(block, 'MODEL', generator.ORDER_ATOMIC) || 'null';
+        const from = generator.valueToCode(block, 'FROM', generator.ORDER_ATOMIC) || 0;
+        const to = generator.valueToCode(block, 'TO', generator.ORDER_ATOMIC) || 100;
+        const loop = block.getFieldValue('LOOP') === 'TRUE';
+        return `sceneManager.playAnimation(${model}, ${from}, ${to}, ${loop});\n`;
+    };
+
+    javascript.javascriptGenerator.forBlock['stop_skeletal_animation'] = function(block, generator) {
+        const object = generator.valueToCode(block, 'OBJECT', generator.ORDER_ATOMIC) || 'null';
+        return `sceneManager.stopSkeletalAnimation(${object});\n`;
+    };
+
+    javascript.javascriptGenerator.forBlock['stop_animation'] = function (block, generator) {
+        const object = generator.valueToCode(block, 'OBJECT', generator.ORDER_ATOMIC) || 'null';
+        return `sceneManager.stopPropertyAnimation(${object});\n`;
+    };
+
+    javascript.javascriptGenerator.forBlock['animate_rotation'] = function (block, generator) {
+        const object = generator.valueToCode(block, 'OBJECT', generator.ORDER_ATOMIC) || 'null';
+        const x = generator.valueToCode(block, 'X', generator.ORDER_ATOMIC) || 0;
+        const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || 0;
+        const z = generator.valueToCode(block, 'Z', generator.ORDER_ATOMIC) || 0;
+        const duration = generator.valueToCode(block, 'DURATION', generator.ORDER_ATOMIC) || 1;
+        const loop = block.getFieldValue('LOOP');
+
+        let loopBool = false;
+        let loopMode = 'CYCLE';
+
+        if (loop === 'YES') {
+            loopBool = true;
+        } else if (loop === 'PINGPONG') {
+            loopBool = true;
+            loopMode = 'PINGPONG';
+        }
+
+        return `sceneManager.animateRotation(${object}, ${x}, ${y}, ${z}, ${duration}, ${loopBool}, '${loopMode}');\n`;
+    };
+
+    javascript.javascriptGenerator.forBlock['animate_position'] = function (block, generator) {
+        const object = generator.valueToCode(block, 'OBJECT', generator.ORDER_ATOMIC) || 'null';
+        const x = generator.valueToCode(block, 'X', generator.ORDER_ATOMIC) || 0;
+        const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || 0;
+        const z = generator.valueToCode(block, 'Z', generator.ORDER_ATOMIC) || 0;
+        const duration = generator.valueToCode(block, 'DURATION', generator.ORDER_ATOMIC) || 1;
+        const loop = block.getFieldValue('LOOP');
+
+        let loopBool = false;
+        let loopMode = 'CYCLE';
+
+        if (loop === 'YES') {
+            loopBool = true;
+        } else if (loop === 'PINGPONG') {
+            loopBool = true;
+            loopMode = 'PINGPONG';
+        }
+
+        return `sceneManager.animatePosition(${object}, ${x}, ${y}, ${z}, ${duration}, ${loopBool}, '${loopMode}');\n`;
+    };
+
+    javascript.javascriptGenerator.forBlock['animate_scale'] = function (block, generator) {
+        const object = generator.valueToCode(block, 'OBJECT', generator.ORDER_ATOMIC) || 'null';
+        const x = generator.valueToCode(block, 'X', generator.ORDER_ATOMIC) || 1;
+        const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || 1;
+        const z = generator.valueToCode(block, 'Z', generator.ORDER_ATOMIC) || 1;
+        const duration = generator.valueToCode(block, 'DURATION', generator.ORDER_ATOMIC) || 1;
+        const loop = block.getFieldValue('LOOP');
+
+        let loopBool = false;
+        let loopMode = 'CYCLE';
+
+        if (loop === 'YES') {
+            loopBool = true;
+        } else if (loop === 'PINGPONG') {
+            loopBool = true;
+            loopMode = 'PINGPONG';
+        }
+
+        return `sceneManager.animateScale(${object}, ${x}, ${y}, ${z}, ${duration}, ${loopBool}, '${loopMode}');\n`;
+    };
+
+    javascript.javascriptGenerator.forBlock['enable_physics'] = function (block, generator) {
+        const name = generator.valueToCode(block, 'NAME', generator.ORDER_ATOMIC) || 'null';
+        const mass = generator.valueToCode(block, 'MASS', generator.ORDER_ATOMIC) || 1;
+        const impostorField = block.getFieldValue('IMPOSTOR');
+        // Extract the type from the full BABYLON path
+        const impostorType = impostorField.split('.').pop();
+        return `sceneManager.enablePhysics(${name}, ${mass}, '${impostorType}');\n`;
+    };
+
+    javascript.javascriptGenerator.forBlock['apply_force'] = function (block, generator) {
+        // This is a more advanced physics function. A helper could be added if needed frequently.
+        const name = block.getFieldValue('NAME');
+        const fx = generator.valueToCode(block, 'FX', generator.ORDER_ATOMIC) || 0;
+        const fy = generator.valueToCode(block, 'FY', generator.ORDER_ATOMIC) || 0;
+        const fz = generator.valueToCode(block, 'FZ', generator.ORDER_ATOMIC) || 0;
+        return `// Apply force requires direct physics access, consider a high-level alternative.\n`;
+    };
+
+    javascript.javascriptGenerator.forBlock['set_gravity'] = function (block, generator) {
+        const gx = generator.valueToCode(block, 'GX', generator.ORDER_ATOMIC) || 0;
+        const gy = generator.valueToCode(block, 'GY', generator.ORDER_ATOMIC) || -9.81;
+        const gz = generator.valueToCode(block, 'GZ', generator.ORDER_ATOMIC) || 0;
+        return `sceneManager.setGravity(${gx}, ${gy}, ${gz});\n`;
+    };
+
+    javascript.javascriptGenerator.forBlock['set_physics_impostor'] = function (block, generator) {
+        const name = block.getFieldValue('NAME');
+        const impostorField = block.getFieldValue('IMPOSTOR');
+        // Extract the type from the full BABYLON path
+        const impostorType = impostorField.split('.').pop();
+        return `// Physics impostor is now set via enablePhysics. For '${name}', you can specify type.\n`;
+    };
+
+    // --- Audio Block Generators ---
+    javascript.javascriptGenerator.forBlock['play_sound_url'] = function (block, generator) {
+        const url = block.getFieldValue('URL');
+        return `
+            sceneManager.playSound('${url}');
+        `;
+    };
+
+    javascript.javascriptGenerator.forBlock['play_note'] = function (block, generator) {
+        const note = block.getFieldValue('NOTE');
+        const duration = generator.valueToCode(block, 'DURATION', generator.ORDER_ATOMIC) || '0.5';
+        return `sceneManager.playNote(${note}, ${duration});\n`;
+    };
+
+    javascript.javascriptGenerator.forBlock['asset_model'] = function (block, generator) {
+        const assetName = block.getFieldValue('ASSET');
+        return [`'${assetName}'`, generator.ORDER_ATOMIC];
+    };
+
+    javascript.javascriptGenerator.forBlock['asset_audio'] = function (block, generator) {
+        const assetName = block.getFieldValue('ASSET');
+        return [`'${assetName}'`, generator.ORDER_ATOMIC];
+    };
+
+    javascript.javascriptGenerator.forBlock['asset_image'] = function (block, generator) {
+        const assetName = block.getFieldValue('ASSET');
+        return [`'${assetName}'`, generator.ORDER_ATOMIC];
+    };
+
+    javascript.javascriptGenerator.forBlock['import_model_from_asset'] = function (block, generator) {
+        const assetName = generator.valueToCode(block, 'ASSET', generator.ORDER_ATOMIC) || 'null';
+        const varName = generator.nameDB_.getName(block.getFieldValue('VAR'), Blockly.Variables.NAME_TYPE);
+        return `var ${varName} = await sceneManager.importModelAsset(${assetName}, assetManager);\n`;
+    };
+
+    javascript.javascriptGenerator.forBlock['play_sound_from_asset'] = function (block, generator) {
+        const assetName = generator.valueToCode(block, 'ASSET', generator.ORDER_ATOMIC) || 'null';
+        return `sceneManager.playSoundAsset(${assetName}, assetManager);\n`;
+    };
+
+    javascript.javascriptGenerator.forBlock['set_texture_from_asset'] = function (block, generator) {
+        const object = generator.valueToCode(block, 'OBJECT', generator.ORDER_ATOMIC) || 'null';
+        const assetName = generator.valueToCode(block, 'ASSET', generator.ORDER_ATOMIC) || 'null';
+        return `sceneManager.setTexture(${object}, ${assetName}, assetManager);\n`;
+    };
+
+    // --- GUI Block Generators ---
+    javascript.javascriptGenerator.forBlock['gui_create_text_block'] = function (block, generator) {
+        const name = block.getFieldValue('NAME');
+        const text = generator.valueToCode(block, 'TEXT', generator.ORDER_ATOMIC) || "''";
+        const hAlign = parseInt(block.getFieldValue('H_ALIGN'));
+        const vAlign = parseInt(block.getFieldValue('V_ALIGN'));
+
+        let top, left;
+        const topBlock = block.getInputTargetBlock('TOP');
+        if (topBlock && topBlock.type === 'text') {
+            top = `'${topBlock.getFieldValue('TEXT')}'`;
+        } else {
+            top = generator.valueToCode(block, 'TOP', generator.ORDER_ATOMIC) || "'0px'";
+        }
+
+        const leftBlock = block.getInputTargetBlock('LEFT');
+        if (leftBlock && leftBlock.type === 'text') {
+            left = `'${leftBlock.getFieldValue('TEXT')}'`;
+        } else {
+            left = generator.valueToCode(block, 'LEFT', generator.ORDER_ATOMIC) || "'0px'";
+        }
+
+        const options = `{
+            horizontalAlignment: ${hAlign},
+            verticalAlignment: ${vAlign},
+            top: ${top},
+            left: ${left}
+        }`;
+
+        return `sceneManager.uiManager.createText('${name}', ${text}, ${options});\n`;
+    };
+
+    javascript.javascriptGenerator.forBlock['gui_set_text'] = function (block, generator) {
+        const name = block.getFieldValue('NAME');
+        const text = generator.valueToCode(block, 'TEXT', generator.ORDER_ATOMIC) || "''";
+        return `sceneManager.uiManager.setText('${name}', ${text});\n`;
+    };
+
+    javascript.javascriptGenerator.forBlock['gui_create_input_text'] = function (block, generator) {
+        const name = block.getFieldValue('NAME');
+        const hAlign = parseInt(block.getFieldValue('H_ALIGN'));
+        const vAlign = parseInt(block.getFieldValue('V_ALIGN'));
+
+        let top, left;
+        const topBlock = block.getInputTargetBlock('TOP');
+        if (topBlock && topBlock.type === 'text') {
+            top = `'${topBlock.getFieldValue('TEXT')}'`;
+        } else {
+            top = generator.valueToCode(block, 'TOP', generator.ORDER_ATOMIC) || "'0px'";
+        }
+
+        const leftBlock = block.getInputTargetBlock('LEFT');
+        if (leftBlock && leftBlock.type === 'text') {
+            left = `'${leftBlock.getFieldValue('TEXT')}'`;
+        } else {
+            left = generator.valueToCode(block, 'LEFT', generator.ORDER_ATOMIC) || "'0px'";
+        }
+
+        const options = `{
+            horizontalAlignment: ${hAlign},
+            verticalAlignment: ${vAlign},
+            top: ${top},
+            left: ${left}
+        }`;
+
+        return `sceneManager.uiManager.createInput('${name}', ${options});\n`;
+    };
+
+    javascript.javascriptGenerator.forBlock['gui_get_input_text'] = function (block, generator) {
+        const name = block.getFieldValue('NAME');
+        const code = `sceneManager.uiManager.getInputText('${name}')`;
+        return [code, generator.ORDER_ATOMIC];
+    };
+
+    javascript.javascriptGenerator.forBlock['gui_create_button'] = function (block, generator) {
+        const name = block.getFieldValue('NAME');
+        const text = generator.valueToCode(block, 'TEXT', generator.ORDER_ATOMIC) || "''";
+        return `sceneManager.uiManager.createButton('${name}', ${text});\n`;
+    };
+
+    javascript.javascriptGenerator.forBlock['gui_create_image_from_url'] = function (block, generator) {
+        const name = block.getFieldValue('NAME');
+        const url = generator.valueToCode(block, 'URL', generator.ORDER_ATOMIC) || "''";
+        return `sceneManager.uiManager.createImage('${name}', ${url});\n`;
+    };
+
+    javascript.javascriptGenerator.forBlock['gui_create_image_from_asset'] = function (block, generator) {
+        const name = block.getFieldValue('NAME');
+        const assetName = generator.valueToCode(block, 'ASSET', generator.ORDER_ATOMIC) || "''";
+        return `
+            (async () => {
+                const asset = await assetManager.getAsset(${assetName});
+                if (asset) {
+                    sceneManager.uiManager.createImageFromAsset('${name}', asset);
+                }
+            })();
+        `;
+    };
+
+    javascript.javascriptGenerator.forBlock['event_on_gui_click'] = function (block, generator) {
+        const name = block.getFieldValue('NAME');
+        const doCode = generator.statementToCode(block, 'DO');
+        const callback = `function() {\n${doCode}\n}`;
+        return `sceneManager.uiManager.onControlClick('${name}', ${callback});\n`;
+    };
+
+    // --- Console Block Generators ---
+    javascript.javascriptGenerator.forBlock['console_log'] = function (block, generator) {
+        const value = generator.valueToCode(block, 'VALUE', generator.ORDER_ATOMIC) || 'null';
+        return `console.log(${value});\n`;
+    };
+
+    javascript.javascriptGenerator.forBlock['console_warn'] = function (block, generator) {
+        const value = generator.valueToCode(block, 'VALUE', generator.ORDER_ATOMIC) || 'null';
+        return `console.warn(${value});\n`;
+    };
+
+    javascript.javascriptGenerator.forBlock['console_error'] = function (block, generator) {
+        const value = generator.valueToCode(block, 'VALUE', generator.ORDER_ATOMIC) || 'null';
+        return `console.error(${value});\n`;
+    };
+
+    javascript.javascriptGenerator.forBlock['console_clear'] = function (block, generator) {
+        return `console.clear();\n`;
+    };
+
+    javascript.javascriptGenerator.forBlock['take_screenshot'] = function (block, generator) {
+        return `sceneManager.takeScreenshot();\n`;
+    };
+
+    javascript.javascriptGenerator.forBlock['set_pixelated_look'] = function (block, generator) {
+        const object = generator.valueToCode(block, 'OBJECT', generator.ORDER_ATOMIC) || 'null';
+        return `sceneManager.setSamplingMode(${object}, 'nearest');\n`;
+    };
+
+    javascript.javascriptGenerator.forBlock['set_background_image'] = function (block, generator) {
+        const url = generator.valueToCode(block, 'URL', generator.ORDER_ATOMIC) || "''";
+        return `sceneManager.setBackgroundImage(${url});\n`;
+    };
+
+    javascript.javascriptGenerator.forBlock['play_animation_by_index'] = function (block, generator) {
+        const index = generator.valueToCode(block, 'INDEX', generator.ORDER_ATOMIC) || 0;
+        const object = generator.valueToCode(block, 'OBJECT', generator.ORDER_ATOMIC) || 'null';
+        const loop = block.getFieldValue('LOOP') === 'TRUE';
+        return `sceneManager.playAnimationByIndex(${object}, ${index}, ${loop});\n`;
+    };
+
+    javascript.javascriptGenerator.forBlock['parse_number_from'] = function (block, generator) {
+        const string = generator.valueToCode(block, 'STRING', generator.ORDER_ATOMIC) || "''";
+        const code = `parseFloat(${string});\n`;
+        return [code, generator.ORDER_ATOMIC];
+    };
+
+    javascript.javascriptGenerator.forBlock['create_environment'] = function (block, generator) {
+        const enableSkybox = block.getFieldValue('ENABLE_SKYBOX') === 'TRUE';
+        const enableGround = block.getFieldValue('ENABLE_GROUND') === 'TRUE';
+        const options = {
+            createSkybox: enableSkybox,
+            createGround: enableGround
+        };
+        return `sceneManager.createEnvironment(${JSON.stringify(options)});\n`;
+    };
+
+    javascript.javascriptGenerator.forBlock['set_background'] = function (block, generator) {
+        const background = generator.valueToCode(block, 'BACKGROUND', generator.ORDER_ATOMIC) || "''";
+        return `sceneManager.setBackground(${background});\n`;
+    };
+
+    javascript.javascriptGenerator.forBlock['procedural_texture'] = function (block, generator) {
+        const texture = block.getFieldValue('TEXTURE');
+        return [`'${texture}'`, generator.ORDER_ATOMIC];
+    };
+
+    // Override the default function definition blocks to be async
+    javascript.javascriptGenerator.forBlock['procedures_defnoreturn'] = function (block, generator) {
+        const funcName = generator.nameDB_.getName(block.getFieldValue('NAME'), Blockly.PROCEDURE_CATEGORY_NAME);
+        let xfix1 = '';
+        if (generator.STATEMENT_PREFIX) {
+            xfix1 += generator.injectId(generator.STATEMENT_PREFIX, block);
+        }
+        if (generator.STATEMENT_SUFFIX) {
+            xfix1 += generator.injectId(generator.STATEMENT_SUFFIX, block);
+        }
+        if (xfix1) {
+            xfix1 = generator.prefixLines(xfix1, generator.INDENT);
+        }
+        let loopVar = '';
+        if (block.hasStatements_) {
+            loopVar = generator.statementToCode(block, 'STACK');
+            if (generator.STATEMENT_SUFFIX) {
+                loopVar = generator.prefixLines(generator.injectId(generator.STATEMENT_SUFFIX, block), generator.INDENT) + loopVar;
+            }
+        }
+        let branch = loopVar;
+        let args = [];
+        const variables = block.getVars();
+        for (let i = 0; i < variables.length; i++) {
+            args[i] = generator.nameDB_.getName(variables[i], Blockly.VARIABLE_CATEGORY_NAME);
+        }
+        let code = 'async function ' + funcName + '(' + args.join(', ') + ') {\n' + branch + '}';
+        code = generator.scrub_(block, code);
+        generator.definitions_['%' + funcName] = code;
+        return null;
+    };
+
+    javascript.javascriptGenerator.forBlock['procedures_defreturn'] = function (block, generator) {
+        const funcName = generator.nameDB_.getName(block.getFieldValue('NAME'), Blockly.PROCEDURE_CATEGORY_NAME);
+        let xfix1 = '';
+        if (generator.STATEMENT_PREFIX) {
+            xfix1 += generator.injectId(generator.STATEMENT_PREFIX, block);
+        }
+        if (generator.STATEMENT_SUFFIX) {
+            xfix1 += generator.injectId(generator.STATEMENT_SUFFIX, block);
+        }
+        if (xfix1) {
+            xfix1 = generator.prefixLines(xfix1, generator.INDENT);
+        }
+        let loopVar = '';
+        if (block.hasStatements_) {
+            loopVar = generator.statementToCode(block, 'STACK');
+            if (generator.STATEMENT_SUFFIX) {
+                loopVar = generator.prefixLines(generator.injectId(generator.STATEMENT_SUFFIX, block), generator.INDENT) + loopVar;
+            }
+        }
+        let branch = loopVar;
+        let returnValue = generator.valueToCode(block, 'RETURN', generator.ORDER_NONE) || '';
+        let xfix2 = '';
+        if (returnValue) {
+            returnValue = generator.INDENT + 'return ' + returnValue + ';\n';
+        }
+        let args = [];
+        const variables = block.getVars();
+        for (let i = 0; i < variables.length; i++) {
+            args[i] = generator.nameDB_.getName(variables[i], Blockly.VARIABLE_CATEGORY_NAME);
+        }
+        let code = 'async function ' + funcName + '(' + args.join(', ') + ') {\n' + branch + returnValue + '}';
+        code = generator.scrub_(block, code);
+        generator.definitions_['%' + funcName] = code;
+        return null;
+    };
+
+    javascript.javascriptGenerator.forBlock['procedures_callreturn'] = function (block, generator) {
+        const funcName = generator.nameDB_.getName(block.getFieldValue('NAME'), Blockly.PROCEDURE_CATEGORY_NAME);
+        const args = [];
+        const variables = block.getVars();
+        for (let i = 0; i < variables.length; i++) {
+            args[i] = generator.valueToCode(block, 'ARG' + i, generator.ORDER_NONE) || 'null';
+        }
+        const code = 'await ' + funcName + '(' + args.join(', ') + ')';
+        return [code, generator.ORDER_FUNCTION_CALL];
+    };
+
+    javascript.javascriptGenerator.forBlock['procedures_callnoreturn'] = function (block, generator) {
+        const funcName = generator.nameDB_.getName(block.getFieldValue('NAME'), Blockly.PROCEDURE_CATEGORY_NAME);
+        const args = [];
+        const variables = block.getVars();
+        for (let i = 0; i < variables.length; i++) {
+            args[i] = generator.valueToCode(block, 'ARG' + i, generator.ORDER_NONE) || 'null';
+        }
+        const code = 'await ' + funcName + '(' + args.join(', ') + ');\n';
+        return code;
+    };
+}
+
+// Convert Blockly Code to JavaScript
+function generateCode() {
+    return javascript.javascriptGenerator.workspaceToCode(workspace);
+}
+
+// Resize canvas to fit its container
+function resizeCanvas() {
+    const container = document.querySelector('.canvas-container');
+    canvas.width = container.offsetWidth;
+    canvas.height = container.offsetHeight;
+    if (sceneManager && sceneManager.engine) {
+        sceneManager.engine.resize();
+
+        // Resize the GUI advanced texture to match the new canvas size
+        sceneManager.uiManager.advancedTexture.scaleTo(sceneManager.engine.getRenderWidth(), sceneManager.engine.getRenderHeight());
+
+        // Mark the texture as dirty to force a re-render of the GUI
+        sceneManager.uiManager.advancedTexture.markAsDirty();
+    }
+
+    // Adjust orthographic camera parameters if in isometric mode
+    if (sceneManager && sceneManager.scene && sceneManager.scene.activeCamera) {
+        const camera = sceneManager.scene.activeCamera;
+        if (camera.mode === BABYLON.Camera.ORTHOGRAPHIC_CAMERA) {
+            const aspectRatio = canvas.width / canvas.height;
+            const orthoSize = 10;
+            camera.orthoLeft = -orthoSize * aspectRatio;
+            camera.orthoRight = orthoSize * aspectRatio;
+            camera.orthoBottom = -orthoSize;
+            camera.orthoTop = orthoSize;
+        }
+    }
+}
+
+function loadWorkspaceDefault() {
+    let state = {};
+    var workspace = Blockly.getMainWorkspace();
+    Blockly.serialization.workspaces.load(state, workspace);
+    doRun();
+}
+
+window.doRun = async function (code) {
+    let codeToRun = code || generateCode();
+
+    if (sceneManager) {
+        sceneManager.dispose();
+    }
+    sceneManager = new BabylonSceneManager(canvas);
+    window.sceneManager = sceneManager; // Expose for debugging and testing
+
+    try {
+        const AsyncFunction = Object.getPrototypeOf(async function () { }).constructor;
+        const userGeneratedCode = new AsyncFunction('sceneManager', 'assetManager', codeToRun);
+        await userGeneratedCode(sceneManager, assetManager);
+    } catch (error) {
+        console.error('Error executing code:', error);
+    } finally {
+        console.log("JULES_VERIFICATION: SCENE_READY");
+    }
+}
+window.doRun = doRun;
+
+const helper = function () {
+    this.getField('MODEL_URL').maxDisplayLength = 16;
+}
+Blockly.Extensions.register('set_max_display_length', helper);
+
+const canvas = document.getElementById('gameCanvas');
+const assetManager = new AssetManager();
+window.sceneManager = new BabylonSceneManager(canvas);
+const projectManager = new ProjectManager(assetManager, workspace, sceneManager);
+
+// Set up our default Blockly color blocks
+// TODO: had to manually set up color block generators due to plugin incompatibility, fix later
+registerFieldColour();
+installAllBlocks({
+    javascript: javascript.javascriptGenerator
+});
+
+javascript.javascriptGenerator.forBlock['colour_random'] = function (block, generator) {
+    return [generator.provideFunction_('colourRandom', `
+function ${generator.FUNCTION_NAME_PLACEHOLDER_}() {
+  var num = Math.floor(Math.random() * 0x1000000);
+  return '#' + ('00000' + num.toString(16)).substr(-6);
+}
+`) + '()', generator.ORDER_FUNCTION_CALL];
+};
+
+javascript.javascriptGenerator.forBlock['colour_picker'] = function (block, generator) {
+    const colour = block.getFieldValue('COLOUR');
+    return [`'${colour}'`, generator.ORDER_ATOMIC];
+};
+
+javascript.javascriptGenerator.forBlock['colour_rgb'] = function (block, generator) {
+    const r = generator.valueToCode(block, 'RED', generator.ORDER_ATOMIC) || 0;
+    const g = generator.valueToCode(block, 'GREEN', generator.ORDER_ATOMIC) || 0;
+    const b = generator.valueToCode(block, 'BLUE', generator.ORDER_ATOMIC) || 0;
+    return [generator.provideFunction_('colourRgb', `
+function ${generator.FUNCTION_NAME_PLACEHOLDER_}(r, g, b) {
+  r = Math.max(Math.min(Number(r), 100), 0) * 2.55;
+  g = Math.max(Math.min(Number(g), 100), 0) * 2.55;
+  b = Math.max(Math.min(Number(b), 100), 0) * 2.55;
+  r = ('0' + (Math.round(r) || 0).toString(16)).slice(-2);
+  g = ('0' + (Math.round(g) || 0).toString(16)).slice(-2);
+  b = ('0' + (Math.round(b) || 0).toString(16)).slice(-2);
+  return '#' + r + g + b;
+}
+`) + `(${r}, ${g}, ${b})`, generator.ORDER_FUNCTION_CALL];
+};
+
+javascript.javascriptGenerator.forBlock['colour_blend'] = function (block, generator) {
+    const c1 = generator.valueToCode(block, 'COLOUR1', generator.ORDER_ATOMIC) || "'#000000'";
+    const c2 = generator.valueToCode(block, 'COLOUR2', generator.ORDER_ATOMIC) || "'#000000'";
+    const ratio = generator.valueToCode(block, 'RATIO', generator.ORDER_ATOMIC) || 0.5;
+    return [generator.provideFunction_('colourBlend', `
+function ${generator.FUNCTION_NAME_PLACEHOLDER_}(c1, c2, ratio) {
+  ratio = Math.max(Math.min(Number(ratio), 1), 0);
+  var r1 = parseInt(c1.substring(1, 3), 16);
+  var g1 = parseInt(c1.substring(3, 5), 16);
+  var b1 = parseInt(c1.substring(5, 7), 16);
+  var r2 = parseInt(c2.substring(1, 3), 16);
+  var g2 = parseInt(c2.substring(3, 5), 16);
+  var b2 = parseInt(c2.substring(5, 7), 16);
+  var r = Math.round(r1 * (1 - ratio) + r2 * ratio);
+  var g = Math.round(g1 * (1 - ratio) + g2 * ratio);
+  var b = Math.round(b1 * (1 - ratio) + b2 * ratio);
+  r = ('0' + (r || 0).toString(16)).slice(-2);
+  g = ('0' + (g || 0).toString(16)).slice(-2);
+  b = ('0' + (b || 0).toString(16)).slice(-2);
+  return '#' + r + g + b;
+}
+`) + `(${c1}, ${c2}, ${ratio})`, generator.ORDER_FUNCTION_CALL];
+};
+
+assetManager.init().then(() => {
+    console.log("Asset manager initialized");
+    loadAssetsIntoView();
+}).catch(error => {
+    console.error("Failed to initialize asset manager:", error);
+});
+
+const assetUploader = document.getElementById('asset-uploader');
+assetUploader.addEventListener('change', async (event) => {
+    const files = event.target.files;
+    for (const file of files) {
+        await assetManager.addAsset(file);
+    }
+    loadAssetsIntoView();
+});
+
+const addAssetFromUrlButton = document.getElementById('add-asset-from-url-button');
+const assetUrlInput = document.getElementById('asset-url-input');
+
+addAssetFromUrlButton.addEventListener('click', async () => {
+    const url = assetUrlInput.value;
+    if (!url) {
+        alert('Please enter a URL.');
+        return;
+    }
+    try {
+        await assetManager.addAssetFromURL(url);
+        loadAssetsIntoView();
+        assetUrlInput.value = '';
+    } catch (error) {
+        alert('Failed to load asset from URL. Please check the URL and try again. See console for more details.');
+    }
+});
+
+async function loadAssetsIntoView() {
+    const assetList = document.getElementById('asset-list');
+    assetList.innerHTML = '';
+    const assets = await assetManager.getAllAssets();
+    assets.forEach(asset => {
+        const li = document.createElement('li');
+        li.textContent = asset.name;
+        const deleteButton = document.createElement('button');
+        deleteButton.textContent = 'Delete';
+        deleteButton.onclick = async () => {
+            await assetManager.deleteAsset(asset.name);
+            loadAssetsIntoView();
+        };
+        li.appendChild(deleteButton);
+        assetList.appendChild(li);
+    });
+    // The toolbox will be updated dynamically by the block definitions.
+}
+
+
+// --- Dropdown Menu Logic ---
+document.getElementById('menuButton').addEventListener('click', function () {
+    document.getElementById('dropdownMenu').classList.toggle('show');
+});
+
+// Close the dropdown if the user clicks outside of it
+window.addEventListener('click', function (event) {
+    if (!event.target.matches('.btn-menu-toggle')) {
+        var dropdowns = document.getElementsByClassName("dropdown-content");
+        for (var i = 0; i < dropdowns.length; i++) {
+            var openDropdown = dropdowns[i];
+            if (openDropdown.classList.contains('show')) {
+                openDropdown.classList.remove('show');
+            }
+        }
+    }
+});
+
+// Add event listener to the dropdown container to close the menu on button click
+document.getElementById('dropdownMenu').addEventListener('click', function (event) {
+    if (event.target.tagName === 'BUTTON') {
+        document.getElementById('dropdownMenu').classList.remove('show');
+    }
+});
+
+document.getElementById('runButton').addEventListener('click', () => {
+    doRun();
+});
+document.getElementById('saveButton').addEventListener('click', () => {
+    projectManager.saveProject();
+});
+document.getElementById('publishButton').addEventListener('click', () => {
+    projectManager.publishProject();
+});
+document.getElementById('loadButton').addEventListener('click', () => {
+    projectManager.loadProject();
+});
+document.getElementById('docsButton').addEventListener('click', () => {
+    window.open('docs/Home.html', '_blank');
+});
+document.getElementById('screenshotButton').addEventListener('click', () => {
+    sceneManager.takeScreenshot();
+});
+document.getElementById('toggleToolboxButton').addEventListener('click', () => {
+    const blocklyDiv = document.getElementById('blocklyDiv');
+    blocklyDiv.classList.toggle('toolbox-collapsed');
+    Blockly.svgResize(workspace);
+});
+
+document.getElementById('undoButton').addEventListener('click', () => {
+    workspace.undo(false);
+});
+
+document.getElementById('redoButton').addEventListener('click', () => {
+    workspace.undo(true);
+});
+
+workspace.addChangeListener(function(event) {
+    const undoButton = document.getElementById('undoButton');
+    const redoButton = document.getElementById('redoButton');
+    undoButton.disabled = workspace.getUndoStack().length === 0;
+    redoButton.disabled = workspace.getRedoStack().length === 0;
+});
+
+document.getElementById('shareButton').addEventListener('click', () => {
+    projectManager.shareProject();
+});
+
+document.getElementById('fullscreenBtn').addEventListener('click', () => {
+    const canvasContainer = document.querySelector('.canvas-container');
+    if (!document.fullscreenElement && !document.mozFullScreenElement && !document.webkitFullscreenElement && !document.msFullscreenElement) {
+        if (canvasContainer.requestFullscreen) {
+            canvasContainer.requestFullscreen();
+        } else if (canvasContainer.mozRequestFullScreen) { /* Firefox */
+            canvasContainer.mozRequestFullScreen();
+        } else if (canvasContainer.webkitRequestFullscreen) { /* Chrome, Safari & Opera */
+            canvasContainer.webkitRequestFullscreen();
+        } else if (canvasContainer.msRequestFullscreen) { /* IE/Edge */
+            canvasContainer.msRequestFullscreen();
+        }
+    } else {
+        if (document.exitFullscreen) {
+            document.exitFullscreen();
+        } else if (document.mozCancelFullScreen) { /* Firefox */
+            document.mozCancelFullScreen();
+        } else if (document.webkitExitFullscreen) { /* Chrome, Safari and Opera */
+            document.webkitExitFullscreen();
+        } else if (document.msExitFullscreen) { /* IE/Edge */
+            document.msExitFullscreen();
+        }
+    }
+});
+
+document.addEventListener('fullscreenchange', () => {
+    document.body.classList.toggle('fullscreen-active', !!document.fullscreenElement);
+    resizeCanvas();
+});
+document.addEventListener('webkitfullscreenchange', () => {
+    document.body.classList.toggle('fullscreen-active', !!document.webkitFullscreenElement);
+    resizeCanvas();
+});
+document.addEventListener('mozfullscreenchange', () => {
+    document.body.classList.toggle('fullscreen-active', !!document.mozFullScreenElement);
+    resizeCanvas();
+});
+document.addEventListener('MSFullscreenChange', () => {
+    document.body.classList.toggle('fullscreen-active', !!document.msFullscreenElement);
+    resizeCanvas();
+});
+
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+// --- Main View Switching Logic ---
+const codeViewButton = document.getElementById('codeViewButton');
+const assetsViewButton = document.getElementById('assetsViewButton');
+const codeView = document.getElementById('code-view');
+const assetsView = document.getElementById('assets-view');
+
+function showView(viewToShow) {
+    // Hide all views
+    codeView.style.display = 'none';
+    assetsView.style.display = 'none';
+
+    // Deactivate all buttons
+    codeViewButton.classList.remove('active');
+    assetsViewButton.classList.remove('active');
+
+    // Show the selected view and activate its button
+    if (viewToShow === 'code') {
+        codeView.style.display = 'block';
+        codeViewButton.classList.add('active');
+    } else if (viewToShow === 'assets') {
+        assetsView.style.display = 'block';
+        assetsViewButton.classList.add('active');
+    }
+}
+
+codeViewButton.addEventListener('click', () => showView('code'));
+assetsViewButton.addEventListener('click', () => showView('assets'));
+
+// Set the initial view
+showView('code');
+
+// --- Touch Control Event Listeners ---
+const touchJump = document.getElementById('touch-jump');
+
+const handleTouch = (key, isPressed) => {
+    sceneManager.inputState.keys[key] = isPressed;
+};
+
+// Jump Button
+touchJump.addEventListener('touchstart', (e) => { e.preventDefault(); handleTouch(' ', true); }, { passive: false });
+touchJump.addEventListener('touchend', (e) => { e.preventDefault(); handleTouch(' ', false); }, { passive: false });
+touchJump.addEventListener('touchcancel', (e) => { e.preventDefault(); handleTouch(' ', false); }, { passive: false });
+
+async function loadProjectFromUrl() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const projectParam = urlParams.get('project');
+    const workspaceDataEl = document.getElementById('workspace-data');
+
+    if (urlParams.has('fullscreen')) {
+        enterPresentationMode();
+    }
+
+    try {
+        if (workspaceDataEl && workspaceDataEl.textContent.trim()) {
+            // Loading from a published Jekyll page
+            const decodedData = atob(workspaceDataEl.textContent.trim());
+            const projectData = JSON.parse(decodedData);
+            await projectManager.loadProjectData(projectData);
+
+        } else if (projectParam) {
+            // Loading from a base64 URL parameter
+            const decodedState = atob(projectParam);
+            const projectData = JSON.parse(decodedState);
+            // Note: Legacy URL sharing might only contain workspace data.
+            // We ensure it fits the new structure before loading.
+            const fullProjectData = {
+                workspace: projectData.workspace || projectData, // Handle old format
+                assets: projectData.assets || [],
+                version: projectData.version || '0.9' // Mark as legacy if no version
+            };
+            await projectManager.loadProjectData(fullProjectData);
+
+        } else {
+            // No project data found, load the default
+            loadWorkspaceDefault();
+        }
+    } catch (e) {
+        console.error("Failed to load project from URL or Jekyll data:", e);
+        //alert("Could not load project. Loading default project instead.");
+        loadWorkspaceDefault();
+    }
+}
+
+function enterPresentationMode() {
+    document.body.classList.add('presentation-mode');
+
+    // Expand canvas and resize engine
+    const canvasContainer = document.querySelector('.canvas-container');
+    if (canvasContainer) {
+        // The CSS will handle the sizing, but we need to tell Babylon to resize its engine
+        setTimeout(() => {
+            resizeCanvas();
+        }, 100); // A small delay to allow CSS to apply
+
+        // Request fullscreen
+        if (canvasContainer.requestFullscreen) {
+            canvasContainer.requestFullscreen();
+        } else if (canvasContainer.mozRequestFullScreen) { /* Firefox */
+            canvasContainer.mozRequestFullScreen();
+        } else if (canvasContainer.webkitRequestFullscreen) { /* Chrome, Safari & Opera */
+            canvasContainer.webkitRequestFullscreen();
+        } else if (canvasContainer.msRequestFullscreen) { /* IE/Edge */
+            canvasContainer.msRequestFullscreen();
+        }
+    }
+}
+loadProjectFromUrl();
+
+// --- Bottom Nav Logic ---
+document.addEventListener('DOMContentLoaded', () => {
+    const container = document.querySelector('.container');
+    const workspaceTab = document.getElementById('workspace-tab');
+    const previewTab = document.getElementById('preview-tab');
+
+    if (workspaceTab && previewTab && container) {
+        workspaceTab.addEventListener('click', () => {
+            container.classList.remove('preview-active');
+            workspaceTab.classList.add('active');
+            previewTab.classList.remove('active');
+
+            // Fix case when toggling toolbox from Preview tab
+            Blockly.svgResize(workspace);
+        });
+
+        previewTab.addEventListener('click', () => {
+            container.classList.add('preview-active');
+            previewTab.classList.add('active');
+            workspaceTab.classList.remove('active');
+            // We need to resize the canvas when it becomes visible, especially after being hidden
+            setTimeout(resizeCanvas, 0);
+        });
+    }
+});

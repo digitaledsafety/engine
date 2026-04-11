@@ -38,7 +38,7 @@ test.describe('Engine Popup Text Enhancement', () => {
         setVarBlock.nextConnection.connect(setPopupTextBlock.previousConnection);
 
         // Execute
-        const code = Blockly.JavaScript.workspaceToCode(workspace);
+        const code = javascript.javascriptGenerator.workspaceToCode(workspace);
         await window.doRun(code);
 
         // Verify state
