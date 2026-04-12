@@ -2730,6 +2730,7 @@ workspace_data: "${base64WorkspaceData}"
                     // 1. Calculate bounding box of the entire hierarchy.
                     const boundingInfo = originalMesh.getHierarchyBoundingVectors(true);
                     const size = boundingInfo.max.subtract(boundingInfo.min);
+                    const center = boundingInfo.max.add(boundingInfo.min).scale(0.5);
 
                     // Use a small epsilon for dimensions to prevent zero-sized impostors which cannon.js dislikes.
                     const epsilon = 0.001;
@@ -2745,8 +2746,7 @@ workspace_data: "${base64WorkspaceData}"
                     }, this.scene);
 
                     // 3. Position the new box at the center of the model's bounding box.
-                    // TODO: fix
-                    //impostorBox.position.copyFrom(boundingInfo.center);
+                    impostorBox.position.copyFrom(center);
                     impostorBox.visibility = 0; // Make it invisible for rendering.
 
                     // 4. Apply the physics impostor to this new box.
@@ -2758,8 +2758,7 @@ workspace_data: "${base64WorkspaceData}"
                     originalMesh.parent = impostorBox;
 
                     // 6. Adjust the original mesh's local position to be relative to the new parent's center.
-                    // TODO: fix
-                    //originalMesh.position.subtractInPlace(boundingInfo.center);
+                    originalMesh.position.subtractInPlace(center);
 
                     // 7. Update the scene's object map to point to the new physics root.
                     // Rename the physics root to the original name for consistency in subsequent block calls.
