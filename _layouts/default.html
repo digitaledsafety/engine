@@ -1296,6 +1296,10 @@ workspace_data: "${base64WorkspaceData}"
                         },
                         {
                             kind: 'block',
+                            type: 'apply_impulse',
+                        },
+                        {
+                            kind: 'block',
                             type: 'set_physics_impostor',
                         },
                         {
@@ -1451,23 +1455,11 @@ workspace_data: "${base64WorkspaceData}"
                     contents: [
                         {
                             kind: 'block',
-                            type: 'create_camera',
-                        },
-                        {
-                            kind: 'block',
                             type: 'set_isometric_camera',
                         },
                         {
                             kind: 'block',
                             type: 'point_camera_at_mesh'
-                        },
-                        {
-                            kind: 'block',
-                            type: 'create_camera',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'set_isometric_camera',
                         },
                         {
                             kind: 'block',
@@ -1484,10 +1476,6 @@ workspace_data: "${base64WorkspaceData}"
                         {
                             kind: 'block',
                             type: 'create_ground',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'set_ground_material',
                         },
                         {
                             kind: 'block',
@@ -2902,6 +2890,20 @@ workspace_data: "${base64WorkspaceData}"
                         case 'LEFT': this.moveDirection.x -= 1; break;
                         case 'RIGHT': this.moveDirection.x += 1; break;
                     }
+                }
+            }
+
+            applyForce(target, force, contactPoint) {
+                const impostor = this._getPhysicsImpostor(target);
+                if (impostor) {
+                    impostor.applyForce(force, contactPoint);
+                }
+            }
+
+            applyImpulse(target, impulse, contactPoint) {
+                const impostor = this._getPhysicsImpostor(target);
+                if (impostor) {
+                    impostor.applyImpulse(impulse, contactPoint);
                 }
             }
 
@@ -4781,7 +4783,7 @@ workspace_data: "${base64WorkspaceData}"
                 type: 'apply_force',
                 message0: 'Apply force to %1 x: %2 y: %3 z: %4 at point x: %5 y: %6 z: %7',
                 args0: [
-                    { type: 'field_input', name: 'NAME', text: 'object' },
+                    { type: 'input_value', name: 'OBJECT' },
                     { type: 'input_value', name: 'FX', check: 'Number' },
                     { type: 'input_value', name: 'FY', check: 'Number' },
                     { type: 'input_value', name: 'FZ', check: 'Number' },
@@ -4794,6 +4796,24 @@ workspace_data: "${base64WorkspaceData}"
                 nextStatement: null,
                 colour: 120,
                 tooltip: 'Applies a force to the specified object at a given point',
+            },
+            {
+                type: 'apply_impulse',
+                message0: 'Apply impulse to %1 x: %2 y: %3 z: %4 at point x: %5 y: %6 z: %7',
+                args0: [
+                    { type: 'input_value', name: 'OBJECT' },
+                    { type: 'input_value', name: 'IX', check: 'Number' },
+                    { type: 'input_value', name: 'IY', check: 'Number' },
+                    { type: 'input_value', name: 'IZ', check: 'Number' },
+                    { type: 'input_value', name: 'PX', check: 'Number' },
+                    { type: 'input_value', name: 'PY', check: 'Number' },
+                    { type: 'input_value', name: 'PZ', check: 'Number' },
+                ],
+                "inputsInline": false,
+                previousStatement: null,
+                nextStatement: null,
+                colour: 120,
+                tooltip: 'Applies an impulse to the specified object at a given point',
             },
             {
                 type: 'set_gravity',
@@ -6121,12 +6141,27 @@ if (${name}) {
             };
 
             javascript.javascriptGenerator.forBlock['apply_force'] = function (block, generator) {
-                // This is a more advanced physics function. A helper could be added if needed frequently.
-                const name = block.getFieldValue('NAME');
+                const object = generator.valueToCode(block, 'OBJECT', generator.ORDER_ATOMIC) || 'null';
                 const fx = generator.valueToCode(block, 'FX', generator.ORDER_ATOMIC) || 0;
                 const fy = generator.valueToCode(block, 'FY', generator.ORDER_ATOMIC) || 0;
                 const fz = generator.valueToCode(block, 'FZ', generator.ORDER_ATOMIC) || 0;
-                return `// Apply force requires direct physics access, consider a high-level alternative.\n`;
+                const px = generator.valueToCode(block, 'PX', generator.ORDER_ATOMIC) || 0;
+                const py = generator.valueToCode(block, 'PY', generator.ORDER_ATOMIC) || 0;
+                const pz = generator.valueToCode(block, 'PZ', generator.ORDER_ATOMIC) || 0;
+
+                return `sceneManager.applyForce(${object}, new BABYLON.Vector3(${fx}, ${fy}, ${fz}), new BABYLON.Vector3(${px}, ${py}, ${pz}));\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['apply_impulse'] = function (block, generator) {
+                const object = generator.valueToCode(block, 'OBJECT', generator.ORDER_ATOMIC) || 'null';
+                const ix = generator.valueToCode(block, 'IX', generator.ORDER_ATOMIC) || 0;
+                const iy = generator.valueToCode(block, 'IY', generator.ORDER_ATOMIC) || 0;
+                const iz = generator.valueToCode(block, 'IZ', generator.ORDER_ATOMIC) || 0;
+                const px = generator.valueToCode(block, 'PX', generator.ORDER_ATOMIC) || 0;
+                const py = generator.valueToCode(block, 'PY', generator.ORDER_ATOMIC) || 0;
+                const pz = generator.valueToCode(block, 'PZ', generator.ORDER_ATOMIC) || 0;
+
+                return `sceneManager.applyImpulse(${object}, new BABYLON.Vector3(${ix}, ${iy}, ${iz}), new BABYLON.Vector3(${px}, ${py}, ${pz}));\n`;
             };
 
             javascript.javascriptGenerator.forBlock['set_gravity'] = function (block, generator) {
