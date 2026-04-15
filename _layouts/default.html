@@ -444,6 +444,41 @@
             pointer-events: none;
             text-transform: uppercase;
         }
+
+        /* Full Screen Flyout Styles */
+        .blocklyFlyout {
+            z-index: 3000 !important;
+        }
+
+        #flyout-close-button {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 5000;
+            background: #ff4d4d;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            font-size: 32px;
+            cursor: pointer;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+        }
+
+        .flyout-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 2500;
+            display: none;
+        }
     </style>
     <script>
         if ('serviceWorker' in navigator) {
@@ -464,9 +499,11 @@
         <div class="hero-content">
             <h1>Welcome to the Creative Coding Environment <span class="beta-badge">Beta</span></h1>
             <p>Your journey into interactive 3D development starts here. Click the button below to begin.</p>
-            <button id="start-button" class="btn">Start Coding</button>
+            <button id="start-button" class="btn" aria-label="Start Coding">Start Coding</button>
         </div>
     </div>
+    <div id="flyout-overlay" class="flyout-overlay" aria-hidden="true"></div>
+    <button id="flyout-close-button" aria-label="Close Flyout">&times;</button>
     {{ content }}
     <div id="workspace-data" style="display: none;">{{ page.workspace_data }}</div>
     <div class="container">
@@ -497,28 +534,28 @@
             </div>
         </div>
     </div>
-    <div id="bottom-nav">
+    <div id="bottom-nav" role="navigation" aria-label="Main Navigation">
         <div class="nav-section-left">
-            <button id="workspace-tab" class="nav-tab active" title="Workspace">👩‍💻</button>
-            <button id="preview-tab" class="nav-tab" title="Preview">✨</button>            
+            <button id="workspace-tab" class="nav-tab active" title="Workspace" aria-label="Open Workspace">👩‍💻</button>
+            <button id="preview-tab" class="nav-tab" title="Preview" aria-label="Open Preview">✨</button>
         </div>
         <div class="nav-section-right">
-            <button id="toggleToolboxButton" class="btn btn-icon" title="Add Blocks">➕</button>
-            <button id="runButton" class="btn btn-run btn-icon" title="Run">▶</button>
+            <button id="toggleToolboxButton" class="btn btn-icon" title="Add Blocks" aria-label="Add Blocks">➕</button>
+            <button id="runButton" class="btn btn-run btn-icon" title="Run" aria-label="Run Code">▶</button>
             <div class="dropdown-menu-container">
-                <button id="menuButton" class="btn btn-icon btn-menu-toggle" title="More actions">⚙️</button>
+                <button id="menuButton" class="btn btn-icon btn-menu-toggle" title="More actions" aria-label="More actions">⚙️</button>
                 <div id="dropdownMenu" class="dropdown-content">
-                    <button id="undoButton" class="btn" title="Undo" disabled>↶ Undo</button>
-                    <button id="redoButton" class="btn" title="Redo" disabled>↷ Redo</button>
-                    <button id="codeViewButton" class="btn btn-icon active" title="Code">👩‍💻 Code</button>
-                    <button id="assetsViewButton" class="btn btn-icon" title="Assets">📦 Assets </button>
-                    <button id="saveButton" class="btn btn-icon" title="Save">💾 Save</button>
-                    <button id="publishButton" class="btn btn-icon" title="Publish">🚀 Publish</button>
-                    <button id="loadButton" class="btn btn-icon" title="Load">📂 Load</button>
-                    <button id="shareButton" class="btn btn-icon" title="Share">🔗 Share</button>
-                    <button id="fullscreenBtn" class="btn btn-icon" title="Fullscreen">⛶ Fullscreen</button>
-                    <button id="screenshotButton" class="btn btn-icon" title="Take Screenshot">📸 Screenshot</button>
-                    <button id="docsButton" class="btn btn-icon" title="Documentation">❓ Docs</button>
+                    <button id="undoButton" class="btn" title="Undo" disabled aria-label="Undo">↶ Undo</button>
+                    <button id="redoButton" class="btn" title="Redo" disabled aria-label="Redo">↷ Redo</button>
+                    <button id="codeViewButton" class="btn btn-icon active" title="Code" aria-label="Show Code">👩‍💻 Code</button>
+                    <button id="assetsViewButton" class="btn btn-icon" title="Assets" aria-label="Show Assets">📦 Assets </button>
+                    <button id="saveButton" class="btn btn-icon" title="Save" aria-label="Save Project">💾 Save</button>
+                    <button id="publishButton" class="btn btn-icon" title="Publish" aria-label="Publish Project">🚀 Publish</button>
+                    <button id="loadButton" class="btn btn-icon" title="Load" aria-label="Load Project">📂 Load</button>
+                    <button id="shareButton" class="btn btn-icon" title="Share" aria-label="Share Project">🔗 Share</button>
+                    <button id="fullscreenBtn" class="btn btn-icon" title="Fullscreen" aria-label="Toggle Fullscreen">⛶ Fullscreen</button>
+                    <button id="screenshotButton" class="btn btn-icon" title="Take Screenshot" aria-label="Take Screenshot">📸 Screenshot</button>
+                    <button id="docsButton" class="btn btn-icon" title="Documentation" aria-label="Open Documentation">❓ Docs</button>
                 </div>
             </div>
         </div>
@@ -1331,11 +1368,7 @@ workspace_data: "${base64WorkspaceData}"
                         },                        
                         {
                             kind: 'block',
-                            type: 'create_box',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'create_sphere',
+                            type: 'create_primitive',
                         },
                         {
                             kind: 'block',
@@ -1459,20 +1492,12 @@ workspace_data: "${base64WorkspaceData}"
                         },
                         {
                             kind: 'block',
+                            type: 'set_fps_camera',
+                        },
+                        {
+                            kind: 'block',
                             type: 'point_camera_at_mesh'
                         },
-                        {
-                            kind: 'block',
-                            type: 'create_camera',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'set_isometric_camera',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'set_fps_camera',
-                        },                        
                         {
                             kind: 'block',
                             type: 'camera_follow',
@@ -4047,6 +4072,88 @@ workspace_data: "${base64WorkspaceData}"
         });
 
 
+        class FullScreenVerticalFlyout extends Blockly.VerticalFlyout {
+            constructor(workspaceOptions) {
+                super(workspaceOptions);
+                this.autoClose = true;
+            }
+
+            show(xmlList) {
+                super.show(xmlList);
+                const flyoutCloseButton = document.getElementById('flyout-close-button');
+                const flyoutOverlay = document.getElementById('flyout-overlay');
+                if (flyoutCloseButton) {
+                    flyoutCloseButton.style.display = 'flex';
+                    flyoutCloseButton.onclick = () => this.hide();
+                }
+                if (flyoutOverlay) {
+                    flyoutOverlay.style.display = 'block';
+                    flyoutOverlay.onclick = () => this.hide();
+                }
+
+                // Ensure layout is calculated
+                this.reflow();
+                this.position();
+
+                // Re-position after a short delay to ensure it stays centered
+                setTimeout(() => {
+                    this.position();
+                }, 50);
+            }
+
+            hide() {
+                super.hide();
+                const flyoutCloseButton = document.getElementById('flyout-close-button');
+                const flyoutOverlay = document.getElementById('flyout-overlay');
+                if (flyoutCloseButton) flyoutCloseButton.style.display = 'none';
+                if (flyoutOverlay) flyoutOverlay.style.display = 'none';
+
+                // Clear toolbox selection to allow reopening the same category
+                if (this.targetWorkspace && this.targetWorkspace.getToolbox()) {
+                    this.targetWorkspace.getToolbox().clearSelection();
+                }
+            }
+
+            position() {
+                if (!this.isVisible() || !this.targetWorkspace) {
+                    return;
+                }
+                const metrics = this.targetWorkspace.getMetrics();
+                if (!metrics) return;
+
+                // Increase width for better mobile readability
+                this.width_ = Math.min(metrics.viewWidth * 0.85, 500);
+
+                // Center the flyout in the middle of the workspace
+                const x = (metrics.viewWidth - this.width_) / 2;
+                const y = (metrics.viewHeight - this.height_) / 2;
+
+                this.svgGroup_.setAttribute('transform', `translate(${x},${y})`);
+
+                // Background style
+                this.svgBackground_.setAttribute('width', this.width_);
+                this.svgBackground_.setAttribute('height', this.height_);
+                this.svgBackground_.setAttribute('fill', '#1e1e1e');
+                this.svgBackground_.setAttribute('fill-opacity', '0.98');
+                this.svgBackground_.setAttribute('rx', '12');
+                this.svgBackground_.setAttribute('ry', '12');
+            }
+        }
+
+        Blockly.registry.register(
+            Blockly.registry.Type.FLYOUTS_VERTICAL_TOOLBOX,
+            'FullScreenVerticalFlyout',
+            FullScreenVerticalFlyout,
+            true
+        );
+
+        Blockly.registry.register(
+            Blockly.registry.Type.FLYOUTS_HORIZONTAL_TOOLBOX,
+            'FullScreenVerticalFlyout',
+            FullScreenVerticalFlyout,
+            true
+        );
+
         // --- Fix for Flyout Zooming ---
         // Ensure blocks in the flyout do not zoom with the workspace
         Blockly.Flyout.prototype.getFlyoutScale = function() {
@@ -4060,6 +4167,9 @@ workspace_data: "${base64WorkspaceData}"
             redoStack: true,
             renderer: 'zelos',
             horizontalLayout: true,
+            plugins: {
+                'flyout': 'FullScreenVerticalFlyout'
+            },
             toolboxPosition: 'end',
             zoom: {
                 controls: true,
@@ -4360,6 +4470,29 @@ workspace_data: "${base64WorkspaceData}"
                 colour: 160,
                 tooltip: 'Attaches a first-person camera to the specified object.',
                 helpUrl: '',
+            },
+            {
+                type: 'create_primitive',
+                message0: 'Create %1 named %2 at x %3 y %4 z %5',
+                args0: [
+                    {
+                        type: 'field_dropdown',
+                        name: 'TYPE',
+                        options: [
+                            ['box', 'box'],
+                            ['sphere', 'sphere']
+                        ],
+                    },
+                    { "type": "input_value", "name": "NAME", "check": "String" },
+                    { type: 'input_value', name: 'X', check: 'Number' },
+                    { type: 'input_value', name: 'Y', check: 'Number' },
+                    { type: 'input_value', name: 'Z', check: 'Number' },
+                ],
+                "inputsInline": true,
+                previousStatement: null,
+                nextStatement: null,
+                colour: 160,
+                tooltip: 'Creates a 3D primitive at the specified position.',
             },
             {
                 type: 'create_box',
@@ -5885,6 +6018,22 @@ if (${name}) {
             javascript.javascriptGenerator.forBlock['set_ground_physics'] = function (block, generator) {
                 const name = block.getFieldValue('NAME');
                 return `sceneManager.setGroundPhysics('${name}');\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['create_primitive'] = function (block, generator) {
+                const type = block.getFieldValue('TYPE');
+                const name = generator.valueToCode(block, 'NAME', generator.ORDER_ATOMIC) || "'myObject'";
+                const x = generator.valueToCode(block, 'X', generator.ORDER_ATOMIC) || 0;
+                const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || 0;
+                const z = generator.valueToCode(block, 'Z', generator.ORDER_ATOMIC) || 0;
+
+                let code;
+                if (type === 'sphere') {
+                    code = `sceneManager.createSphere(${name}, ${x}, ${y}, ${z});\n`;
+                } else {
+                    code = `sceneManager.createBox(${name}, ${x}, ${y}, ${z});\n`;
+                }
+                return code;
             };
 
             javascript.javascriptGenerator.forBlock['create_box'] = function (block, generator) {
