@@ -1333,6 +1333,10 @@ workspace_data: "${base64WorkspaceData}"
                         },
                         {
                             kind: 'block',
+                            type: 'apply_impulse',
+                        },
+                        {
+                            kind: 'block',
                             type: 'set_physics_impostor',
                         },
                         {
@@ -1364,6 +1368,10 @@ workspace_data: "${base64WorkspaceData}"
                         },
                         {
                             kind: 'block',
+                            type: 'get_collided_object',
+                        },
+                        {
+                            kind: 'block',
                             type: 'destroy_object',
                         },                        
                         {
@@ -1381,6 +1389,10 @@ workspace_data: "${base64WorkspaceData}"
                         {
                             kind: 'block',
                             type: 'rotate_object',
+                        },
+                        {
+                            kind: 'block',
+                            type: 'get_object_pos',
                         },
                         {
                             "kind": "block",
@@ -3000,6 +3012,39 @@ workspace_data: "${base64WorkspaceData}"
                 if (this.scene.activeCamera && typeof this.scene.activeCamera.radius === 'number') {
                     this.scene.activeCamera.radius = Math.max(1, this.scene.activeCamera.radius - value);
                 }
+            }
+
+            applyForce(target, fx, fy, fz, px, py, pz) {
+                const mesh = this._getMesh(target);
+                if (mesh && mesh.physicsImpostor) {
+                    const force = new BABYLON.Vector3(fx, fy, fz);
+                    const contactPoint = new BABYLON.Vector3(px, py, pz);
+                    mesh.physicsImpostor.applyForce(force, contactPoint);
+                }
+            }
+
+            applyImpulse(target, fx, fy, fz, px, py, pz) {
+                const mesh = this._getMesh(target);
+                if (mesh && mesh.physicsImpostor) {
+                    const impulse = new BABYLON.Vector3(fx, fy, fz);
+                    const contactPoint = new BABYLON.Vector3(px, py, pz);
+                    mesh.physicsImpostor.applyImpulse(impulse, contactPoint);
+                }
+            }
+
+            getPosX(target) {
+                const mesh = this._getMesh(target);
+                return mesh ? mesh.position.x : 0;
+            }
+
+            getPosY(target) {
+                const mesh = this._getMesh(target);
+                return mesh ? mesh.position.y : 0;
+            }
+
+            getPosZ(target) {
+                const mesh = this._getMesh(target);
+                return mesh ? mesh.position.z : 0;
             }
             
             takeScreenshot() {
@@ -4930,7 +4975,7 @@ workspace_data: "${base64WorkspaceData}"
                 type: 'apply_force',
                 message0: 'Apply force to %1 x: %2 y: %3 z: %4 at point x: %5 y: %6 z: %7',
                 args0: [
-                    { type: 'field_input', name: 'NAME', text: 'object' },
+                    { type: 'input_value', name: 'OBJECT' },
                     { type: 'input_value', name: 'FX', check: 'Number' },
                     { type: 'input_value', name: 'FY', check: 'Number' },
                     { type: 'input_value', name: 'FZ', check: 'Number' },
@@ -4943,6 +4988,46 @@ workspace_data: "${base64WorkspaceData}"
                 nextStatement: null,
                 colour: 120,
                 tooltip: 'Applies a force to the specified object at a given point',
+            },
+            {
+                type: 'apply_impulse',
+                message0: 'Apply impulse to %1 x: %2 y: %3 z: %4 at point x: %5 y: %6 z: %7',
+                args0: [
+                    { type: 'input_value', name: 'OBJECT' },
+                    { type: 'input_value', name: 'FX', check: 'Number' },
+                    { type: 'input_value', name: 'FY', check: 'Number' },
+                    { type: 'input_value', name: 'FZ', check: 'Number' },
+                    { type: 'input_value', name: 'PX', check: 'Number' },
+                    { type: 'input_value', name: 'PY', check: 'Number' },
+                    { type: 'input_value', name: 'PZ', check: 'Number' },
+                ],
+                "inputsInline": false,
+                previousStatement: null,
+                nextStatement: null,
+                colour: 120,
+                tooltip: 'Applies an impulse to the specified object at a given point',
+            },
+            {
+                type: 'get_object_pos',
+                message0: 'Get %1 position of %2',
+                args0: [
+                    {
+                        type: 'field_dropdown',
+                        name: 'AXIS',
+                        options: [['X', 'X'], ['Y', 'Y'], ['Z', 'Z']]
+                    },
+                    { type: 'input_value', name: 'OBJECT' }
+                ],
+                output: 'Number',
+                colour: 120,
+                tooltip: 'Returns the X, Y, or Z position of an object'
+            },
+            {
+                type: 'get_collided_object',
+                message0: 'collided object',
+                output: null,
+                colour: 120,
+                tooltip: 'To be used inside an onCollision callback'
             },
             {
                 type: 'set_gravity',
@@ -6289,12 +6374,36 @@ if (${name}) {
             };
 
             javascript.javascriptGenerator.forBlock['apply_force'] = function (block, generator) {
-                // This is a more advanced physics function. A helper could be added if needed frequently.
-                const name = block.getFieldValue('NAME');
+                const target = generator.valueToCode(block, 'OBJECT', generator.ORDER_ATOMIC) || 'null';
                 const fx = generator.valueToCode(block, 'FX', generator.ORDER_ATOMIC) || 0;
                 const fy = generator.valueToCode(block, 'FY', generator.ORDER_ATOMIC) || 0;
                 const fz = generator.valueToCode(block, 'FZ', generator.ORDER_ATOMIC) || 0;
-                return `// Apply force requires direct physics access, consider a high-level alternative.\n`;
+                const px = generator.valueToCode(block, 'PX', generator.ORDER_ATOMIC) || 0;
+                const py = generator.valueToCode(block, 'PY', generator.ORDER_ATOMIC) || 0;
+                const pz = generator.valueToCode(block, 'PZ', generator.ORDER_ATOMIC) || 0;
+                return `sceneManager.applyForce(${target}, ${fx}, ${fy}, ${fz}, ${px}, ${py}, ${pz});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['apply_impulse'] = function (block, generator) {
+                const target = generator.valueToCode(block, 'OBJECT', generator.ORDER_ATOMIC) || 'null';
+                const fx = generator.valueToCode(block, 'FX', generator.ORDER_ATOMIC) || 0;
+                const fy = generator.valueToCode(block, 'FY', generator.ORDER_ATOMIC) || 0;
+                const fz = generator.valueToCode(block, 'FZ', generator.ORDER_ATOMIC) || 0;
+                const px = generator.valueToCode(block, 'PX', generator.ORDER_ATOMIC) || 0;
+                const py = generator.valueToCode(block, 'PY', generator.ORDER_ATOMIC) || 0;
+                const pz = generator.valueToCode(block, 'PZ', generator.ORDER_ATOMIC) || 0;
+                return `sceneManager.applyImpulse(${target}, ${fx}, ${fy}, ${fz}, ${px}, ${py}, ${pz});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['get_object_pos'] = function (block, generator) {
+                const axis = block.getFieldValue('AXIS');
+                const target = generator.valueToCode(block, 'OBJECT', generator.ORDER_ATOMIC) || 'null';
+                return [`sceneManager.getPos${axis}(${target})`, javascript.Order.FUNCTION_CALL];
+            };
+
+            javascript.javascriptGenerator.forBlock['get_collided_object'] = function (block, generator) {
+                const collidedObjectVar = generator.nameDB_.getName('collided_object', Blockly.VARIABLE_CATEGORY_NAME);
+                return [collidedObjectVar, javascript.Order.ATOMIC];
             };
 
             javascript.javascriptGenerator.forBlock['set_gravity'] = function (block, generator) {
