@@ -1171,20 +1171,6 @@ workspace_data: "${base64WorkspaceData}"
                         },
                         {
                             kind: 'block',
-                            type: 'wait_seconds',
-                            inputs: {
-                                SECONDS: {
-                                    block: {
-                                        type: 'math_number',
-                                        fields: {
-                                            NUM: 1,
-                                        },
-                                    },
-                                },
-                            },
-                        },
-                        {
-                            kind: 'block',
                             type: 'select_object',
                         },
                         {
@@ -5777,22 +5763,6 @@ workspace_data: "${base64WorkspaceData}"
                 "helpUrl": ""
             },
             {
-                "type": "wait_seconds",
-                "message0": "wait %1 seconds",
-                "args0": [
-                    {
-                        "type": "input_value",
-                        "name": "SECONDS",
-                        "check": "Number"
-                    }
-                ],
-                "previousStatement": null,
-                "nextStatement": null,
-                "colour": "%{BKY_LOOPS_HUE}",
-                "tooltip": "Pauses execution for a specified number of seconds.",
-                "helpUrl": ""
-            },
-            {
                 "type": "gui_set_popup_text",
                 "message0": "in popup %1 set text to %2",
                 "args0": [
@@ -5871,10 +5841,6 @@ workspace_data: "${base64WorkspaceData}"
                 return `sceneManager.setPopupText(${popupName}, ${text});\n`;
             };
 
-            javascript.javascriptGenerator.forBlock['wait_seconds'] = function(block, generator) {
-                const seconds = generator.valueToCode(block, 'SECONDS', generator.ORDER_ATOMIC) || '1';
-                return `await new Promise(resolve => setTimeout(resolve, ${seconds} * 1000));\n`;
-            };
 
             javascript.javascriptGenerator.forBlock['show_loading_screen'] = function (block, generator) {
                 return `

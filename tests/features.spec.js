@@ -18,27 +18,6 @@ test.describe('Engine New Features', () => {
     expect(result).toBe(true);
   });
 
-  test('Wait block delay works', async ({ page }) => {
-    const consoleMessages = [];
-    page.on('console', msg => consoleMessages.push(msg.text()));
-
-    const startTime = Date.now();
-    await page.evaluate(async () => {
-      console.log('START_WAIT');
-      await new Promise(resolve => setTimeout(resolve, 0)); // Yield
-      // Simulating generated code for wait block
-      await (async () => {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      })();
-      console.log('END_WAIT');
-    });
-
-    const duration = Date.now() - startTime;
-    expect(consoleMessages).toContain('START_WAIT');
-    expect(consoleMessages).toContain('END_WAIT');
-    expect(duration).toBeGreaterThanOrEqual(1000);
-  });
-
   test('Robust jump check prevents mid-air jumping', async ({ page }) => {
     await page.click('#preview-tab');
     const jumpResult = await page.evaluate(async () => {
