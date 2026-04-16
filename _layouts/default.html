@@ -2374,16 +2374,20 @@ workspace_data: "${base64WorkspaceData}"
                 const joystickZone = document.getElementById('joystick-zone');
 
                 // Only initialize the joystick if the touch UI is likely active (based on CSS media queries).
-                if (joystickZone && window.matchMedia('(max-width: 768px)').matches) {
+                if (joystickZone && window.matchMedia("(max-width: 768px)").matches) {
+                    const jumpButtonContainer = document.getElementById("jump-button-container");
+                    if (jumpButtonContainer) {
+                        jumpButtonContainer.style.display = "block";
+                    }
                     this.joystickManager = nipplejs.create({
                         zone: joystickZone,
-                        mode: 'dynamic',
-                        color: 'grey',
+                        mode: "dynamic",
+                        color: "grey",
                         size: 120,
                         fadeTime: 0
                     });
 
-                    this.joystickManager.on('added', (evt, nipple) => {
+                    this.joystickManager.on("added", (evt, nipple) => {
                         // Detach camera controls when the joystick is active to prevent conflicts
                         if (this.scene.activeCamera) {
                             this.scene.activeCamera.detachControl(this.canvas);
