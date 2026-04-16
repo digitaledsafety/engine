@@ -1168,7 +1168,7 @@ workspace_data: "${base64WorkspaceData}"
                         {
                             kind: 'block',
                             type: 'controls_flow_statements',
-                        },                      
+                        },
                         {
                             kind: 'block',
                             type: 'select_object',
@@ -2477,6 +2477,13 @@ workspace_data: "${base64WorkspaceData}"
                 return sphereMesh;
             }
 
+            createCylinder(name, x, y, z) {
+                const cylinderMesh = BABYLON.MeshBuilder.CreateCylinder(name, { diameter: 1, height: 1 }, this.scene);
+                cylinderMesh.position.set(x, y, z);
+                this.objects[name] = cylinderMesh;
+                return cylinderMesh;
+            }
+
             async createText(name, text, fontUrl, size = 1, resolution = 16, depth = 0.5) {
                 if (!isValidAssetURL(fontUrl)) {
                     return null;
@@ -2909,8 +2916,12 @@ workspace_data: "${base64WorkspaceData}"
 
             playerJump(force) {
                 if (this.player && this.player.physicsImpostor) {
-                    const verticalVelocity = this.player.physicsImpostor.getLinearVelocity().y;
-                    if (Math.abs(verticalVelocity) < 0.1) { // Simple ground check
+                    const boundingInfo = this.player.getHierarchyBoundingVectors(true);
+                    const height = boundingInfo.max.y - boundingInfo.min.y;
+                    const rayLength = (height / 2) + 0.2;
+                    const ray = new BABYLON.Ray(this.player.getAbsolutePosition(), new BABYLON.Vector3(0, -1, 0), rayLength);
+                    const pick = this.scene.pickWithRay(ray, (mesh) => mesh !== this.player && !mesh.isDescendantOf(this.player));
+                    if (pick.hit) {
                         this.player.physicsImpostor.applyImpulse(new BABYLON.Vector3(0, force, 0), this.player.getAbsolutePosition());
                     }
                 }
@@ -4480,7 +4491,8 @@ workspace_data: "${base64WorkspaceData}"
                         name: 'TYPE',
                         options: [
                             ['box', 'box'],
-                            ['sphere', 'sphere']
+                            ['sphere', 'sphere'],
+                            ['cylinder', 'cylinder']
                         ],
                     },
                     { "type": "input_value", "name": "NAME", "check": "String" },
@@ -5829,6 +5841,7 @@ workspace_data: "${base64WorkspaceData}"
                 return `sceneManager.setPopupText(${popupName}, ${text});\n`;
             };
 
+
             javascript.javascriptGenerator.forBlock['show_loading_screen'] = function (block, generator) {
                 return `
                     if (sceneManager.engine.loadingScreen) {
@@ -6030,6 +6043,8 @@ if (${name}) {
                 let code;
                 if (type === 'sphere') {
                     code = `sceneManager.createSphere(${name}, ${x}, ${y}, ${z});\n`;
+                } else if (type === 'cylinder') {
+                    code = `sceneManager.createCylinder(${name}, ${x}, ${y}, ${z});\n`;
                 } else {
                     code = `sceneManager.createBox(${name}, ${x}, ${y}, ${z});\n`;
                 }
