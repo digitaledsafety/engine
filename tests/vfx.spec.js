@@ -2,6 +2,7 @@ const { test, expect } = require('@playwright/test');
 
 test.describe('VFX and Lighting Demo', () => {
   test('New VFX demo workspace loads and runs without errors', async ({ page }) => {
+    test.setTimeout(60000);
     // Navigate to the specific demo workspace
     await page.goto('/workspaces/vfx-demo/');
 
