@@ -1485,7 +1485,15 @@ workspace_data: "${base64WorkspaceData}"
                         {
                             kind: 'block',
                             type: 'set_texture_from_asset',
-                        }                        
+                        },
+                        {
+                            kind: 'block',
+                            type: 'look_at',
+                        },
+                        {
+                            kind: 'block',
+                            type: 'move_towards',
+                        }
                     ]
                 },
 
@@ -1562,9 +1570,13 @@ workspace_data: "${base64WorkspaceData}"
                 },
                 {
                     kind: 'category',
-                    name: 'Utils',
-                    categorystyle: 'colour_category',
+                    name: 'Math',
+                    categorystyle: 'math_category',
                     contents: [
+                        {
+                            kind: 'block',
+                            type: 'get_distance',
+                        },
                         {
                             kind: 'block',
                             type: 'colour_picker',
@@ -2848,6 +2860,44 @@ workspace_data: "${base64WorkspaceData}"
                 if (mesh) {
                     mesh.rotation.set(x * (Math.PI / 180), y * (Math.PI / 180), z * (Math.PI / 180));
                 }
+            }
+
+            lookAt(target, destination) {
+                const targetMesh = this._getMesh(target);
+                const destMesh = this._getMesh(destination);
+                if (targetMesh && destMesh) {
+                    targetMesh.lookAt(destMesh.getAbsolutePosition());
+                }
+            }
+
+            moveTowards(target, destination, speed) {
+                const targetMesh = this._getMesh(target);
+                const destMesh = this._getMesh(destination);
+                if (targetMesh && destMesh) {
+                    const direction = destMesh.getAbsolutePosition().subtract(targetMesh.getAbsolutePosition());
+                    const distance = direction.length();
+                    if (distance > 0.01) {
+                        const stepSize = speed * (this.engine.getDeltaTime() / 1000);
+                        if (stepSize >= distance) {
+                            // If we're close enough to reach or overshoot, just jump to the destination
+                            // To avoid parent/local space issues, we add the remaining direction vector
+                            targetMesh.position.addInPlace(direction);
+                        } else {
+                            direction.normalize();
+                            const moveStep = direction.scale(stepSize);
+                            targetMesh.position.addInPlace(moveStep);
+                        }
+                    }
+                }
+            }
+
+            getDistance(target1, target2) {
+                const mesh1 = this._getMesh(target1);
+                const mesh2 = this._getMesh(target2);
+                if (mesh1 && mesh2) {
+                    return BABYLON.Vector3.Distance(mesh1.getAbsolutePosition(), mesh2.getAbsolutePosition());
+                }
+                return 0;
             }
             changeColor(target, color) {
                 let mesh = this._getMesh(target);
@@ -5863,6 +5913,45 @@ workspace_data: "${base64WorkspaceData}"
                 "colour": "#5B80A5",
                 "tooltip": "Sets the main text of an existing popup.",
                 "helpUrl": ""
+            },
+            {
+                "type": "look_at",
+                "message0": "make %1 look at %2",
+                "args0": [
+                    { "type": "input_value", "name": "OBJECT", "check": ["String", "Mesh"] },
+                    { "type": "input_value", "name": "TARGET", "check": ["String", "Mesh"] }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": 210,
+                "tooltip": "Makes one object face another object.",
+                "helpUrl": ""
+            },
+            {
+                "type": "move_towards",
+                "message0": "move %1 towards %2 with speed %3",
+                "args0": [
+                    { "type": "input_value", "name": "OBJECT", "check": ["String", "Mesh"] },
+                    { "type": "input_value", "name": "TARGET", "check": ["String", "Mesh"] },
+                    { "type": "input_value", "name": "SPEED", "check": "Number" }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": 210,
+                "tooltip": "Moves one object towards another object at a given speed.",
+                "helpUrl": ""
+            },
+            {
+                "type": "get_distance",
+                "message0": "distance between %1 and %2",
+                "args0": [
+                    { "type": "input_value", "name": "OBJECT1", "check": ["String", "Mesh"] },
+                    { "type": "input_value", "name": "OBJECT2", "check": ["String", "Mesh"] }
+                ],
+                "output": "Number",
+                "colour": 230,
+                "tooltip": "Returns the distance between two objects.",
+                "helpUrl": ""
             }
         ]);
 
@@ -6399,6 +6488,26 @@ if (${name}) {
                 const axis = block.getFieldValue('AXIS');
                 const target = generator.valueToCode(block, 'OBJECT', generator.ORDER_ATOMIC) || 'null';
                 return [`sceneManager.getPos${axis}(${target})`, javascript.Order.FUNCTION_CALL];
+            };
+
+            javascript.javascriptGenerator.forBlock['look_at'] = function (block, generator) {
+                const object = generator.valueToCode(block, 'OBJECT', generator.ORDER_ATOMIC) || 'null';
+                const target = generator.valueToCode(block, 'TARGET', generator.ORDER_ATOMIC) || 'null';
+                return `sceneManager.lookAt(${object}, ${target});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['move_towards'] = function (block, generator) {
+                const object = generator.valueToCode(block, 'OBJECT', generator.ORDER_ATOMIC) || 'null';
+                const target = generator.valueToCode(block, 'TARGET', generator.ORDER_ATOMIC) || 'null';
+                const speed = generator.valueToCode(block, 'SPEED', generator.ORDER_ATOMIC) || 0;
+                return `sceneManager.moveTowards(${object}, ${target}, ${speed});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['get_distance'] = function (block, generator) {
+                const object1 = generator.valueToCode(block, 'OBJECT1', generator.ORDER_ATOMIC) || 'null';
+                const object2 = generator.valueToCode(block, 'OBJECT2', generator.ORDER_ATOMIC) || 'null';
+                const code = `sceneManager.getDistance(${object1}, ${object2})`;
+                return [code, generator.ORDER_ATOMIC];
             };
 
             javascript.javascriptGenerator.forBlock['get_collided_object'] = function (block, generator) {
