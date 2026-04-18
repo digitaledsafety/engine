@@ -600,11 +600,13 @@
 
         // --- URL Sanitization ---
         function isValidAssetURL(url) {
-            if (typeof url !== 'string' || !url.trim().toLowerCase().startsWith('https://')) {
-                console.error('Invalid URL:', url, 'Only HTTPS URLs are allowed for assets.');
-                return false;
+            if (typeof url !== 'string') return false;
+            const normalized = url.trim().toLowerCase();
+            if (normalized.startsWith('https://') || normalized.startsWith('blob:')) {
+                return true;
             }
-            return true;
+            console.error('Invalid URL:', url, 'Only HTTPS or blob URLs are allowed for assets.');
+            return false;
         }
 
         // --- Hero Overlay Logic ---
@@ -1055,6 +1057,33 @@ workspace_data: "${base64WorkspaceData}"
                     }
                 }
             }
+
+            setGlow(enabled, intensity) {
+                if (enabled) {
+                    if (!this.glowLayer) {
+                        this.glowLayer = new BABYLON.GlowLayer("glow", this.scene);
+                    }
+                    this.glowLayer.intensity = intensity;
+                } else {
+                    if (this.glowLayer) {
+                        this.glowLayer.dispose();
+                        this.glowLayer = null;
+                    }
+                }
+            }
+
+            setProperty(target, property, value) {
+                let mesh = this._getMesh(target);
+                if (mesh && property) {
+                    const props = property.split('.');
+                    let curr = mesh;
+                    for (let i = 0; i < props.length - 1; i++) {
+                        if (curr[props[i]]) curr = curr[props[i]];
+                        else return;
+                    }
+                    curr[props[props.length - 1]] = value;
+                }
+            }
         }
 
         // Initialize Blockly with Drag-and-Drop Enabled
@@ -1493,6 +1522,10 @@ workspace_data: "${base64WorkspaceData}"
                         {
                             kind: 'block',
                             type: 'set_outline',
+                        },
+                        {
+                            kind: 'block',
+                            type: 'set_property',
                         }
                     ]
                 },
@@ -1569,6 +1602,10 @@ workspace_data: "${base64WorkspaceData}"
                         {
                             kind: 'block',
                             type: 'set_fog'
+                        },
+                        {
+                            kind: 'block',
+                            type: 'set_glow'
                         },
                         {
                             kind: 'block',
@@ -2954,7 +2991,8 @@ workspace_data: "${base64WorkspaceData}"
                 if (this.player && this.player.physicsImpostor) {
                     const boundingInfo = this.player.getHierarchyBoundingVectors(true);
                     const height = boundingInfo.max.y - boundingInfo.min.y;
-                    const rayLength = (height / 2) + 0.2;
+                    // Slightly longer ray to account for physics jitter/float
+                    const rayLength = (height / 2) + 0.8;
                     const ray = new BABYLON.Ray(this.player.getAbsolutePosition(), new BABYLON.Vector3(0, -1, 0), rayLength);
                     const pick = this.scene.pickWithRay(ray, (mesh) => mesh !== this.player && !mesh.isDescendantOf(this.player));
                     if (pick.hit) {
@@ -4809,6 +4847,19 @@ workspace_data: "${base64WorkspaceData}"
                 "tooltip": "Gets a metadata value from an object by its key."
             },
             {
+                "type": "set_property",
+                "message0": "set property %1 of %2 to %3",
+                "args0": [
+                    { "type": "input_value", "name": "PROPERTY", "check": "String" },
+                    { "type": "input_value", "name": "TARGET" },
+                    { "type": "input_value", "name": "VALUE" }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": 230,
+                "tooltip": "Sets a raw property on a Babylon.js mesh (e.g., 'visibility' or 'material.alpha')."
+            },
+            {
                 type: 'move_object',
                 message0: 'Move object %1 to x %2 y %3 z %4',
                 args0: [
@@ -6108,6 +6159,19 @@ workspace_data: "${base64WorkspaceData}"
                 "colour": 65,
                 "tooltip": "Enables shadows for a light on specified objects.",
                 "helpUrl": ""
+            },
+            {
+                "type": "set_glow",
+                "message0": "set glow enabled %1 intensity %2",
+                "args0": [
+                    { "type": "field_checkbox", "name": "ENABLED", "checked": true },
+                    { "type": "input_value", "name": "INTENSITY", "check": "Number" }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": 180,
+                "tooltip": "Enables or disables the glow effect for the whole scene.",
+                "helpUrl": ""
             }
         ]);
 
@@ -6151,6 +6215,19 @@ workspace_data: "${base64WorkspaceData}"
                 const light = generator.valueToCode(block, 'LIGHT', generator.ORDER_ATOMIC) || 'null';
                 const targets = generator.valueToCode(block, 'TARGETS', generator.ORDER_ATOMIC) || '[]';
                 return `sceneManager.enableShadows(${light}, ${targets});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['set_glow'] = function (block, generator) {
+                const enabled = block.getFieldValue('ENABLED') === 'TRUE';
+                const intensity = generator.valueToCode(block, 'INTENSITY', generator.ORDER_ATOMIC) || 1;
+                return `sceneManager.setGlow(${enabled}, ${intensity});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['set_property'] = function (block, generator) {
+                const property = generator.valueToCode(block, 'PROPERTY', generator.ORDER_ATOMIC) || "''";
+                const target = generator.valueToCode(block, 'TARGET', generator.ORDER_ATOMIC) || 'null';
+                const value = generator.valueToCode(block, 'VALUE', generator.ORDER_ATOMIC) || 'null';
+                return `sceneManager.setProperty(${target}, ${property}, ${value});\n`;
             };
 
             javascript.javascriptGenerator.forBlock['create_popup'] = function (block, generator) {
