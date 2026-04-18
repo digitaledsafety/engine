@@ -1312,6 +1312,19 @@ workspace_data: "${base64WorkspaceData}"
                     categorystyle: 'logic_category',
                     contents: [
                         {
+                                                    {
+                            kind: 'block',
+                            type: 'cursor_position',
+                        },
+                        {
+                            kind: 'block',
+                            type: 'cursor_is_down',
+                        },
+                        {
+                            kind: 'block',
+                            type: 'cursor_object',
+                        },
+                        {
                             kind: 'block',
                             type: 'set_as_player',
                         },
@@ -2237,6 +2250,15 @@ workspace_data: "${base64WorkspaceData}"
                 this.player = null;
                 this.moveDirection = new BABYLON.Vector3(0, 0, 0);
                 this.playerSpeed = 5;
+                this.pointerState = {
+                    x: 0,
+                    y: 0,
+                    z: 0,
+                    screenX: 0,
+                    screenY: 0,
+                    isPressed: false,
+                    pickedObject: null
+                };
                 this.perFrameFunctions = [];
                 this.buttonPressActions = {};
                 this.inputState = { keys: {} };
@@ -3263,6 +3285,34 @@ workspace_data: "${base64WorkspaceData}"
             }
 
             initInputListeners() {
+                this.scene.onPointerObservable.add((pointerInfo) => {
+                    this.pointerState.screenX = this.scene.pointerX;
+                    this.pointerState.screenY = this.scene.pointerY;
+
+                    if (pointerInfo.type === BABYLON.PointerEventTypes.POINTERDOWN) {
+                        this.pointerState.isPressed = true;
+                    } else if (pointerInfo.type === BABYLON.PointerEventTypes.POINTERUP) {
+                        this.pointerState.isPressed = false;
+                    }
+
+                    const pickInfo = this.scene.pick(this.scene.pointerX, this.scene.pointerY);
+                    if (pickInfo.hit) {
+                        this.pointerState.x = pickInfo.pickedPoint.x;
+                        this.pointerState.y = pickInfo.pickedPoint.y;
+                        this.pointerState.z = pickInfo.pickedPoint.z;
+                        this.pointerState.pickedObject = pickInfo.pickedMesh ? pickInfo.pickedMesh.name : null;
+                    } else {
+                        const ray = this.scene.createPickingRay(this.scene.pointerX, this.scene.pointerY, BABYLON.Matrix.Identity(), this.scene.activeCamera);
+                        const distance = -ray.origin.y / ray.direction.y;
+                        if (distance > 0) {
+                            const point = ray.origin.add(ray.direction.scale(distance));
+                            this.pointerState.x = point.x;
+                            this.pointerState.y = point.y;
+                            this.pointerState.z = point.z;
+                        }
+                        this.pointerState.pickedObject = null;
+                    }
+                });
                 window.addEventListener('keydown', (event) => {
                     this.inputState.keys[event.key.toLowerCase()] = true;
                 });
@@ -5355,6 +5405,44 @@ workspace_data: "${base64WorkspaceData}"
                 "helpUrl": ""
             },
             {
+                            {
+                "type": "cursor_position",
+                "message0": "cursor %1",
+                "args0": [
+                    {
+                        "type": "field_dropdown",
+                        "name": "AXIS",
+                        "options": [
+                            ["world x", "x"],
+                            ["world y", "y"],
+                            ["world z", "z"],
+                            ["screen x", "screenX"],
+                            ["screen y", "screenY"]
+                        ]
+                    }
+                ],
+                "output": "Number",
+                "colour": "#4C97FF",
+                "tooltip": "Returns the current position of the cursor or touch point.",
+                "helpUrl": ""
+            },
+            {
+                "type": "cursor_is_down",
+                "message0": "is cursor pressed?",
+                "output": "Boolean",
+                "colour": "#4C97FF",
+                "tooltip": "Returns true if the cursor or touch point is currently pressed.",
+                "helpUrl": ""
+            },
+            {
+                "type": "cursor_object",
+                "message0": "object under cursor",
+                "output": "String",
+                "colour": "#4C97FF",
+                "tooltip": "Returns the name of the object currently under the cursor or touch point.",
+                "helpUrl": ""
+            },
+            {
                 "type": "set_as_player",
                 "message0": "set %1 as player",
                 "args0": [
@@ -5991,7 +6079,20 @@ if (${name}) {
             };
 
             // --- Player and Camera Block Generators ---
-            javascript.javascriptGenerator.forBlock['set_as_player'] = function (block, generator) {
+                        javascript.javascriptGenerator.forBlock['cursor_position'] = function (block, generator) {
+                const axis = block.getFieldValue('AXIS');
+                return [`sceneManager.pointerState.${axis}`, generator.ORDER_ATOMIC];
+            };
+
+            javascript.javascriptGenerator.forBlock['cursor_is_down'] = function (block, generator) {
+                return ['sceneManager.pointerState.isPressed', generator.ORDER_ATOMIC];
+            };
+
+            javascript.javascriptGenerator.forBlock['cursor_object'] = function (block, generator) {
+                return ['sceneManager.pointerState.pickedObject', generator.ORDER_ATOMIC];
+            };
+
+javascript.javascriptGenerator.forBlock['set_as_player'] = function (block, generator) {
                 const objectName = generator.valueToCode(block, 'OBJECT', generator.ORDER_ATOMIC) || 'null';
                 return `sceneManager.setAsPlayer(${objectName});\n`;
             };
