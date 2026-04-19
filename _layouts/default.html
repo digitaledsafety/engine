@@ -3097,6 +3097,136 @@ workspace_data: "${base64WorkspaceData}"
                 return mesh ? mesh.position.z : 0;
             }
             
+            createParticleSystem(target, type) {
+                const mesh = this._getMesh(target);
+                if (!mesh) return;
+
+                const particleSystem = new BABYLON.ParticleSystem("particles", 2000, this.scene);
+
+                if (type === 'fire') {
+                    particleSystem.particleTexture = new BABYLON.Texture("https://assets.babylonjs.com/textures/flare.png", this.scene);
+                    particleSystem.emitter = mesh;
+                    particleSystem.minEmitBox = new BABYLON.Vector3(-0.5, 0, -0.5);
+                    particleSystem.maxEmitBox = new BABYLON.Vector3(0.5, 0, 0.5);
+                    particleSystem.color1 = new BABYLON.Color4(1, 0.5, 0, 1.0);
+                    particleSystem.color2 = new BABYLON.Color4(1, 0.2, 0, 1.0);
+                    particleSystem.colorDead = new BABYLON.Color4(0, 0, 0, 0.0);
+                    particleSystem.minSize = 0.1;
+                    particleSystem.maxSize = 0.5;
+                    particleSystem.minLifeTime = 0.3;
+                    particleSystem.maxLifeTime = 1.0;
+                    particleSystem.emitRate = 500;
+                    particleSystem.blendMode = BABYLON.ParticleSystem.BLENDMODE_ONEONE;
+                    particleSystem.gravity = new BABYLON.Vector3(0, 5, 0);
+                    particleSystem.direction1 = new BABYLON.Vector3(-1, 1, -1);
+                    particleSystem.direction2 = new BABYLON.Vector3(1, 1, 1);
+                    particleSystem.minAngularSpeed = 0;
+                    particleSystem.maxAngularSpeed = Math.PI;
+                    particleSystem.minEmitPower = 1;
+                    particleSystem.maxEmitPower = 3;
+                    particleSystem.updateSpeed = 0.005;
+                } else if (type === 'smoke') {
+                    particleSystem.particleTexture = new BABYLON.Texture("https://assets.babylonjs.com/textures/flare.png", this.scene);
+                    particleSystem.emitter = mesh;
+                    particleSystem.minEmitBox = new BABYLON.Vector3(-0.2, 0, -0.2);
+                    particleSystem.maxEmitBox = new BABYLON.Vector3(0.2, 0, 0.2);
+                    particleSystem.color1 = new BABYLON.Color4(0.1, 0.1, 0.1, 1.0);
+                    particleSystem.color2 = new BABYLON.Color4(0.2, 0.2, 0.2, 1.0);
+                    particleSystem.colorDead = new BABYLON.Color4(0, 0, 0, 0.0);
+                    particleSystem.minSize = 0.5;
+                    particleSystem.maxSize = 1.0;
+                    particleSystem.minLifeTime = 1.0;
+                    particleSystem.maxLifeTime = 2.0;
+                    particleSystem.emitRate = 100;
+                    particleSystem.gravity = new BABYLON.Vector3(0, 1, 0);
+                    particleSystem.direction1 = new BABYLON.Vector3(-0.5, 1, -0.5);
+                    particleSystem.direction2 = new BABYLON.Vector3(0.5, 1, 0.5);
+                } else if (type === 'rain') {
+                    particleSystem.particleTexture = new BABYLON.Texture("https://assets.babylonjs.com/textures/flare.png", this.scene);
+                    particleSystem.emitter = mesh;
+                    particleSystem.minEmitBox = new BABYLON.Vector3(-10, 10, -10);
+                    particleSystem.maxEmitBox = new BABYLON.Vector3(10, 10, 10);
+                    particleSystem.direction1 = new BABYLON.Vector3(0, -1, 0);
+                    particleSystem.direction2 = new BABYLON.Vector3(0, -1, 0);
+                    particleSystem.minLifeTime = 1;
+                    particleSystem.maxLifeTime = 2;
+                    particleSystem.emitRate = 1000;
+                    particleSystem.minSize = 0.1;
+                    particleSystem.maxSize = 0.2;
+                    particleSystem.gravity = new BABYLON.Vector3(0, -9.81, 0);
+                }
+
+                particleSystem.start();
+                return particleSystem;
+            }
+
+            setFog(mode, color, density, start, end) {
+                this.scene.fogEnabled = true;
+                if (mode === 'none') {
+                    this.scene.fogEnabled = false;
+                } else if (mode === 'exp') {
+                    this.scene.fogMode = BABYLON.Scene.FOGMODE_EXP;
+                    this.scene.fogDensity = density;
+                } else if (mode === 'exp2') {
+                    this.scene.fogMode = BABYLON.Scene.FOGMODE_EXP2;
+                    this.scene.fogDensity = density;
+                } else if (mode === 'linear') {
+                    this.scene.fogMode = BABYLON.Scene.FOGMODE_LINEAR;
+                    this.scene.fogStart = start;
+                    this.scene.fogEnd = end;
+                }
+                this.scene.fogColor = BABYLON.Color3.FromHexString(color);
+            }
+
+            setOutline(target, width, color) {
+                const mesh = this._getMesh(target);
+                if (mesh) {
+                    mesh.renderOutline = true;
+                    mesh.outlineWidth = width;
+                    mesh.outlineColor = BABYLON.Color3.FromHexString(color);
+                }
+            }
+
+            createAdvancedLight(type, name, x, y, z, dx, dy, dz) {
+                let light;
+                const pos = new BABYLON.Vector3(x, y, z);
+                const dir = new BABYLON.Vector3(dx, dy, dz);
+                if (type === 'directional') {
+                    light = new BABYLON.DirectionalLight(name, dir, this.scene);
+                    light.position = pos;
+                } else if (type === 'hemispheric') {
+                    light = new BABYLON.HemisphericLight(name, dir, this.scene);
+                } else if (type === 'spot') {
+                    light = new BABYLON.SpotLight(name, pos, dir, Math.PI / 3, 2, this.scene);
+                } else {
+                    light = new BABYLON.PointLight(name, pos, this.scene);
+                }
+                return light;
+            }
+
+            enableShadows(light, meshes) {
+                if (!light || !(light instanceof BABYLON.ShadowLight)) return;
+                const shadowGenerator = new BABYLON.ShadowGenerator(1024, light);
+                shadowGenerator.useBlurExponentialShadowMap = true;
+                shadowGenerator.blurKernel = 32;
+
+                if (Array.isArray(meshes)) {
+                    meshes.forEach(m => {
+                        const mesh = this._getMesh(m);
+                        if (mesh) {
+                            shadowGenerator.addShadowCaster(mesh);
+                            mesh.receiveShadows = true;
+                        }
+                    });
+                } else {
+                    const mesh = this._getMesh(meshes);
+                    if (mesh) {
+                        shadowGenerator.addShadowCaster(mesh);
+                        mesh.receiveShadows = true;
+                    }
+                }
+            }
+
             takeScreenshot() {
                 const camera = this.scene.activeCamera;
                 if (!camera) return;
