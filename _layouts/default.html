@@ -600,11 +600,13 @@
 
         // --- URL Sanitization ---
         function isValidAssetURL(url) {
-            if (typeof url !== 'string' || !url.trim().toLowerCase().startsWith('https://')) {
-                console.error('Invalid URL:', url, 'Only HTTPS URLs are allowed for assets.');
-                return false;
+            if (typeof url !== 'string') return false;
+            const normalized = url.trim().toLowerCase();
+            if (normalized.startsWith('https://') || normalized.startsWith('blob:')) {
+                return true;
             }
-            return true;
+            console.error('Invalid URL:', url, 'Only HTTPS or blob URLs are allowed for assets.');
+            return false;
         }
 
         // --- Hero Overlay Logic ---
@@ -1055,6 +1057,33 @@ workspace_data: "${base64WorkspaceData}"
                     }
                 }
             }
+
+            setGlow(enabled, intensity) {
+                if (enabled) {
+                    if (!this.glowLayer) {
+                        this.glowLayer = new BABYLON.GlowLayer("glow", this.scene);
+                    }
+                    this.glowLayer.intensity = intensity;
+                } else {
+                    if (this.glowLayer) {
+                        this.glowLayer.dispose();
+                        this.glowLayer = null;
+                    }
+                }
+            }
+
+            setProperty(target, property, value) {
+                let mesh = this._getMesh(target);
+                if (mesh && property) {
+                    const props = property.split('.');
+                    let curr = mesh;
+                    for (let i = 0; i < props.length - 1; i++) {
+                        if (curr[props[i]]) curr = curr[props[i]];
+                        else return;
+                    }
+                    curr[props[props.length - 1]] = value;
+                }
+            }
         }
 
         // Initialize Blockly with Drag-and-Drop Enabled
@@ -1485,7 +1514,19 @@ workspace_data: "${base64WorkspaceData}"
                         {
                             kind: 'block',
                             type: 'set_texture_from_asset',
-                        }                        
+                        },
+                        {
+                            kind: 'block',
+                            type: 'create_particles',
+                        },
+                        {
+                            kind: 'block',
+                            type: 'set_outline',
+                        },
+                        {
+                            kind: 'block',
+                            type: 'set_property',
+                        }
                     ]
                 },
 
@@ -1549,6 +1590,14 @@ workspace_data: "${base64WorkspaceData}"
                         {
                             kind: 'block',
                             type: 'set_background_image',
+                        },
+                        {
+                            kind: 'block',
+                            type: 'set_fog'
+                        },
+                        {
+                            kind: 'block',
+                            type: 'set_glow'
                         },
                         {
                             kind: 'block',
@@ -2934,7 +2983,8 @@ workspace_data: "${base64WorkspaceData}"
                 if (this.player && this.player.physicsImpostor) {
                     const boundingInfo = this.player.getHierarchyBoundingVectors(true);
                     const height = boundingInfo.max.y - boundingInfo.min.y;
-                    const rayLength = (height / 2) + 0.2;
+                    // Slightly longer ray to account for physics jitter/float
+                    const rayLength = (height / 2) + 0.8;
                     const ray = new BABYLON.Ray(this.player.getAbsolutePosition(), new BABYLON.Vector3(0, -1, 0), rayLength);
                     const pick = this.scene.pickWithRay(ray, (mesh) => mesh !== this.player && !mesh.isDescendantOf(this.player));
                     if (pick.hit) {
@@ -4659,6 +4709,19 @@ workspace_data: "${base64WorkspaceData}"
                 "tooltip": "Gets a metadata value from an object by its key."
             },
             {
+                "type": "set_property",
+                "message0": "set property %1 of %2 to %3",
+                "args0": [
+                    { "type": "input_value", "name": "PROPERTY", "check": "String" },
+                    { "type": "input_value", "name": "TARGET" },
+                    { "type": "input_value", "name": "VALUE" }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": 230,
+                "tooltip": "Sets a raw property on a Babylon.js mesh (e.g., 'visibility' or 'material.alpha')."
+            },
+            {
                 type: 'move_object',
                 message0: 'Move object %1 to x %2 y %3 z %4',
                 args0: [
@@ -5863,10 +5926,172 @@ workspace_data: "${base64WorkspaceData}"
                 "colour": "#5B80A5",
                 "tooltip": "Sets the main text of an existing popup.",
                 "helpUrl": ""
+            },
+            {
+                "type": "create_particles",
+                "message0": "Create %1 particles on %2",
+                "args0": [
+                    {
+                        "type": "field_dropdown",
+                        "name": "TYPE",
+                        "options": [["fire", "fire"], ["smoke", "smoke"], ["rain", "rain"]]
+                    },
+                    { "type": "input_value", "name": "TARGET" }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": 160,
+                "tooltip": "Creates a particle system on the specified object.",
+                "helpUrl": ""
+            },
+            {
+                "type": "set_fog",
+                "message0": "set fog mode %1 color %2",
+                "args0": [
+                    {
+                        "type": "field_dropdown",
+                        "name": "MODE",
+                        "options": [["none", "none"], ["exp", "exp"], ["exp2", "exp2"], ["linear", "linear"]]
+                    },
+                    { "type": "input_value", "name": "COLOR" }
+                ],
+                "message1": "density %1 start %2 end %3",
+                "args1": [
+                    { "type": "input_value", "name": "DENSITY", "check": "Number" },
+                    { "type": "input_value", "name": "START", "check": "Number" },
+                    { "type": "input_value", "name": "END", "check": "Number" }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": 180,
+                "tooltip": "Sets the scene atmospheric fog.",
+                "helpUrl": ""
+            },
+            {
+                "type": "set_outline",
+                "message0": "set outline on %1 width %2 color %3",
+                "args0": [
+                    { "type": "input_value", "name": "TARGET" },
+                    { "type": "input_value", "name": "WIDTH", "check": "Number" },
+                    { "type": "input_value", "name": "COLOR" }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": 210,
+                "tooltip": "Enables an outline highlight on an object.",
+                "helpUrl": ""
+            },
+            {
+                "type": "create_advanced_light",
+                "message0": "create %1 light named %2",
+                "args0": [
+                    {
+                        "type": "field_dropdown",
+                        "name": "TYPE",
+                        "options": [["directional", "directional"], ["hemispheric", "hemispheric"], ["spot", "spot"], ["point", "point"]]
+                    },
+                    { "type": "field_input", "name": "NAME", "text": "light" }
+                ],
+                "message1": "position x %1 y %2 z %3",
+                "args1": [
+                    { "type": "input_value", "name": "X", "check": "Number" },
+                    { "type": "input_value", "name": "Y", "check": "Number" },
+                    { "type": "input_value", "name": "Z", "check": "Number" }
+                ],
+                "message2": "direction x %1 y %2 z %3",
+                "args2": [
+                    { "type": "input_value", "name": "DX", "check": "Number" },
+                    { "type": "input_value", "name": "DY", "check": "Number" },
+                    { "type": "input_value", "name": "DZ", "check": "Number" }
+                ],
+                "output": "Light",
+                "colour": 65,
+                "tooltip": "Creates an advanced light with position and direction.",
+                "helpUrl": ""
+            },
+            {
+                "type": "enable_shadows",
+                "message0": "enable shadows for light %1 on %2",
+                "args0": [
+                    { "type": "input_value", "name": "LIGHT" },
+                    { "type": "input_value", "name": "TARGETS" }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": 65,
+                "tooltip": "Enables shadows for a light on specified objects.",
+                "helpUrl": ""
+            },
+            {
+                "type": "set_glow",
+                "message0": "set glow enabled %1 intensity %2",
+                "args0": [
+                    { "type": "field_checkbox", "name": "ENABLED", "checked": true },
+                    { "type": "input_value", "name": "INTENSITY", "check": "Number" }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": 180,
+                "tooltip": "Enables or disables the glow effect for the whole scene.",
+                "helpUrl": ""
             }
         ]);
 
         {
+            javascript.javascriptGenerator.forBlock['create_particles'] = function (block, generator) {
+                const type = block.getFieldValue('TYPE');
+                const target = generator.valueToCode(block, 'TARGET', generator.ORDER_ATOMIC) || 'null';
+                return `sceneManager.createParticleSystem(${target}, '${type}');\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['set_fog'] = function (block, generator) {
+                const mode = block.getFieldValue('MODE');
+                const color = generator.valueToCode(block, 'COLOR', generator.ORDER_ATOMIC) || "'#ffffff'";
+                const density = generator.valueToCode(block, 'DENSITY', generator.ORDER_ATOMIC) || 0.1;
+                const start = generator.valueToCode(block, 'START', generator.ORDER_ATOMIC) || 0;
+                const end = generator.valueToCode(block, 'END', generator.ORDER_ATOMIC) || 100;
+                return `sceneManager.setFog('${mode}', ${color}, ${density}, ${start}, ${end});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['set_outline'] = function (block, generator) {
+                const target = generator.valueToCode(block, 'TARGET', generator.ORDER_ATOMIC) || 'null';
+                const width = generator.valueToCode(block, 'WIDTH', generator.ORDER_ATOMIC) || 0.1;
+                const color = generator.valueToCode(block, 'COLOR', generator.ORDER_ATOMIC) || "'#ffffff'";
+                return `sceneManager.setOutline(${target}, ${width}, ${color});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['create_advanced_light'] = function (block, generator) {
+                const type = block.getFieldValue('TYPE');
+                const name = block.getFieldValue('NAME');
+                const x = generator.valueToCode(block, 'X', generator.ORDER_ATOMIC) || 0;
+                const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || 10;
+                const z = generator.valueToCode(block, 'Z', generator.ORDER_ATOMIC) || 0;
+                const dx = generator.valueToCode(block, 'DX', generator.ORDER_ATOMIC) || 0;
+                const dy = generator.valueToCode(block, 'DY', generator.ORDER_ATOMIC) || -1;
+                const dz = generator.valueToCode(block, 'DZ', generator.ORDER_ATOMIC) || 0;
+                const code = `sceneManager.createAdvancedLight('${type}', '${name}', ${x}, ${y}, ${z}, ${dx}, ${dy}, ${dz})`;
+                return [code, generator.ORDER_ATOMIC];
+            };
+
+            javascript.javascriptGenerator.forBlock['enable_shadows'] = function (block, generator) {
+                const light = generator.valueToCode(block, 'LIGHT', generator.ORDER_ATOMIC) || 'null';
+                const targets = generator.valueToCode(block, 'TARGETS', generator.ORDER_ATOMIC) || '[]';
+                return `sceneManager.enableShadows(${light}, ${targets});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['set_glow'] = function (block, generator) {
+                const enabled = block.getFieldValue('ENABLED') === 'TRUE';
+                const intensity = generator.valueToCode(block, 'INTENSITY', generator.ORDER_ATOMIC) || 1;
+                return `sceneManager.setGlow(${enabled}, ${intensity});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['set_property'] = function (block, generator) {
+                const property = generator.valueToCode(block, 'PROPERTY', generator.ORDER_ATOMIC) || "''";
+                const target = generator.valueToCode(block, 'TARGET', generator.ORDER_ATOMIC) || 'null';
+                const value = generator.valueToCode(block, 'VALUE', generator.ORDER_ATOMIC) || 'null';
+                return `sceneManager.setProperty(${target}, ${property}, ${value});\n`;
+            };
+
             javascript.javascriptGenerator.forBlock['create_popup'] = function (block, generator) {
                 const title = generator.valueToCode(block, 'TITLE', generator.ORDER_ATOMIC) || "''";
                 const text = generator.valueToCode(block, 'TEXT', generator.ORDER_ATOMIC) || "''";
