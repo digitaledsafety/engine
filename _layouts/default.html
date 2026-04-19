@@ -1058,32 +1058,6 @@ workspace_data: "${base64WorkspaceData}"
                 }
             }
 
-            setGlow(enabled, intensity) {
-                if (enabled) {
-                    if (!this.glowLayer) {
-                        this.glowLayer = new BABYLON.GlowLayer("glow", this.scene);
-                    }
-                    this.glowLayer.intensity = intensity;
-                } else {
-                    if (this.glowLayer) {
-                        this.glowLayer.dispose();
-                        this.glowLayer = null;
-                    }
-                }
-            }
-
-            setProperty(target, property, value) {
-                let mesh = this._getMesh(target);
-                if (mesh && property) {
-                    const props = property.split('.');
-                    let curr = mesh;
-                    for (let i = 0; i < props.length - 1; i++) {
-                        if (curr[props[i]]) curr = curr[props[i]];
-                        else return;
-                    }
-                    curr[props[props.length - 1]] = value;
-                }
-            }
         }
 
         // Initialize Blockly with Drag-and-Drop Enabled
@@ -3696,6 +3670,7 @@ workspace_data: "${base64WorkspaceData}"
                 const endFrame = loopMode === 'PINGPONG' ? totalFrames * 2 : totalFrames;
                 this.scene.beginDirectAnimation(mesh, [animation], 0, endFrame, loop);
             }
+
             animateKeyframes(target, property, keyframes, loop, loopMode) {
                 const mesh = this._getMesh(target);
                 if (!mesh) return;
@@ -3757,7 +3732,6 @@ workspace_data: "${base64WorkspaceData}"
 
                 this.scene.beginDirectAnimation(mesh, [animation], 0, endFrame, loop);
             }
-
 
             async importAnimation(url) {
                 if (!isValidAssetURL(url)) {
@@ -3996,6 +3970,33 @@ workspace_data: "${base64WorkspaceData}"
                     skyboxMaterial.reflectionTexture.coordinatesMode = BABYLON.Texture.SKYBOX_MODE;
                     skybox.material = skyboxMaterial;
                     this.background = skybox;
+                }
+            }
+
+            setGlow(enabled, intensity) {
+                if (enabled) {
+                    if (!this.glowLayer) {
+                        this.glowLayer = new BABYLON.GlowLayer("glow", this.scene);
+                    }
+                    this.glowLayer.intensity = intensity;
+                } else {
+                    if (this.glowLayer) {
+                        this.glowLayer.dispose();
+                        this.glowLayer = null;
+                    }
+                }
+            }
+
+            setProperty(target, property, value) {
+                let mesh = this._getMesh(target);
+                if (mesh && property) {
+                    const props = property.split('.');
+                    let curr = mesh;
+                    for (let i = 0; i < props.length - 1; i++) {
+                        if (curr[props[i]]) curr = curr[props[i]];
+                        else return;
+                    }
+                    curr[props[props.length - 1]] = value;
                 }
             }
 
