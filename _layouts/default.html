@@ -2482,9 +2482,9 @@ workspace_data: "${base64WorkspaceData}"
 
             initAutoHide() {
                 this.uiElements = document.querySelectorAll('.interactive-ui');
-                const canvasContainer = document.querySelector('.canvas-container');
+                this._canvasContainer = document.querySelector('.canvas-container');
 
-                const resetTimer = () => {
+                this._resetTimer = () => {
                     this.uiElements.forEach(el => el.classList.remove('hidden'));
                     clearTimeout(this.inactivityTimer);
                     this.inactivityTimer = setTimeout(() => {
@@ -2493,12 +2493,14 @@ workspace_data: "${base64WorkspaceData}"
                 };
 
                 // Initial call to start the timer
-                resetTimer();
+                this._resetTimer();
 
                 // Reset timer on user interaction
-                canvasContainer.addEventListener('mousemove', resetTimer, false);
-                canvasContainer.addEventListener('touchstart', resetTimer, { passive: true });
-                canvasContainer.addEventListener('click', resetTimer, false);
+                if (this._canvasContainer) {
+                    this._canvasContainer.addEventListener('mousemove', this._resetTimer, false);
+                    this._canvasContainer.addEventListener('touchstart', this._resetTimer, { passive: true });
+                    this._canvasContainer.addEventListener('click', this._resetTimer, false);
+                }
             }
 
             // High-level API for cleaner code generation
@@ -3417,12 +3419,14 @@ workspace_data: "${base64WorkspaceData}"
             }
 
             initInputListeners() {
-                window.addEventListener('keydown', (event) => {
+                this._onKeyDown = (event) => {
                     this.inputState.keys[event.key.toLowerCase()] = true;
-                });
-                window.addEventListener('keyup', (event) => {
+                };
+                this._onKeyUp = (event) => {
                     this.inputState.keys[event.key.toLowerCase()] = false;
-                });
+                };
+                window.addEventListener('keydown', this._onKeyDown);
+                window.addEventListener('keyup', this._onKeyUp);
             }
 
             initScene() {
@@ -3557,6 +3561,18 @@ workspace_data: "${base64WorkspaceData}"
                     this.joystickManager.destroy();
                     this.joystickManager = null;
                 }
+
+                // Remove input listeners
+                window.removeEventListener('keydown', this._onKeyDown);
+                window.removeEventListener('keyup', this._onKeyUp);
+
+                // Remove auto-hide listeners
+                if (this._canvasContainer && this._resetTimer) {
+                    this._canvasContainer.removeEventListener('mousemove', this._resetTimer);
+                    this._canvasContainer.removeEventListener('touchstart', this._resetTimer);
+                    this._canvasContainer.removeEventListener('click', this._resetTimer);
+                }
+
                 this.uiManager.dispose();
                 this.scene.dispose();
                 this.engine.dispose();
@@ -7156,8 +7172,10 @@ if (${name}) {
 
         const canvas = document.getElementById('gameCanvas');
         const assetManager = new AssetManager();
+        window.assetManager = assetManager;
         window.sceneManager = new BabylonSceneManager(canvas);
         const projectManager = new ProjectManager(assetManager, workspace, sceneManager);
+        window.projectManager = projectManager;
 
         // Set up our default Blockly color blocks
         // TODO: had to manually set up color block generators due to plugin incompatibility, fix later
@@ -7265,8 +7283,10 @@ function ${generator.FUNCTION_NAME_PLACEHOLDER_}(c1, c2, ratio) {
                 const deleteButton = document.createElement('button');
                 deleteButton.textContent = 'Delete';
                 deleteButton.onclick = async () => {
-                    await assetManager.deleteAsset(asset.name);
-                    loadAssetsIntoView();
+                    if (confirm(`Are you sure you want to delete "${asset.name}"?`)) {
+                        await assetManager.deleteAsset(asset.name);
+                        loadAssetsIntoView();
+                    }
                 };
                 li.appendChild(deleteButton);
                 assetList.appendChild(li);
@@ -7360,9 +7380,24 @@ function ${generator.FUNCTION_NAME_PLACEHOLDER_}(c1, c2, ratio) {
                         findBlocks(item.contents || []);
                     } else if (item.kind === 'block') {
                         const type = item.type.toLowerCase();
-                        // Also try to find localized name or tooltip if possible,
-                        // but for now type is a good start.
-                        if (type.includes(searchTerm.replace(/ /g, '_'))) {
+                        let found = type.includes(searchTerm.replace(/ /g, '_'));
+
+                        // Search in block labels and tooltips
+                        if (!found && Blockly.Blocks[item.type]) {
+                            const blockDef = Blockly.Blocks[item.type];
+                            // Match message0 if it exists
+                            if (blockDef.message0 && blockDef.message0.toLowerCase().includes(searchTerm)) {
+                                found = true;
+                            }
+                            // Match tooltip if it exists
+                            if (!found && blockDef.tooltip && typeof blockDef.tooltip === 'string' && blockDef.tooltip.toLowerCase().includes(searchTerm)) {
+                                found = true;
+                            } else if (!found && blockDef.tooltip && typeof blockDef.tooltip === 'object' && blockDef.tooltip.text && blockDef.tooltip.text.toLowerCase().includes(searchTerm)) {
+                                found = true;
+                            }
+                        }
+
+                        if (found) {
                             searchResults.push(item);
                         }
                     }
@@ -7466,6 +7501,17 @@ function ${generator.FUNCTION_NAME_PLACEHOLDER_}(c1, c2, ratio) {
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
 
+        // Global Keyboard Shortcuts
+        window.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                e.preventDefault();
+                doRun();
+            } else if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                e.preventDefault();
+                projectManager.saveProject();
+            }
+        });
+
         // --- Main View Switching Logic ---
         const codeViewButton = document.getElementById('codeViewButton');
         const assetsViewButton = document.getElementById('assetsViewButton');
@@ -7501,7 +7547,9 @@ function ${generator.FUNCTION_NAME_PLACEHOLDER_}(c1, c2, ratio) {
         const touchJump = document.getElementById('touch-jump');
 
         const handleTouch = (key, isPressed) => {
-            sceneManager.inputState.keys[key] = isPressed;
+            if (window.sceneManager && window.sceneManager.inputState) {
+                window.sceneManager.inputState.keys[key] = isPressed;
+            }
         };
 
         // Jump Button
