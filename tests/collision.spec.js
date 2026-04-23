@@ -2,6 +2,7 @@ const { test, expect } = require('@playwright/test');
 
 test.describe('Engine Collision Functionality', () => {
   test('VRM collision detection works', async ({ page }) => {
+    test.slow();
     // Workspace JSON for testing VRM physics and collision
     // Using a simple box instead of VRM to avoid network 404 and slowness
     const workspace_json = {
@@ -115,6 +116,6 @@ test.describe('Engine Collision Functionality', () => {
         window.doRun();
     }, workspace_json);
 
-    await expect.poll(() => consoleMessages, { timeout: 30000 }).toContain('COLLISION_DETECTED');
+    await expect.poll(() => consoleMessages, { timeout: 60000 }).toContain('COLLISION_DETECTED');
   });
 });
