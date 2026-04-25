@@ -6,7 +6,7 @@ on:
   pull_request:
     branches: ["main"]
   workflow_dispatch:
-
+  
 jobs:
   call-jekyll-deployment:
     uses: digitaledsafety/workflows/.github/workflows/reusable-jekyll-playwright-deploy.yml@main
