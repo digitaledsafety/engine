@@ -1,4 +1,4 @@
-export const registerBlocks = (Blockly, assetHelpers) => {
+export function registerBlocks(Blockly, assetHelpers) {
     const { getModelAssets, getAudioAssets, getImageAssets } = assetHelpers;
 Blockly.Blocks['asset_model'] = {
             init: function () {
@@ -267,6 +267,30 @@ Blockly.Blocks['asset_model'] = {
                 helpUrl: '',
             },
             {
+                type: 'create_primitive',
+                message0: 'Create %1 named %2 at x %3 y %4 z %5',
+                args0: [
+                    {
+                        type: 'field_dropdown',
+                        name: 'TYPE',
+                        options: [
+                            ['box', 'box'],
+                            ['sphere', 'sphere'],
+                            ['cylinder', 'cylinder']
+                        ],
+                    },
+                    { "type": "input_value", "name": "NAME", "check": "String" },
+                    { type: 'input_value', name: 'X', check: 'Number' },
+                    { type: 'input_value', name: 'Y', check: 'Number' },
+                    { type: 'input_value', name: 'Z', check: 'Number' },
+                ],
+                "inputsInline": true,
+                previousStatement: null,
+                nextStatement: null,
+                colour: 160,
+                tooltip: 'Creates a 3D primitive at the specified position.',
+            },
+            {
                 type: 'create_box',
                 message0: 'Create box named %1 at x %2 y %3 z %4',
                 args0: [
@@ -368,6 +392,19 @@ Blockly.Blocks['asset_model'] = {
                 "output": null,
                 "colour": 230,
                 "tooltip": "Gets a metadata value from an object by its key."
+            },
+            {
+                "type": "set_property",
+                "message0": "set property %1 of %2 to %3",
+                "args0": [
+                    { "type": "input_value", "name": "PROPERTY", "check": "String" },
+                    { "type": "input_value", "name": "TARGET" },
+                    { "type": "input_value", "name": "VALUE" }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": 230,
+                "tooltip": "Sets a raw property on a Babylon.js mesh (e.g., 'visibility' or 'material.alpha')."
             },
             {
                 type: 'move_object',
@@ -686,7 +723,7 @@ Blockly.Blocks['asset_model'] = {
                 type: 'apply_force',
                 message0: 'Apply force to %1 x: %2 y: %3 z: %4 at point x: %5 y: %6 z: %7',
                 args0: [
-                    { type: 'field_input', name: 'NAME', text: 'object' },
+                    { type: 'input_value', name: 'OBJECT' },
                     { type: 'input_value', name: 'FX', check: 'Number' },
                     { type: 'input_value', name: 'FY', check: 'Number' },
                     { type: 'input_value', name: 'FZ', check: 'Number' },
@@ -699,6 +736,46 @@ Blockly.Blocks['asset_model'] = {
                 nextStatement: null,
                 colour: 120,
                 tooltip: 'Applies a force to the specified object at a given point',
+            },
+            {
+                type: 'apply_impulse',
+                message0: 'Apply impulse to %1 x: %2 y: %3 z: %4 at point x: %5 y: %6 z: %7',
+                args0: [
+                    { type: 'input_value', name: 'OBJECT' },
+                    { type: 'input_value', name: 'FX', check: 'Number' },
+                    { type: 'input_value', name: 'FY', check: 'Number' },
+                    { type: 'input_value', name: 'FZ', check: 'Number' },
+                    { type: 'input_value', name: 'PX', check: 'Number' },
+                    { type: 'input_value', name: 'PY', check: 'Number' },
+                    { type: 'input_value', name: 'PZ', check: 'Number' },
+                ],
+                "inputsInline": false,
+                previousStatement: null,
+                nextStatement: null,
+                colour: 120,
+                tooltip: 'Applies an impulse to the specified object at a given point',
+            },
+            {
+                type: 'get_object_pos',
+                message0: 'Get %1 position of %2',
+                args0: [
+                    {
+                        type: 'field_dropdown',
+                        name: 'AXIS',
+                        options: [['X', 'X'], ['Y', 'Y'], ['Z', 'Z']]
+                    },
+                    { type: 'input_value', name: 'OBJECT' }
+                ],
+                output: 'Number',
+                colour: 120,
+                tooltip: 'Returns the X, Y, or Z position of an object'
+            },
+            {
+                type: 'get_collided_object',
+                message0: 'collided object',
+                output: null,
+                colour: 120,
+                tooltip: 'To be used inside an onCollision callback'
             },
             {
                 type: 'set_gravity',
@@ -1534,10 +1611,172 @@ Blockly.Blocks['asset_model'] = {
                 "colour": "#5B80A5",
                 "tooltip": "Sets the main text of an existing popup.",
                 "helpUrl": ""
+            },
+            {
+                "type": "create_particles",
+                "message0": "Create %1 particles on %2",
+                "args0": [
+                    {
+                        "type": "field_dropdown",
+                        "name": "TYPE",
+                        "options": [["fire", "fire"], ["smoke", "smoke"], ["rain", "rain"]]
+                    },
+                    { "type": "input_value", "name": "TARGET" }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": 160,
+                "tooltip": "Creates a particle system on the specified object.",
+                "helpUrl": ""
+            },
+            {
+                "type": "set_fog",
+                "message0": "set fog mode %1 color %2",
+                "args0": [
+                    {
+                        "type": "field_dropdown",
+                        "name": "MODE",
+                        "options": [["none", "none"], ["exp", "exp"], ["exp2", "exp2"], ["linear", "linear"]]
+                    },
+                    { "type": "input_value", "name": "COLOR" }
+                ],
+                "message1": "density %1 start %2 end %3",
+                "args1": [
+                    { "type": "input_value", "name": "DENSITY", "check": "Number" },
+                    { "type": "input_value", "name": "START", "check": "Number" },
+                    { "type": "input_value", "name": "END", "check": "Number" }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": 180,
+                "tooltip": "Sets the scene atmospheric fog.",
+                "helpUrl": ""
+            },
+            {
+                "type": "set_outline",
+                "message0": "set outline on %1 width %2 color %3",
+                "args0": [
+                    { "type": "input_value", "name": "TARGET" },
+                    { "type": "input_value", "name": "WIDTH", "check": "Number" },
+                    { "type": "input_value", "name": "COLOR" }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": 210,
+                "tooltip": "Enables an outline highlight on an object.",
+                "helpUrl": ""
+            },
+            {
+                "type": "create_advanced_light",
+                "message0": "create %1 light named %2",
+                "args0": [
+                    {
+                        "type": "field_dropdown",
+                        "name": "TYPE",
+                        "options": [["directional", "directional"], ["hemispheric", "hemispheric"], ["spot", "spot"], ["point", "point"]]
+                    },
+                    { "type": "field_input", "name": "NAME", "text": "light" }
+                ],
+                "message1": "position x %1 y %2 z %3",
+                "args1": [
+                    { "type": "input_value", "name": "X", "check": "Number" },
+                    { "type": "input_value", "name": "Y", "check": "Number" },
+                    { "type": "input_value", "name": "Z", "check": "Number" }
+                ],
+                "message2": "direction x %1 y %2 z %3",
+                "args2": [
+                    { "type": "input_value", "name": "DX", "check": "Number" },
+                    { "type": "input_value", "name": "DY", "check": "Number" },
+                    { "type": "input_value", "name": "DZ", "check": "Number" }
+                ],
+                "output": "Light",
+                "colour": 65,
+                "tooltip": "Creates an advanced light with position and direction.",
+                "helpUrl": ""
+            },
+            {
+                "type": "enable_shadows",
+                "message0": "enable shadows for light %1 on %2",
+                "args0": [
+                    { "type": "input_value", "name": "LIGHT" },
+                    { "type": "input_value", "name": "TARGETS" }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": 65,
+                "tooltip": "Enables shadows for a light on specified objects.",
+                "helpUrl": ""
+            },
+            {
+                "type": "set_glow",
+                "message0": "set glow enabled %1 intensity %2",
+                "args0": [
+                    { "type": "field_checkbox", "name": "ENABLED", "checked": true },
+                    { "type": "input_value", "name": "INTENSITY", "check": "Number" }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": 180,
+                "tooltip": "Enables or disables the glow effect for the whole scene.",
+                "helpUrl": ""
             }
         ]);
 
         {
+            javascript.javascriptGenerator.forBlock['create_particles'] = function (block, generator) {
+                const type = block.getFieldValue('TYPE');
+                const target = generator.valueToCode(block, 'TARGET', generator.ORDER_ATOMIC) || 'null';
+                return `sceneManager.createParticleSystem(${target}, '${type}');\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['set_fog'] = function (block, generator) {
+                const mode = block.getFieldValue('MODE');
+                const color = generator.valueToCode(block, 'COLOR', generator.ORDER_ATOMIC) || "'#ffffff'";
+                const density = generator.valueToCode(block, 'DENSITY', generator.ORDER_ATOMIC) || 0.1;
+                const start = generator.valueToCode(block, 'START', generator.ORDER_ATOMIC) || 0;
+                const end = generator.valueToCode(block, 'END', generator.ORDER_ATOMIC) || 100;
+                return `sceneManager.setFog('${mode}', ${color}, ${density}, ${start}, ${end});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['set_outline'] = function (block, generator) {
+                const target = generator.valueToCode(block, 'TARGET', generator.ORDER_ATOMIC) || 'null';
+                const width = generator.valueToCode(block, 'WIDTH', generator.ORDER_ATOMIC) || 0.1;
+                const color = generator.valueToCode(block, 'COLOR', generator.ORDER_ATOMIC) || "'#ffffff'";
+                return `sceneManager.setOutline(${target}, ${width}, ${color});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['create_advanced_light'] = function (block, generator) {
+                const type = block.getFieldValue('TYPE');
+                const name = block.getFieldValue('NAME');
+                const x = generator.valueToCode(block, 'X', generator.ORDER_ATOMIC) || 0;
+                const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || 10;
+                const z = generator.valueToCode(block, 'Z', generator.ORDER_ATOMIC) || 0;
+                const dx = generator.valueToCode(block, 'DX', generator.ORDER_ATOMIC) || 0;
+                const dy = generator.valueToCode(block, 'DY', generator.ORDER_ATOMIC) || -1;
+                const dz = generator.valueToCode(block, 'DZ', generator.ORDER_ATOMIC) || 0;
+                const code = `sceneManager.createAdvancedLight('${type}', '${name}', ${x}, ${y}, ${z}, ${dx}, ${dy}, ${dz})`;
+                return [code, generator.ORDER_ATOMIC];
+            };
+
+            javascript.javascriptGenerator.forBlock['enable_shadows'] = function (block, generator) {
+                const light = generator.valueToCode(block, 'LIGHT', generator.ORDER_ATOMIC) || 'null';
+                const targets = generator.valueToCode(block, 'TARGETS', generator.ORDER_ATOMIC) || '[]';
+                return `sceneManager.enableShadows(${light}, ${targets});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['set_glow'] = function (block, generator) {
+                const enabled = block.getFieldValue('ENABLED') === 'TRUE';
+                const intensity = generator.valueToCode(block, 'INTENSITY', generator.ORDER_ATOMIC) || 1;
+                return `sceneManager.setGlow(${enabled}, ${intensity});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['set_property'] = function (block, generator) {
+                const property = generator.valueToCode(block, 'PROPERTY', generator.ORDER_ATOMIC) || "''";
+                const target = generator.valueToCode(block, 'TARGET', generator.ORDER_ATOMIC) || 'null';
+                const value = generator.valueToCode(block, 'VALUE', generator.ORDER_ATOMIC) || 'null';
+                return `sceneManager.setProperty(${target}, ${property}, ${value});\n`;
+            };
+
             javascript.javascriptGenerator.forBlock['create_popup'] = function (block, generator) {
                 const title = generator.valueToCode(block, 'TITLE', generator.ORDER_ATOMIC) || "''";
                 const text = generator.valueToCode(block, 'TEXT', generator.ORDER_ATOMIC) || "''";
@@ -1600,6 +1839,7 @@ Blockly.Blocks['asset_model'] = {
                 const text = generator.valueToCode(block, 'TEXT', generator.ORDER_ATOMIC) || "''";
                 return `sceneManager.setPopupText(${popupName}, ${text});\n`;
             };
+
 
             javascript.javascriptGenerator.forBlock['show_loading_screen'] = function (block, generator) {
                 return `
@@ -1790,6 +2030,24 @@ if (${name}) {
             javascript.javascriptGenerator.forBlock['set_ground_physics'] = function (block, generator) {
                 const name = block.getFieldValue('NAME');
                 return `sceneManager.setGroundPhysics('${name}');\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['create_primitive'] = function (block, generator) {
+                const type = block.getFieldValue('TYPE');
+                const name = generator.valueToCode(block, 'NAME', generator.ORDER_ATOMIC) || "'myObject'";
+                const x = generator.valueToCode(block, 'X', generator.ORDER_ATOMIC) || 0;
+                const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || 0;
+                const z = generator.valueToCode(block, 'Z', generator.ORDER_ATOMIC) || 0;
+
+                let code;
+                if (type === 'sphere') {
+                    code = `sceneManager.createSphere(${name}, ${x}, ${y}, ${z});\n`;
+                } else if (type === 'cylinder') {
+                    code = `sceneManager.createCylinder(${name}, ${x}, ${y}, ${z});\n`;
+                } else {
+                    code = `sceneManager.createBox(${name}, ${x}, ${y}, ${z});\n`;
+                }
+                return code;
             };
 
             javascript.javascriptGenerator.forBlock['create_box'] = function (block, generator) {
@@ -2026,12 +2284,36 @@ if (${name}) {
             };
 
             javascript.javascriptGenerator.forBlock['apply_force'] = function (block, generator) {
-                // This is a more advanced physics function. A helper could be added if needed frequently.
-                const name = block.getFieldValue('NAME');
+                const target = generator.valueToCode(block, 'OBJECT', generator.ORDER_ATOMIC) || 'null';
                 const fx = generator.valueToCode(block, 'FX', generator.ORDER_ATOMIC) || 0;
                 const fy = generator.valueToCode(block, 'FY', generator.ORDER_ATOMIC) || 0;
                 const fz = generator.valueToCode(block, 'FZ', generator.ORDER_ATOMIC) || 0;
-                return `// Apply force requires direct physics access, consider a high-level alternative.\n`;
+                const px = generator.valueToCode(block, 'PX', generator.ORDER_ATOMIC) || 0;
+                const py = generator.valueToCode(block, 'PY', generator.ORDER_ATOMIC) || 0;
+                const pz = generator.valueToCode(block, 'PZ', generator.ORDER_ATOMIC) || 0;
+                return `sceneManager.applyForce(${target}, ${fx}, ${fy}, ${fz}, ${px}, ${py}, ${pz});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['apply_impulse'] = function (block, generator) {
+                const target = generator.valueToCode(block, 'OBJECT', generator.ORDER_ATOMIC) || 'null';
+                const fx = generator.valueToCode(block, 'FX', generator.ORDER_ATOMIC) || 0;
+                const fy = generator.valueToCode(block, 'FY', generator.ORDER_ATOMIC) || 0;
+                const fz = generator.valueToCode(block, 'FZ', generator.ORDER_ATOMIC) || 0;
+                const px = generator.valueToCode(block, 'PX', generator.ORDER_ATOMIC) || 0;
+                const py = generator.valueToCode(block, 'PY', generator.ORDER_ATOMIC) || 0;
+                const pz = generator.valueToCode(block, 'PZ', generator.ORDER_ATOMIC) || 0;
+                return `sceneManager.applyImpulse(${target}, ${fx}, ${fy}, ${fz}, ${px}, ${py}, ${pz});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['get_object_pos'] = function (block, generator) {
+                const axis = block.getFieldValue('AXIS');
+                const target = generator.valueToCode(block, 'OBJECT', generator.ORDER_ATOMIC) || 'null';
+                return [`sceneManager.getPos${axis}(${target})`, javascript.Order.FUNCTION_CALL];
+            };
+
+            javascript.javascriptGenerator.forBlock['get_collided_object'] = function (block, generator) {
+                const collidedObjectVar = generator.nameDB_.getName('collided_object', Blockly.VARIABLE_CATEGORY_NAME);
+                return [collidedObjectVar, javascript.Order.ATOMIC];
             };
 
             javascript.javascriptGenerator.forBlock['set_gravity'] = function (block, generator) {
@@ -2359,5 +2641,18 @@ if (${name}) {
             };
         }
 
+        // Convert Blockly Code to JavaScript
 
-};
+javascript.javascriptGenerator.forBlock['colour_random'] = function (block, generator) {
+            return [generator.provideFunction_('colourRandom', `
+function ${generator.FUNCTION_NAME_PLACEHOLDER_}() {
+  var num = Math.floor(Math.random() * 0x1000000);
+  return '#' + ('00000' + num.toString(16)).substr(-6);
+}
+`) + '()', generator.ORDER_FUNCTION_CALL];
+        };
+javascript.javascriptGenerator.forBlock['colour_picker'] = function (block, generator) {
+            const colour = block.getFieldValue('COLOUR');
+            return [`'${colour}'`, generator.ORDER_ATOMIC];
+        };
+}

@@ -20,7 +20,7 @@ test('verify all changes', async ({ page }) => {
 
   // 3. Verify Search Functionality
   const searchInput = page.locator('#search-input');
-  await searchInput.fill('create_box');
+  await searchInput.fill('create_primitive');
   await page.waitForTimeout(1000);
   const hasSearchResults = await page.evaluate(() => {
     const labels = Array.from(document.querySelectorAll('.blocklyToolboxCategoryLabel'));
@@ -33,7 +33,7 @@ test('verify all changes', async ({ page }) => {
       const flyout = window.workspace.getFlyout();
       return flyout.getWorkspace().getTopBlocks().map(b => b.type);
   });
-  expect(blocksInSearch).toContain('create_box');
+  expect(blocksInSearch).toContain('create_primitive');
 
   // 4. Verify Mobile Styles (Simulation)
   await page.setViewportSize({ width: 375, height: 667 });

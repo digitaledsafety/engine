@@ -36,11 +36,13 @@ CustomLoadingScreen.prototype.hideLoadingUI = function () {
 };
 
 export function isValidAssetURL(url) {
-            if (typeof url !== 'string' || !url.trim().toLowerCase().startsWith('https://')) {
-                console.error('Invalid URL:', url, 'Only HTTPS URLs are allowed for assets.');
-                return false;
+            if (typeof url !== 'string') return false;
+            const normalized = url.trim().toLowerCase();
+            if (normalized.startsWith('https://') || normalized.startsWith('blob:')) {
+                return true;
             }
-            return true;
+            console.error('Invalid URL:', url, 'Only HTTPS or blob URLs are allowed for assets.');
+            return false;
         }
 
 export class AssetManager {
@@ -342,16 +344,20 @@ export class BabylonSceneManager {
                 const joystickZone = this.container.querySelector('#joystick-zone');
 
                 // Only initialize the joystick if the touch UI is likely active (based on CSS media queries).
-                if (joystickZone && window.matchMedia('(max-width: 768px)').matches) {
+                if (joystickZone && window.matchMedia("(max-width: 768px)").matches) {
+                    const jumpButtonContainer = document.getElementById("jump-button-container");
+                    if (jumpButtonContainer) {
+                        jumpButtonContainer.style.display = "block";
+                    }
                     this.joystickManager = nipplejs.create({
                         zone: joystickZone,
-                        mode: 'dynamic',
-                        color: 'grey',
+                        mode: "dynamic",
+                        color: "grey",
                         size: 120,
                         fadeTime: 0
                     });
 
-                    this.joystickManager.on('added', (evt, nipple) => {
+                    this.joystickManager.on("added", (evt, nipple) => {
                         // Detach camera controls when the joystick is active to prevent conflicts
                         if (this.scene.activeCamera) {
                             this.scene.activeCamera.detachControl(this.canvas);
@@ -411,9 +417,9 @@ export class BabylonSceneManager {
 
             initAutoHide() {
                 this.uiElements = this.container.querySelectorAll('.interactive-ui');
-                const canvasContainer = this.container.querySelector('.canvas-container');
+                this._canvasContainer = this.container.querySelector('.canvas-container');
 
-                const resetTimer = () => {
+                this._resetTimer = () => {
                     this.uiElements.forEach(el => el.classList.remove('hidden'));
                     clearTimeout(this.inactivityTimer);
                     this.inactivityTimer = setTimeout(() => {
@@ -422,12 +428,14 @@ export class BabylonSceneManager {
                 };
 
                 // Initial call to start the timer
-                resetTimer();
+                this._resetTimer();
 
                 // Reset timer on user interaction
-                canvasContainer.addEventListener('mousemove', resetTimer, false);
-                canvasContainer.addEventListener('touchstart', resetTimer, { passive: true });
-                canvasContainer.addEventListener('click', resetTimer, false);
+                if (this._canvasContainer) {
+                    this._canvasContainer.addEventListener('mousemove', this._resetTimer, false);
+                    this._canvasContainer.addEventListener('touchstart', this._resetTimer, { passive: true });
+                    this._canvasContainer.addEventListener('click', this._resetTimer, false);
+                }
             }
 
             // High-level API for cleaner code generation
@@ -443,6 +451,13 @@ export class BabylonSceneManager {
                 sphereMesh.position.set(x, y, z);
                 this.objects[name] = sphereMesh;
                 return sphereMesh;
+            }
+
+            createCylinder(name, x, y, z) {
+                const cylinderMesh = BABYLON.MeshBuilder.CreateCylinder(name, { diameter: 1, height: 1 }, this.scene);
+                cylinderMesh.position.set(x, y, z);
+                this.objects[name] = cylinderMesh;
+                return cylinderMesh;
             }
 
             async createText(name, text, fontUrl, size = 1, resolution = 16, depth = 0.5) {
@@ -877,8 +892,13 @@ export class BabylonSceneManager {
 
             playerJump(force) {
                 if (this.player && this.player.physicsImpostor) {
-                    const verticalVelocity = this.player.physicsImpostor.getLinearVelocity().y;
-                    if (Math.abs(verticalVelocity) < 0.1) { // Simple ground check
+                    const boundingInfo = this.player.getHierarchyBoundingVectors(true);
+                    const height = boundingInfo.max.y - boundingInfo.min.y;
+                    // Slightly longer ray to account for physics jitter/float
+                    const rayLength = (height / 2) + 0.8;
+                    const ray = new BABYLON.Ray(this.player.getAbsolutePosition(), new BABYLON.Vector3(0, -1, 0), rayLength);
+                    const pick = this.scene.pickWithRay(ray, (mesh) => mesh !== this.player && !mesh.isDescendantOf(this.player));
+                    if (pick.hit) {
                         this.player.physicsImpostor.applyImpulse(new BABYLON.Vector3(0, force, 0), this.player.getAbsolutePosition());
                     }
                 }
@@ -952,6 +972,169 @@ export class BabylonSceneManager {
             cameraZoom(value) {
                 if (this.scene.activeCamera && typeof this.scene.activeCamera.radius === 'number') {
                     this.scene.activeCamera.radius = Math.max(1, this.scene.activeCamera.radius - value);
+                }
+            }
+
+            applyForce(target, fx, fy, fz, px, py, pz) {
+                const mesh = this._getMesh(target);
+                if (mesh && mesh.physicsImpostor) {
+                    const force = new BABYLON.Vector3(fx, fy, fz);
+                    const contactPoint = new BABYLON.Vector3(px, py, pz);
+                    mesh.physicsImpostor.applyForce(force, contactPoint);
+                }
+            }
+
+            applyImpulse(target, fx, fy, fz, px, py, pz) {
+                const mesh = this._getMesh(target);
+                if (mesh && mesh.physicsImpostor) {
+                    const impulse = new BABYLON.Vector3(fx, fy, fz);
+                    const contactPoint = new BABYLON.Vector3(px, py, pz);
+                    mesh.physicsImpostor.applyImpulse(impulse, contactPoint);
+                }
+            }
+
+            getPosX(target) {
+                const mesh = this._getMesh(target);
+                return mesh ? mesh.position.x : 0;
+            }
+
+            getPosY(target) {
+                const mesh = this._getMesh(target);
+                return mesh ? mesh.position.y : 0;
+            }
+
+            getPosZ(target) {
+                const mesh = this._getMesh(target);
+                return mesh ? mesh.position.z : 0;
+            }
+
+            createParticleSystem(target, type) {
+                const mesh = this._getMesh(target);
+                if (!mesh) return;
+
+                const particleSystem = new BABYLON.ParticleSystem("particles", 2000, this.scene);
+
+                if (type === 'fire') {
+                    particleSystem.particleTexture = new BABYLON.Texture("https://assets.babylonjs.com/textures/flare.png", this.scene);
+                    particleSystem.emitter = mesh;
+                    particleSystem.minEmitBox = new BABYLON.Vector3(-0.5, 0, -0.5);
+                    particleSystem.maxEmitBox = new BABYLON.Vector3(0.5, 0, 0.5);
+                    particleSystem.color1 = new BABYLON.Color4(1, 0.5, 0, 1.0);
+                    particleSystem.color2 = new BABYLON.Color4(1, 0.2, 0, 1.0);
+                    particleSystem.colorDead = new BABYLON.Color4(0, 0, 0, 0.0);
+                    particleSystem.minSize = 0.1;
+                    particleSystem.maxSize = 0.5;
+                    particleSystem.minLifeTime = 0.3;
+                    particleSystem.maxLifeTime = 1.0;
+                    particleSystem.emitRate = 500;
+                    particleSystem.blendMode = BABYLON.ParticleSystem.BLENDMODE_ONEONE;
+                    particleSystem.gravity = new BABYLON.Vector3(0, 5, 0);
+                    particleSystem.direction1 = new BABYLON.Vector3(-1, 1, -1);
+                    particleSystem.direction2 = new BABYLON.Vector3(1, 1, 1);
+                    particleSystem.minAngularSpeed = 0;
+                    particleSystem.maxAngularSpeed = Math.PI;
+                    particleSystem.minEmitPower = 1;
+                    particleSystem.maxEmitPower = 3;
+                    particleSystem.updateSpeed = 0.005;
+                } else if (type === 'smoke') {
+                    particleSystem.particleTexture = new BABYLON.Texture("https://assets.babylonjs.com/textures/flare.png", this.scene);
+                    particleSystem.emitter = mesh;
+                    particleSystem.minEmitBox = new BABYLON.Vector3(-0.2, 0, -0.2);
+                    particleSystem.maxEmitBox = new BABYLON.Vector3(0.2, 0, 0.2);
+                    particleSystem.color1 = new BABYLON.Color4(0.1, 0.1, 0.1, 1.0);
+                    particleSystem.color2 = new BABYLON.Color4(0.2, 0.2, 0.2, 1.0);
+                    particleSystem.colorDead = new BABYLON.Color4(0, 0, 0, 0.0);
+                    particleSystem.minSize = 0.5;
+                    particleSystem.maxSize = 1.0;
+                    particleSystem.minLifeTime = 1.0;
+                    particleSystem.maxLifeTime = 2.0;
+                    particleSystem.emitRate = 100;
+                    particleSystem.gravity = new BABYLON.Vector3(0, 1, 0);
+                    particleSystem.direction1 = new BABYLON.Vector3(-0.5, 1, -0.5);
+                    particleSystem.direction2 = new BABYLON.Vector3(0.5, 1, 0.5);
+                } else if (type === 'rain') {
+                    particleSystem.particleTexture = new BABYLON.Texture("https://assets.babylonjs.com/textures/flare.png", this.scene);
+                    particleSystem.emitter = mesh;
+                    particleSystem.minEmitBox = new BABYLON.Vector3(-10, 10, -10);
+                    particleSystem.maxEmitBox = new BABYLON.Vector3(10, 10, 10);
+                    particleSystem.direction1 = new BABYLON.Vector3(0, -1, 0);
+                    particleSystem.direction2 = new BABYLON.Vector3(0, -1, 0);
+                    particleSystem.minLifeTime = 1;
+                    particleSystem.maxLifeTime = 2;
+                    particleSystem.emitRate = 1000;
+                    particleSystem.minSize = 0.1;
+                    particleSystem.maxSize = 0.2;
+                    particleSystem.gravity = new BABYLON.Vector3(0, -9.81, 0);
+                }
+
+                particleSystem.start();
+                return particleSystem;
+            }
+
+            setFog(mode, color, density, start, end) {
+                this.scene.fogEnabled = true;
+                if (mode === 'none') {
+                    this.scene.fogEnabled = false;
+                } else if (mode === 'exp') {
+                    this.scene.fogMode = BABYLON.Scene.FOGMODE_EXP;
+                    this.scene.fogDensity = density;
+                } else if (mode === 'exp2') {
+                    this.scene.fogMode = BABYLON.Scene.FOGMODE_EXP2;
+                    this.scene.fogDensity = density;
+                } else if (mode === 'linear') {
+                    this.scene.fogMode = BABYLON.Scene.FOGMODE_LINEAR;
+                    this.scene.fogStart = start;
+                    this.scene.fogEnd = end;
+                }
+                this.scene.fogColor = BABYLON.Color3.FromHexString(color);
+            }
+
+            setOutline(target, width, color) {
+                const mesh = this._getMesh(target);
+                if (mesh) {
+                    mesh.renderOutline = true;
+                    mesh.outlineWidth = width;
+                    mesh.outlineColor = BABYLON.Color3.FromHexString(color);
+                }
+            }
+
+            createAdvancedLight(type, name, x, y, z, dx, dy, dz) {
+                let light;
+                const pos = new BABYLON.Vector3(x, y, z);
+                const dir = new BABYLON.Vector3(dx, dy, dz);
+                if (type === 'directional') {
+                    light = new BABYLON.DirectionalLight(name, dir, this.scene);
+                    light.position = pos;
+                } else if (type === 'hemispheric') {
+                    light = new BABYLON.HemisphericLight(name, dir, this.scene);
+                } else if (type === 'spot') {
+                    light = new BABYLON.SpotLight(name, pos, dir, Math.PI / 3, 2, this.scene);
+                } else {
+                    light = new BABYLON.PointLight(name, pos, this.scene);
+                }
+                return light;
+            }
+
+            enableShadows(light, meshes) {
+                if (!light || !(light instanceof BABYLON.ShadowLight)) return;
+                const shadowGenerator = new BABYLON.ShadowGenerator(1024, light);
+                shadowGenerator.useBlurExponentialShadowMap = true;
+                shadowGenerator.blurKernel = 32;
+
+                if (Array.isArray(meshes)) {
+                    meshes.forEach(m => {
+                        const mesh = this._getMesh(m);
+                        if (mesh) {
+                            shadowGenerator.addShadowCaster(mesh);
+                            mesh.receiveShadows = true;
+                        }
+                    });
+                } else {
+                    const mesh = this._getMesh(meshes);
+                    if (mesh) {
+                        shadowGenerator.addShadowCaster(mesh);
+                        mesh.receiveShadows = true;
+                    }
                 }
             }
 
@@ -1171,12 +1354,14 @@ export class BabylonSceneManager {
             }
 
             initInputListeners() {
-                window.addEventListener('keydown', (event) => {
+                this._onKeyDown = (event) => {
                     this.inputState.keys[event.key.toLowerCase()] = true;
-                });
-                window.addEventListener('keyup', (event) => {
+                };
+                this._onKeyUp = (event) => {
                     this.inputState.keys[event.key.toLowerCase()] = false;
-                });
+                };
+                window.addEventListener('keydown', this._onKeyDown);
+                window.addEventListener('keyup', this._onKeyUp);
             }
 
             initScene() {
@@ -1311,6 +1496,18 @@ export class BabylonSceneManager {
                     this.joystickManager.destroy();
                     this.joystickManager = null;
                 }
+
+                // Remove input listeners
+                window.removeEventListener('keydown', this._onKeyDown);
+                window.removeEventListener('keyup', this._onKeyUp);
+
+                // Remove auto-hide listeners
+                if (this._canvasContainer && this._resetTimer) {
+                    this._canvasContainer.removeEventListener('mousemove', this._resetTimer);
+                    this._canvasContainer.removeEventListener('touchstart', this._resetTimer);
+                    this._canvasContainer.removeEventListener('click', this._resetTimer);
+                }
+
                 this.uiManager.dispose();
                 this.scene.dispose();
                 this.engine.dispose();
@@ -1424,6 +1621,7 @@ export class BabylonSceneManager {
                 const endFrame = loopMode === 'PINGPONG' ? totalFrames * 2 : totalFrames;
                 this.scene.beginDirectAnimation(mesh, [animation], 0, endFrame, loop);
             }
+
             animateKeyframes(target, property, keyframes, loop, loopMode) {
                 const mesh = this._getMesh(target);
                 if (!mesh) return;
@@ -1485,7 +1683,6 @@ export class BabylonSceneManager {
 
                 this.scene.beginDirectAnimation(mesh, [animation], 0, endFrame, loop);
             }
-
 
             async importAnimation(url) {
                 if (!isValidAssetURL(url)) {
@@ -1724,6 +1921,33 @@ export class BabylonSceneManager {
                     skyboxMaterial.reflectionTexture.coordinatesMode = BABYLON.Texture.SKYBOX_MODE;
                     skybox.material = skyboxMaterial;
                     this.background = skybox;
+                }
+            }
+
+            setGlow(enabled, intensity) {
+                if (enabled) {
+                    if (!this.glowLayer) {
+                        this.glowLayer = new BABYLON.GlowLayer("glow", this.scene);
+                    }
+                    this.glowLayer.intensity = intensity;
+                } else {
+                    if (this.glowLayer) {
+                        this.glowLayer.dispose();
+                        this.glowLayer = null;
+                    }
+                }
+            }
+
+            setProperty(target, property, value) {
+                let mesh = this._getMesh(target);
+                if (mesh && property) {
+                    const props = property.split('.');
+                    let curr = mesh;
+                    for (let i = 0; i < props.length - 1; i++) {
+                        if (curr[props[i]]) curr = curr[props[i]];
+                        else return;
+                    }
+                    curr[props[props.length - 1]] = value;
                 }
             }
 

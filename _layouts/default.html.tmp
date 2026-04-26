@@ -1,0 +1,42 @@
+<<<<<<< SEARCH
+            initJoystick() {
+                const joystickZone = document.getElementById('joystick-zone');
+
+                // Only initialize the joystick if the touch UI is likely active (based on CSS media queries).
+                if (joystickZone && window.matchMedia("(max-width: 768px)").matches) {
+                    const jumpButtonContainer = document.getElementById("jump-button-container");
+                    if (jumpButtonContainer) {
+                        jumpButtonContainer.style.display = "block";
+                    }
+                    this.joystickManager = nipplejs.create({
+                        zone: joystickZone,
+                        mode: "dynamic",
+                        color: "grey",
+                        size: 120,
+                        fadeTime: 0
+                    });
+                        size: 120,
+                        fadeTime: 0
+                    });
+
+                    this.joystickManager.on('added', (evt, nipple) => {
+=======
+            initJoystick() {
+                const joystickZone = document.getElementById('joystick-zone');
+
+                // Only initialize the joystick if the touch UI is likely active (based on CSS media queries).
+                if (joystickZone && window.matchMedia("(max-width: 768px)").matches) {
+                    const jumpButtonContainer = document.getElementById("jump-button-container");
+                    if (jumpButtonContainer) {
+                        jumpButtonContainer.style.display = "block";
+                    }
+                    this.joystickManager = nipplejs.create({
+                        zone: joystickZone,
+                        mode: 'dynamic',
+                        color: 'grey',
+                        size: 120,
+                        fadeTime: 0
+                    });
+
+                    this.joystickManager.on('added', (evt, nipple) => {
+>>>>>>> REPLACE

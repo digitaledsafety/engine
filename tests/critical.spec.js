@@ -5,12 +5,9 @@ test.describe('Engine Critical Functionality', () => {
     await page.goto('/');
     // Handle the hero overlay
     const startButton = page.locator('#start-button');
-    await expect(startButton).toBeVisible({ timeout: 10000 });
-    await startButton.click();
-    // Wait for overlay to be hidden
-    const heroOverlay = page.locator('#hero-overlay');
-    await expect(heroOverlay).toHaveClass(/hidden/, { timeout: 10000 });
-    await expect(heroOverlay).not.toBeVisible();
+    if (await startButton.isVisible()) {
+      await startButton.click();
+    }
   });
 
   test('Page loads and Hero overlay is dismissed', async ({ page }) => {

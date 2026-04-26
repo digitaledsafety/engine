@@ -272,6 +272,10 @@ export const toolbox = {
                         },
                         {
                             kind: 'block',
+                            type: 'apply_impulse',
+                        },
+                        {
+                            kind: 'block',
                             type: 'set_physics_impostor',
                         },
                         {
@@ -303,15 +307,15 @@ export const toolbox = {
                         },
                         {
                             kind: 'block',
+                            type: 'get_collided_object',
+                        },
+                        {
+                            kind: 'block',
                             type: 'destroy_object',
                         },
                         {
                             kind: 'block',
-                            type: 'create_box',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'create_sphere',
+                            type: 'create_primitive',
                         },
                         {
                             kind: 'block',
@@ -324,6 +328,10 @@ export const toolbox = {
                         {
                             kind: 'block',
                             type: 'rotate_object',
+                        },
+                        {
+                            kind: 'block',
+                            type: 'get_object_pos',
                         },
                         {
                             "kind": "block",
@@ -416,6 +424,18 @@ export const toolbox = {
                         {
                             kind: 'block',
                             type: 'set_texture_from_asset',
+                        },
+                        {
+                            kind: 'block',
+                            type: 'create_particles',
+                        },
+                        {
+                            kind: 'block',
+                            type: 'set_outline',
+                        },
+                        {
+                            kind: 'block',
+                            type: 'set_property',
                         }
                     ]
                 },
@@ -435,19 +455,11 @@ export const toolbox = {
                         },
                         {
                             kind: 'block',
-                            type: 'point_camera_at_mesh'
-                        },
-                        {
-                            kind: 'block',
-                            type: 'create_camera',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'set_isometric_camera',
-                        },
-                        {
-                            kind: 'block',
                             type: 'set_fps_camera',
+                        },
+                        {
+                            kind: 'block',
+                            type: 'point_camera_at_mesh'
                         },
                         {
                             kind: 'block',
@@ -488,6 +500,14 @@ export const toolbox = {
                         {
                             kind: 'block',
                             type: 'set_background_image',
+                        },
+                        {
+                            kind: 'block',
+                            type: 'set_fog'
+                        },
+                        {
+                            kind: 'block',
+                            type: 'set_glow'
                         },
                         {
                             kind: 'block',
