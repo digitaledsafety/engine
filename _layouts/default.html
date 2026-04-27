@@ -132,8 +132,35 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 5px;
+            padding: 10px;
             border-bottom: 1px solid #ddd;
+            gap: 10px;
+        }
+
+        .asset-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .asset-preview {
+            width: 40px;
+            height: 40px;
+            object-fit: contain;
+            background: #eee;
+            border-radius: 4px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 20px;
+        }
+
+        .asset-name {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .main-nav .btn-nav.active {
@@ -555,6 +582,8 @@
                     <button id="shareButton" class="btn btn-icon" title="Share" aria-label="Share Project">🔗 Share</button>
                     <button id="fullscreenBtn" class="btn btn-icon" title="Fullscreen" aria-label="Toggle Fullscreen">⛶ Fullscreen</button>
                     <button id="screenshotButton" class="btn btn-icon" title="Take Screenshot" aria-label="Take Screenshot">📸 Screenshot</button>
+                    <button id="toggleGridButton" class="btn btn-icon" title="Toggle Grid" aria-label="Toggle Grid">▦ Toggle Grid</button>
+                    <button id="viewCodeButton" class="btn btn-icon" title="View Code" aria-label="View Code">📜 View Code</button>
                     <button id="docsButton" class="btn btn-icon" title="Documentation" aria-label="Open Documentation">❓ Docs</button>
                 </div>
             </div>
@@ -2287,6 +2316,7 @@ workspace_data: "${base64WorkspaceData}"
                 this.processedCollisions = new Set();
                 this.background = null;
                 this.backgroundLayer = null;
+                this.grid = null;
 
                 this.initScene();
                 this.initInputListeners();
@@ -2960,7 +2990,7 @@ workspace_data: "${base64WorkspaceData}"
                     const boundingInfo = this.player.getHierarchyBoundingVectors(true);
                     const height = boundingInfo.max.y - boundingInfo.min.y;
                     // Slightly longer ray to account for physics jitter/float
-                    const rayLength = (height / 2) + 0.8;
+                    const rayLength = (height / 2) + 0.1;
                     const ray = new BABYLON.Ray(this.player.getAbsolutePosition(), new BABYLON.Vector3(0, -1, 0), rayLength);
                     const pick = this.scene.pickWithRay(ray, (mesh) => mesh !== this.player && !mesh.isDescendantOf(this.player));
                     if (pick.hit) {
@@ -3576,6 +3606,21 @@ workspace_data: "${base64WorkspaceData}"
                 this.uiManager.dispose();
                 this.scene.dispose();
                 this.engine.dispose();
+            }
+
+            toggleGrid() {
+                if (this.grid) {
+                    this.grid.dispose();
+                    this.grid = null;
+                } else {
+                    this.grid = BABYLON.MeshBuilder.CreateGround("grid", { width: 100, height: 100 }, this.scene);
+                    const gridMaterial = new BABYLON.StandardMaterial("gridMaterial", this.scene);
+                    gridMaterial.wireframe = true;
+                    gridMaterial.diffuseColor = new BABYLON.Color3(0.5, 0.5, 0.5);
+                    gridMaterial.alpha = 0.2;
+                    this.grid.material = gridMaterial;
+                    this.grid.isPickable = false;
+                }
             }
 
             getMeshNames() {
@@ -4669,7 +4714,7 @@ workspace_data: "${base64WorkspaceData}"
             },
             {
                 type: 'import_3d_file_url',
-                message0: 'Import model URL %1\r\n',
+                message0: 'Import model URL %1',
                 args0: [
                     {
                         type: 'field_input',
@@ -4694,10 +4739,11 @@ workspace_data: "${base64WorkspaceData}"
                         name: 'POS_Z',
                         value: 0,
                     },
-                ],                
-                colour: 160,
-                tooltip: 'Imports a 3D file from a URL and executes actions on success.',
+                ],
+                "inputsInline": true,
                 output: "Mesh",
+                colour: 160,
+                tooltip: 'Imports a 3D file from a URL and returns it.',
                 helpUrl: '',
                 extensions: [
                     'set_max_display_length',
@@ -6480,7 +6526,7 @@ if (${name}) {
                 const name = javascript.javascriptGenerator.nameDB_.getDistinctName(Blockly.utils.idGenerator.genUid(), Blockly.Variables.NameType);
                 const width = generator.valueToCode(block, 'WIDTH', generator.ORDER_ATOMIC) || 10;
                 const height = generator.valueToCode(block, 'HEIGHT', generator.ORDER_ATOMIC) || 10;
-                const code = `sceneManager.createGround('${name}', ${width}, ${height});\n`;
+                const code = `sceneManager.createGround('${name}', ${width}, ${height})`;
                 return [code, generator.ORDER_ATOMIC];
             };
 
@@ -7279,15 +7325,46 @@ function ${generator.FUNCTION_NAME_PLACEHOLDER_}(c1, c2, ratio) {
             const assets = await assetManager.getAllAssets();
             assets.forEach(asset => {
                 const li = document.createElement('li');
-                li.textContent = asset.name;
+
+                const infoDiv = document.createElement('div');
+                infoDiv.className = 'asset-info';
+
+                const preview = document.createElement('div');
+                preview.className = 'asset-preview';
+
+                if (asset.type.startsWith('image/')) {
+                    const img = document.createElement('img');
+                    img.src = URL.createObjectURL(asset.data instanceof Blob ? asset.data : new Blob([asset.data], {type: asset.type}));
+                    img.className = 'asset-preview';
+                    preview.appendChild(img);
+                } else if (asset.type.startsWith('audio/')) {
+                    preview.textContent = '🎵';
+                } else if (asset.type.startsWith('model/')) {
+                    preview.textContent = '📦';
+                } else {
+                    preview.textContent = '📄';
+                }
+
+                const nameSpan = document.createElement('span');
+                nameSpan.className = 'asset-name';
+                nameSpan.textContent = asset.name;
+                nameSpan.title = asset.name;
+
+                infoDiv.appendChild(preview);
+                infoDiv.appendChild(nameSpan);
+
                 const deleteButton = document.createElement('button');
                 deleteButton.textContent = 'Delete';
+                deleteButton.className = 'btn';
+                deleteButton.style.backgroundColor = '#dc3545';
                 deleteButton.onclick = async () => {
                     if (confirm(`Are you sure you want to delete "${asset.name}"?`)) {
                         await assetManager.deleteAsset(asset.name);
                         loadAssetsIntoView();
                     }
                 };
+
+                li.appendChild(infoDiv);
                 li.appendChild(deleteButton);
                 assetList.appendChild(li);
             });
@@ -7337,6 +7414,15 @@ function ${generator.FUNCTION_NAME_PLACEHOLDER_}(c1, c2, ratio) {
         });
         document.getElementById('screenshotButton').addEventListener('click', () => {
             sceneManager.takeScreenshot();
+        });
+        document.getElementById('toggleGridButton').addEventListener('click', () => {
+            if (window.sceneManager) {
+                window.sceneManager.toggleGrid();
+            }
+        });
+        document.getElementById('viewCodeButton').addEventListener('click', () => {
+            const code = generateCode();
+            alert("Generated JavaScript Code:\n\n" + code);
         });
         const searchContainer = document.getElementById('search-container');
         const searchInput = document.getElementById('search-input');
