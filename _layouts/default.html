@@ -2318,17 +2318,24 @@ workspace_data: "${base64WorkspaceData}"
                 this.resumeEngine();
             }
 
-            setPopupTitle(target, title) {
+            _getPopupPanel(target) {
                 let popup = null;
                 if (typeof target === 'string') {
                     popup = this.uiManager.getControlByName(target);
-                } else if (target && target.name) { // It's an object, presumably the popup container
+                } else if (target && target.name) {
                     popup = target;
                 }
 
                 if (popup && popup.children && popup.children.length > 0) {
-                    const panel = popup.children[0]; // Assumes the panel is the first child
-                    const titleControl = panel.getChildByName(`${popup.name}_title`);
+                    return { popup, panel: popup.children[0] };
+                }
+                return null;
+            }
+
+            setPopupTitle(target, title) {
+                const res = this._getPopupPanel(target);
+                if (res) {
+                    const titleControl = res.panel.getChildByName(`${res.popup.name}_title`);
                     if (titleControl) {
                         titleControl.text = title;
                     }
@@ -2336,33 +2343,25 @@ workspace_data: "${base64WorkspaceData}"
             }
 
             setPopupImage(target, imageUrl) {
-                let popup = null;
-                if (typeof target === 'string') {
-                    popup = this.uiManager.getControlByName(target);
-                } else if (target && target.name) {
-                    popup = target;
-                }
-
-                if (popup && popup.children && popup.children.length > 0) {
-                    const panel = popup.children[0];
-                    const imageControl = panel.getChildByName(`${popup.name}_image`);
+                const res = this._getPopupPanel(target);
+                if (res) {
+                    let imageControl = res.panel.getChildByName(`${res.popup.name}_image`);
                     if (imageControl) {
                         imageControl.source = imageUrl;
+                    } else {
+                        imageControl = new BABYLON.GUI.Image(`${res.popup.name}_image`, imageUrl);
+                        imageControl.width = "150px";
+                        imageControl.height = "150px";
+                        imageControl.paddingBottom = "20px";
+                        res.panel.addControl(imageControl);
                     }
                 }
             }
 
             setPopupButtonText(target, buttonName, text) {
-                let popup = null;
-                if (typeof target === 'string') {
-                    popup = this.uiManager.getControlByName(target);
-                } else if (target && target.name) {
-                    popup = target;
-                }
-
-                if (popup && popup.children && popup.children.length > 0) {
-                    const panel = popup.children[0];
-                    const buttonControl = panel.getChildByName(buttonName);
+                const res = this._getPopupPanel(target);
+                if (res) {
+                    const buttonControl = res.panel.getChildByName(buttonName);
                     if (buttonControl && buttonControl.textBlock) {
                         buttonControl.textBlock.text = text;
                     }
@@ -2370,25 +2369,19 @@ workspace_data: "${base64WorkspaceData}"
             }
 
             setPopupText(target, text) {
-                let popup = null;
-                if (typeof target === 'string') {
-                    popup = this.uiManager.getControlByName(target);
-                } else if (target && target.name) {
-                    popup = target;
-                }
-
-                if (popup && popup.children && popup.children.length > 0) {
-                    const panel = popup.children[0];
-                    let textControl = panel.getChildByName(`${popup.name}_text`);
+                const res = this._getPopupPanel(target);
+                if (res) {
+                    let textControl = res.panel.getChildByName(`${res.popup.name}_text`);
                     if (textControl) {
                         textControl.text = text;
                     } else {
-                        const textBlock = new BABYLON.GUI.TextBlock(`${popup.name}_text`, text);
+                        const textBlock = new BABYLON.GUI.TextBlock(`${res.popup.name}_text`, text);
                         textBlock.resizeToFit = true;
                         textBlock.color = "white";
                         textBlock.fontSize = 24;
                         textBlock.paddingBottom = "20px";
-                        panel.addControl(textBlock);
+                        // Try to insert before buttons but after title/image
+                        res.panel.addControl(textBlock);
                     }
                 }
             }
@@ -2523,6 +2516,20 @@ workspace_data: "${base64WorkspaceData}"
                 cylinderMesh.position.set(x, y, z);
                 this.objects[name] = cylinderMesh;
                 return cylinderMesh;
+            }
+
+            createCone(name, x, y, z) {
+                const coneMesh = BABYLON.MeshBuilder.CreateCylinder(name, { diameterTop: 0, diameterBottom: 1, height: 1 }, this.scene);
+                coneMesh.position.set(x, y, z);
+                this.objects[name] = coneMesh;
+                return coneMesh;
+            }
+
+            createTorus(name, x, y, z) {
+                const torusMesh = BABYLON.MeshBuilder.CreateTorus(name, { diameter: 1, thickness: 0.4 }, this.scene);
+                torusMesh.position.set(x, y, z);
+                this.objects[name] = torusMesh;
+                return torusMesh;
             }
 
             async createText(name, text, fontUrl, size = 1, resolution = 16, depth = 0.5) {
@@ -2769,7 +2776,7 @@ workspace_data: "${base64WorkspaceData}"
                 return null;
             }
 
-            enablePhysics(target, mass, impostorType = 'BoxImpostor') {
+            enablePhysics(target, mass, impostorType = 'BoxImpostor', friction = 0.2, restitution = 0.9) {
                 let originalMesh;
                 if (typeof target === 'string') {
                     originalMesh = this._getMesh(target);
@@ -2824,7 +2831,7 @@ workspace_data: "${base64WorkspaceData}"
 
                     // 4. Apply the physics impostor to this new box.
                     const impostor = BABYLON.PhysicsImpostor[impostorType];
-                    impostorBox.physicsImpostor = new BABYLON.PhysicsImpostor(impostorBox, impostor, { mass: mass, restitution: 0.9 }, this.scene);
+                    impostorBox.physicsImpostor = new BABYLON.PhysicsImpostor(impostorBox, impostor, { mass: mass, friction: friction, restitution: restitution }, this.scene);
 
                     // 5. Parent the original visual mesh to the new physics box.
                     // This makes the physics box the new "root" for all transformations.
@@ -2841,7 +2848,7 @@ workspace_data: "${base64WorkspaceData}"
                 } else {
                     // It's a simple mesh (like a primitive), apply physics directly to it.
                     const impostor = BABYLON.PhysicsImpostor[impostorType];
-                    originalMesh.physicsImpostor = new BABYLON.PhysicsImpostor(originalMesh, impostor, { mass: mass, restitution: 0.9 }, this.scene);
+                    originalMesh.physicsImpostor = new BABYLON.PhysicsImpostor(originalMesh, impostor, { mass: mass, friction: friction, restitution: restitution }, this.scene);
                 }
             }
 
@@ -4738,7 +4745,9 @@ workspace_data: "${base64WorkspaceData}"
                         options: [
                             ['box', 'box'],
                             ['sphere', 'sphere'],
-                            ['cylinder', 'cylinder']
+                            ['cylinder', 'cylinder'],
+                            ['cone', 'cone'],
+                            ['torus', 'torus']
                         ],
                     },
                     { "type": "input_value", "name": "NAME", "check": "String" },
@@ -5175,11 +5184,16 @@ workspace_data: "${base64WorkspaceData}"
                         ],
                     },                    
                 ],
+                message1: 'friction %1 restitution %2',
+                args1: [
+                    { type: 'input_value', name: 'FRICTION', check: 'Number' },
+                    { type: 'input_value', name: 'RESTITUTION', check: 'Number' }
+                ],
                 "inputsInline": true,
                 previousStatement: null,
                 nextStatement: null,
                 colour: 120,
-                tooltip: 'Enables physics on the specified object with the given mass',
+                tooltip: 'Enables physics on the specified object with the given mass, friction and restitution',
             },
             {
                 type: 'apply_force',
@@ -6185,6 +6199,20 @@ workspace_data: "${base64WorkspaceData}"
         ]);
 
         {
+            function getLoopParams(block) {
+                const loop = block.getFieldValue('LOOP');
+                let loopBool = false;
+                let loopMode = 'CYCLE';
+
+                if (loop === 'YES') {
+                    loopBool = true;
+                } else if (loop === 'PINGPONG') {
+                    loopBool = true;
+                    loopMode = 'PINGPONG';
+                }
+                return { loopBool, loopMode };
+            }
+
             javascript.javascriptGenerator.forBlock['create_particles'] = function (block, generator) {
                 const type = block.getFieldValue('TYPE');
                 const target = generator.valueToCode(block, 'TARGET', generator.ORDER_ATOMIC) || 'null';
@@ -6506,6 +6534,10 @@ if (${name}) {
                     code = `sceneManager.createSphere(${name}, ${x}, ${y}, ${z});\n`;
                 } else if (type === 'cylinder') {
                     code = `sceneManager.createCylinder(${name}, ${x}, ${y}, ${z});\n`;
+                } else if (type === 'cone') {
+                    code = `sceneManager.createCone(${name}, ${x}, ${y}, ${z});\n`;
+                } else if (type === 'torus') {
+                    code = `sceneManager.createTorus(${name}, ${x}, ${y}, ${z});\n`;
                 } else {
                     code = `sceneManager.createBox(${name}, ${x}, ${y}, ${z});\n`;
                 }
@@ -6608,17 +6640,7 @@ if (${name}) {
                 const object = generator.valueToCode(block, 'OBJECT', generator.ORDER_ATOMIC) || 'null';
                 const property = block.getFieldValue('PROPERTY');
                 const keyframes = generator.valueToCode(block, 'KEYFRAMES', generator.ORDER_ATOMIC) || '[]';
-                const loop = block.getFieldValue('LOOP');
-
-                let loopBool = false;
-                let loopMode = 'CYCLE';
-
-                if (loop === 'YES') {
-                    loopBool = true;
-                } else if (loop === 'PINGPONG') {
-                    loopBool = true;
-                    loopMode = 'PINGPONG';
-                }
+                const { loopBool, loopMode } = getLoopParams(block);
 
                 return "sceneManager.animateKeyframes(" + object + ", '" + property + "', " + keyframes + ", " + loopBool + ", '" + loopMode + "');\n";
             };
@@ -6628,17 +6650,7 @@ if (${name}) {
                 const from = generator.valueToCode(block, 'FROM', generator.ORDER_ATOMIC) || 0;
                 const to = generator.valueToCode(block, 'TO', generator.ORDER_ATOMIC) || 0;
                 const duration = generator.valueToCode(block, 'DURATION', generator.ORDER_ATOMIC) || 1;
-                const loop = block.getFieldValue('LOOP');
-
-                let loopBool = false;
-                let loopMode = 'CYCLE'; // Default string
-
-                if (loop === 'YES') {
-                    loopBool = true;
-                } else if (loop === 'PINGPONG') {
-                    loopBool = true;
-                    loopMode = 'PINGPONG';
-                }
+                const { loopBool, loopMode } = getLoopParams(block);
 
                 return `sceneManager.animateProperty(${object}, '${property}', ${from}, ${to}, ${duration}, ${loopBool}, '${loopMode}');\n`;
             };
@@ -6679,17 +6691,7 @@ if (${name}) {
                 const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || 0;
                 const z = generator.valueToCode(block, 'Z', generator.ORDER_ATOMIC) || 0;
                 const duration = generator.valueToCode(block, 'DURATION', generator.ORDER_ATOMIC) || 1;
-                const loop = block.getFieldValue('LOOP');
-
-                let loopBool = false;
-                let loopMode = 'CYCLE';
-
-                if (loop === 'YES') {
-                    loopBool = true;
-                } else if (loop === 'PINGPONG') {
-                    loopBool = true;
-                    loopMode = 'PINGPONG';
-                }
+                const { loopBool, loopMode } = getLoopParams(block);
 
                 return `sceneManager.animateRotation(${object}, ${x}, ${y}, ${z}, ${duration}, ${loopBool}, '${loopMode}');\n`;
             };
@@ -6700,17 +6702,7 @@ if (${name}) {
                 const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || 0;
                 const z = generator.valueToCode(block, 'Z', generator.ORDER_ATOMIC) || 0;
                 const duration = generator.valueToCode(block, 'DURATION', generator.ORDER_ATOMIC) || 1;
-                const loop = block.getFieldValue('LOOP');
-
-                let loopBool = false;
-                let loopMode = 'CYCLE';
-
-                if (loop === 'YES') {
-                    loopBool = true;
-                } else if (loop === 'PINGPONG') {
-                    loopBool = true;
-                    loopMode = 'PINGPONG';
-                }
+                const { loopBool, loopMode } = getLoopParams(block);
 
                 return `sceneManager.animatePosition(${object}, ${x}, ${y}, ${z}, ${duration}, ${loopBool}, '${loopMode}');\n`;
             };
@@ -6721,17 +6713,7 @@ if (${name}) {
                 const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || 1;
                 const z = generator.valueToCode(block, 'Z', generator.ORDER_ATOMIC) || 1;
                 const duration = generator.valueToCode(block, 'DURATION', generator.ORDER_ATOMIC) || 1;
-                const loop = block.getFieldValue('LOOP');
-
-                let loopBool = false;
-                let loopMode = 'CYCLE';
-
-                if (loop === 'YES') {
-                    loopBool = true;
-                } else if (loop === 'PINGPONG') {
-                    loopBool = true;
-                    loopMode = 'PINGPONG';
-                }
+                const { loopBool, loopMode } = getLoopParams(block);
 
                 return `sceneManager.animateScale(${object}, ${x}, ${y}, ${z}, ${duration}, ${loopBool}, '${loopMode}');\n`;
             };
@@ -6740,9 +6722,11 @@ if (${name}) {
                 const name = generator.valueToCode(block, 'NAME', generator.ORDER_ATOMIC) || 'null';
                 const mass = generator.valueToCode(block, 'MASS', generator.ORDER_ATOMIC) || 1;
                 const impostorField = block.getFieldValue('IMPOSTOR');
+                const friction = generator.valueToCode(block, 'FRICTION', generator.ORDER_ATOMIC) || 0.2;
+                const restitution = generator.valueToCode(block, 'RESTITUTION', generator.ORDER_ATOMIC) || 0.9;
                 // Extract the type from the full BABYLON path
                 const impostorType = impostorField.split('.').pop();                
-                return `sceneManager.enablePhysics(${name}, ${mass}, '${impostorType}');\n`;
+                return `sceneManager.enablePhysics(${name}, ${mass}, '${impostorType}', ${friction}, ${restitution});\n`;
             };
 
             javascript.javascriptGenerator.forBlock['apply_force'] = function (block, generator) {
