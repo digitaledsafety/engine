@@ -3206,52 +3206,76 @@ workspace_data: "${base64WorkspaceData}"
                 }
             }
 
-            takeScreenshot() {
-                const camera = this.scene.activeCamera;
-                if (!camera) return;
-
-                const width = window.innerWidth;
-                const height = window.innerHeight;
-
-                // Temporarily adjust orthographic camera aspect ratio if needed
-                let oldOrtho = null;
-                if (camera.mode === BABYLON.Camera.ORTHOGRAPHIC_CAMERA) {
-                    oldOrtho = {
-                        left: camera.orthoLeft,
-                        right: camera.orthoRight,
-                        top: camera.orthoTop,
-                        bottom: camera.orthoBottom
-                    };
-                    const aspectRatio = width / height;
-                    const orthoSize = 10;
-                    camera.orthoLeft = -orthoSize * aspectRatio;
-                    camera.orthoRight = orthoSize * aspectRatio;
-                    camera.orthoBottom = -orthoSize;
-                    camera.orthoTop = orthoSize;
-                }
-
-                BABYLON.Tools.CreateScreenshot(this.engine, camera, { width: width * 2, height: height * 2 }, (data) => {
-                    // Restore orthographic camera parameters
-                    if (oldOrtho) {
-                        camera.orthoLeft = oldOrtho.left;
-                        camera.orthoRight = oldOrtho.right;
-                        camera.orthoTop = oldOrtho.top;
-                        camera.orthoBottom = oldOrtho.bottom;
+            takeScreenshot(ratioType) {
+                return new Promise((resolve) => {
+                    const camera = this.scene.activeCamera;
+                    if (!camera) {
+                        resolve();
+                        return;
                     }
 
-                    // Create a formatted timestamp (e.g., 2026-01-17_12-00-00)
-                    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-                    const fileName = `engine_${timestamp}.png`;
-            
-                    const link = document.createElement('a');
-                    link.setAttribute('download', fileName);
-                    link.setAttribute('href', data);
-                    
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                    
-                    console.log(`Downloaded: ${fileName}`);
+                    const ratios = {
+                        '1:1': { w: 2160, h: 2160, label: '1-1_square' },
+                        '16:9': { w: 3840, h: 2160, label: '16-9_landscape' },
+                        '9:16': { w: 2160, h: 3840, label: '9-16_portrait' },
+                        '4:3': { w: 2880, h: 2160, label: '4-3_standard' }
+                    };
+
+                    const selected = ratios[ratioType] || {
+                        w: this.engine.getRenderWidth() * 2,
+                        h: this.engine.getRenderHeight() * 2,
+                        label: 'current'
+                    };
+
+                    const width = selected.w;
+                    const height = selected.h;
+
+                    // Temporarily adjust camera aspect ratio
+                    const oldAspectRatio = camera.aspectRatio;
+                    camera.aspectRatio = width / height;
+
+                    // Temporarily adjust orthographic camera parameters if needed
+                    let oldOrtho = null;
+                    if (camera.mode === BABYLON.Camera.ORTHOGRAPHIC_CAMERA) {
+                        oldOrtho = {
+                            left: camera.orthoLeft,
+                            right: camera.orthoRight,
+                            top: camera.orthoTop,
+                            bottom: camera.orthoBottom
+                        };
+                        const aspectRatio = width / height;
+                        const orthoSize = 10;
+                        camera.orthoLeft = -orthoSize * aspectRatio;
+                        camera.orthoRight = orthoSize * aspectRatio;
+                        camera.orthoBottom = -orthoSize;
+                        camera.orthoTop = orthoSize;
+                    }
+
+                    BABYLON.Tools.CreateScreenshot(this.engine, camera, { width, height }, (data) => {
+                        // Restore camera parameters
+                        camera.aspectRatio = oldAspectRatio;
+                        if (oldOrtho) {
+                            camera.orthoLeft = oldOrtho.left;
+                            camera.orthoRight = oldOrtho.right;
+                            camera.orthoTop = oldOrtho.top;
+                            camera.orthoBottom = oldOrtho.bottom;
+                        }
+
+                        // Create a formatted timestamp (e.g., 2026-01-17_12-00-00)
+                        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+                        const fileName = `engine_${timestamp}_${selected.label}.png`;
+
+                        const link = document.createElement('a');
+                        link.setAttribute('download', fileName);
+                        link.setAttribute('href', data);
+
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+
+                        console.log(`Downloaded: ${fileName}`);
+                        resolve();
+                    });
                 });
             }
 
@@ -4504,11 +4528,25 @@ workspace_data: "${base64WorkspaceData}"
         Blockly.defineBlocksWithJsonArray([
             {
                 "type": "take_screenshot",
-                "message0": "take screenshot",
+                "message0": "take %1 screenshot",
+                "args0": [
+                    {
+                        "type": "field_dropdown",
+                        "name": "RATIO",
+                        "options": [
+                            ["all", "ALL"],
+                            ["square (1:1)", "1:1"],
+                            ["landscape (16:9)", "16:9"],
+                            ["portrait (9:16)", "9:16"],
+                            ["standard (4:3)", "4:3"],
+                            ["current view", "CURRENT"]
+                        ]
+                    }
+                ],
                 "previousStatement": null,
                 "nextStatement": null,
                 "colour": "#5BA55B",
-                "tooltip": "Takes a screenshot of the current view and downloads it.",
+                "tooltip": "Takes a screenshot of the current view or specific aspect ratios and downloads them.",
                 "helpUrl": ""
             },
             {
@@ -6977,7 +7015,19 @@ if (${name}) {
             };
 
             javascript.javascriptGenerator.forBlock['take_screenshot'] = function (block, generator) {
-                return `sceneManager.takeScreenshot();\n`;
+                const ratio = block.getFieldValue('RATIO');
+                if (ratio === 'ALL') {
+                    return `
+                        (async () => {
+                            const ratios = ['1:1', '16:9', '9:16', '4:3'];
+                            for (const r of ratios) {
+                                await sceneManager.takeScreenshot(r);
+                            }
+                        })();
+                    `;
+                } else {
+                    return `sceneManager.takeScreenshot('${ratio}');\n`;
+                }
             };
 
             javascript.javascriptGenerator.forBlock['set_pixelated_look'] = function (block, generator) {
@@ -7346,8 +7396,11 @@ function ${generator.FUNCTION_NAME_PLACEHOLDER_}(c1, c2, ratio) {
         document.getElementById('docsButton').addEventListener('click', () => {
             window.open('docs/Home.html', '_blank');
         });
-        document.getElementById('screenshotButton').addEventListener('click', () => {
-            sceneManager.takeScreenshot();
+        document.getElementById('screenshotButton').addEventListener('click', async () => {
+            const ratios = ['1:1', '16:9', '9:16', '4:3'];
+            for (const ratio of ratios) {
+                await sceneManager.takeScreenshot(ratio);
+            }
         });
         const searchContainer = document.getElementById('search-container');
         const searchInput = document.getElementById('search-input');
