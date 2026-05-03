@@ -3230,23 +3230,11 @@ workspace_data: "${base64WorkspaceData}"
                     const width = selected.w;
                     const height = selected.h;
 
-                    const currentAR = this.engine.getRenderWidth() / this.engine.getRenderHeight();
-                    const targetAR = width / height;
-
-                    // Temporarily adjust camera aspect ratio and FOV mode for "cover" effect
+                    // Temporarily adjust camera aspect ratio
                     const oldAspectRatio = camera.aspectRatio;
-                    const oldFOVMode = camera.fovMode;
-                    camera.aspectRatio = targetAR;
+                    camera.aspectRatio = width / height;
 
-                    if (targetAR > currentAR) {
-                        // Target is wider than current: fix horizontal view, crop top/bottom
-                        camera.fovMode = BABYLON.Camera.FOVMODE_HORIZONTAL_FIXED;
-                    } else {
-                        // Target is narrower than current: fix vertical view, crop sides
-                        camera.fovMode = BABYLON.Camera.FOVMODE_VERTICAL_FIXED;
-                    }
-
-                    // Temporarily adjust orthographic camera parameters for "cover" effect
+                    // Temporarily adjust orthographic camera parameters if needed
                     let oldOrtho = null;
                     if (camera.mode === BABYLON.Camera.ORTHOGRAPHIC_CAMERA) {
                         oldOrtho = {
@@ -3255,29 +3243,17 @@ workspace_data: "${base64WorkspaceData}"
                             top: camera.orthoTop,
                             bottom: camera.orthoBottom
                         };
-
-                        const currentHeight = Math.abs(camera.orthoTop - camera.orthoBottom);
-                        const currentWidth = Math.abs(camera.orthoRight - camera.orthoLeft);
-                        const centerX = (camera.orthoRight + camera.orthoLeft) / 2;
-                        const centerY = (camera.orthoTop + camera.orthoBottom) / 2;
-
-                        if (targetAR > currentAR) {
-                            // Target is wider: maintain width, reduce height
-                            const newHeight = currentWidth / targetAR;
-                            camera.orthoTop = centerY + newHeight / 2;
-                            camera.orthoBottom = centerY - newHeight / 2;
-                        } else {
-                            // Target is narrower: maintain height, reduce width
-                            const newWidth = currentHeight * targetAR;
-                            camera.orthoRight = centerX + newWidth / 2;
-                            camera.orthoLeft = centerX - newWidth / 2;
-                        }
+                        const aspectRatio = width / height;
+                        const orthoSize = 10;
+                        camera.orthoLeft = -orthoSize * aspectRatio;
+                        camera.orthoRight = orthoSize * aspectRatio;
+                        camera.orthoBottom = -orthoSize;
+                        camera.orthoTop = orthoSize;
                     }
 
                     BABYLON.Tools.CreateScreenshot(this.engine, camera, { width, height }, (data) => {
                         // Restore camera parameters
                         camera.aspectRatio = oldAspectRatio;
-                        camera.fovMode = oldFOVMode;
                         if (oldOrtho) {
                             camera.orthoLeft = oldOrtho.left;
                             camera.orthoRight = oldOrtho.right;
