@@ -16,7 +16,7 @@ function CustomLoadingScreen(/* variables needed, for example:*/ loadingUIText, 
         CustomLoadingScreen.prototype.displayLoadingUI = function () {
             var loadingDiv = document.createElement("div");
             loadingDiv.id = "customLoadingScreen";
-            const canvasContainer = document.querySelector('.canvas-container');
+            const canvasContainer = this.root.querySelector('.canvas-container');
             if (canvasContainer) {
                 loadingDiv.style.position = "absolute";
                 loadingDiv.style.top = "0";
@@ -42,7 +42,8 @@ function CustomLoadingScreen(/* variables needed, for example:*/ loadingUIText, 
                 this._loadingDiv.parentNode.removeChild(this._loadingDiv);
                 this._loadingDiv = null;
             }
-        };\nclass AssetManager {
+        };
+class AssetManager {
             constructor() {
                 this.db = null;
                 this.assets = [];
@@ -177,7 +178,8 @@ function CustomLoadingScreen(/* variables needed, for example:*/ loadingUIText, 
                 await this.init();
                 this.assets = await this.getAllAssets();
             }
-        }\nclass BabylonSceneManager {
+        }
+class BabylonSceneManager {
             constructor(canvas, root = document, assetManager = null) { this.root = root; this.assetManager = assetManager;
                 this._getElementById = (id) => this.root.getElementById ? this.root.getElementById(id) : this.root.querySelector("#" + id);
                 this.initAudioEngine();
@@ -411,8 +413,8 @@ function CustomLoadingScreen(/* variables needed, for example:*/ loadingUIText, 
             }
 
             initAutoHide() {
-                this.uiElements = document.querySelectorAll('.interactive-ui');
-                this._canvasContainer = document.querySelector('.canvas-container');
+                this.uiElements = this.root.querySelectorAll('.interactive-ui');
+                this._canvasContainer = this.root.querySelector('.canvas-container');
 
                 this._resetTimer = () => {
                     this.uiElements.forEach(el => el.classList.remove('hidden'));
@@ -1964,7 +1966,8 @@ function CustomLoadingScreen(/* variables needed, for example:*/ loadingUIText, 
                 // Reset clear color to default, Babylon's default is cornflower blue, let's use it
                 this.scene.clearColor = new BABYLON.Color4(100 / 255, 149 / 255, 237 / 255, 1);
             }
-        }\nclass UIManager {
+        }
+class UIManager {
             constructor(scene) {
                 this.scene = scene;
                 this.advancedTexture = BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI("UI", true, this.scene);
@@ -2207,7 +2210,8 @@ function CustomLoadingScreen(/* variables needed, for example:*/ loadingUIText, 
                 this.clear();
                 this.advancedTexture.dispose();
             }
-        }\n
+        }
+
 class CreativeEnginePlayer extends HTMLElement {
     constructor() {
         super();
@@ -2215,27 +2219,19 @@ class CreativeEnginePlayer extends HTMLElement {
         this.sceneManager = null;
         this.assetManager = new AssetManager();
     }
-
     static get observedAttributes() { return ["project-url"]; }
-
     attributeChangedCallback(name, oldValue, newValue) {
-        if (name === "project-url" && oldValue !== newValue) {
-            this.loadFromUrl(newValue);
-        }
+        if (name === "project-url" && oldValue !== newValue) { this.loadFromUrl(newValue); }
     }
-
-    connectedCallback() {
-        this.render();
-    }
-
+    connectedCallback() { this.render(); }
     render() {
         this.shadowRoot.innerHTML = `
         <style>
-            :host { display: block; width: 100%; height: 400px; position: relative; background: #000; overflow: hidden; }
+            :host { display: block; width: 100%; height: 400px; position: relative; background: #000; overflow: hidden; font-family: sans-serif; }
             .canvas-container { width: 100%; height: 100%; position: relative; }
             canvas { width: 100%; height: 100%; display: block; outline: none; }
             #embed-ui { position: absolute; bottom: 10px; right: 10px; display: flex; gap: 5px; z-index: 100; }
-            .btn-embed { padding: 5px 10px; background: rgba(0,0,0,0.5); color: white; border: 1px solid rgba(255,255,255,0.3); border-radius: 4px; cursor: pointer; font-size: 12px; font-family: sans-serif; }
+            .btn-embed { padding: 5px 10px; background: rgba(0,0,0,0.5); color: white; border: 1px solid rgba(255,255,255,0.3); border-radius: 4px; cursor: pointer; font-size: 12px; }
             .btn-embed:hover { background: rgba(0,0,0,0.8); }
         </style>
         <div class="canvas-container">
@@ -2248,27 +2244,17 @@ class CreativeEnginePlayer extends HTMLElement {
         `;
         const canvas = this.shadowRoot.getElementById("gameCanvas");
         this.sceneManager = new BabylonSceneManager(canvas, this.shadowRoot, this.assetManager);
-
         this.shadowRoot.getElementById("remixBtn").onclick = () => {
             const url = this.getAttribute("project-url");
             if (url) window.open(url, "_blank");
         };
-
         this.shadowRoot.getElementById("fullscreenBtn").onclick = () => {
-            if (!document.fullscreenElement) {
-                this.shadowRoot.querySelector(".canvas-container").requestFullscreen();
-            } else {
-                document.exitFullscreen();
-            }
+            const container = this.shadowRoot.querySelector(".canvas-container");
+            if (!document.fullscreenElement) { container.requestFullscreen(); } else { document.exitFullscreen(); }
         };
-
-        if (this.hasAttribute("project-url")) {
-            this.loadFromUrl(this.getAttribute("project-url"));
-        }
-
+        if (this.hasAttribute("project-url")) { this.loadFromUrl(this.getAttribute("project-url")); }
         window.addEventListener("resize", () => { if(this.sceneManager) this.sceneManager.engine.resize(); });
     }
-
     async loadFromUrl(url) {
         if (!this.sceneManager) return;
         try {
@@ -2283,28 +2269,22 @@ class CreativeEnginePlayer extends HTMLElement {
                 const projectData = JSON.parse(decodedData);
                 await this.loadProjectData(projectData);
             }
-        } catch (e) {
-            console.error("Failed to load project from URL:", e);
-        }
+        } catch (e) { console.error("Failed to load project from URL:", e); }
     }
-
     async loadProjectData(projectData) {
         this.sceneManager.clear();
         const allAssets = await this.assetManager.getAllAssets();
         for (const asset of allAssets) { await this.assetManager.deleteAsset(asset.name); }
-
         for (const asset of projectData.assets) {
             const data = this._base64ToBlob(asset.data, asset.type);
             await this.assetManager.addAsset(new File([data], asset.name, { type: asset.type }));
         }
-
         if (projectData.code) {
             const AsyncFunction = Object.getPrototypeOf(async function () { }).constructor;
             const userGeneratedCode = new AsyncFunction("sceneManager", "assetManager", projectData.code);
             await userGeneratedCode(this.sceneManager, this.assetManager);
         }
     }
-
     _base64ToBlob(b64Data, contentType = "", sliceSize = 512) {
         const byteCharacters = atob(b64Data);
         const byteArrays = [];
