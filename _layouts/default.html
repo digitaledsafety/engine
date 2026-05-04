@@ -3206,7 +3206,7 @@ workspace_data: "${base64WorkspaceData}"
                 }
             }
 
-            takeScreenshot() {
+            async takeScreenshot() {
                 const camera = this.scene.activeCamera;
                 if (!camera) return;
 
@@ -3230,28 +3230,31 @@ workspace_data: "${base64WorkspaceData}"
                     camera.orthoTop = orthoSize;
                 }
 
-                BABYLON.Tools.CreateScreenshot(this.engine, camera, { width: width * 2, height: height * 2 }, (data) => {
-                    // Restore orthographic camera parameters
-                    if (oldOrtho) {
-                        camera.orthoLeft = oldOrtho.left;
-                        camera.orthoRight = oldOrtho.right;
-                        camera.orthoTop = oldOrtho.top;
-                        camera.orthoBottom = oldOrtho.bottom;
-                    }
+                return new Promise((resolve) => {
+                    BABYLON.Tools.CreateScreenshot(this.engine, camera, { width: width * 2, height: height * 2 }, (data) => {
+                        // Restore orthographic camera parameters
+                        if (oldOrtho) {
+                            camera.orthoLeft = oldOrtho.left;
+                            camera.orthoRight = oldOrtho.right;
+                            camera.orthoTop = oldOrtho.top;
+                            camera.orthoBottom = oldOrtho.bottom;
+                        }
 
-                    // Create a formatted timestamp (e.g., 2026-01-17_12-00-00)
-                    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-                    const fileName = `engine_${timestamp}.png`;
-            
-                    const link = document.createElement('a');
-                    link.setAttribute('download', fileName);
-                    link.setAttribute('href', data);
-                    
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                    
-                    console.log(`Downloaded: ${fileName}`);
+                        // Create a formatted timestamp (e.g., 2026-01-17_12-00-00)
+                        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+                        const fileName = `engine_${timestamp}.png`;
+
+                        const link = document.createElement('a');
+                        link.setAttribute('download', fileName);
+                        link.setAttribute('href', data);
+
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+
+                        console.log(`Downloaded: ${fileName}`);
+                        resolve();
+                    });
                 });
             }
 
@@ -6977,7 +6980,7 @@ if (${name}) {
             };
 
             javascript.javascriptGenerator.forBlock['take_screenshot'] = function (block, generator) {
-                return `sceneManager.takeScreenshot();\n`;
+                return `await sceneManager.takeScreenshot();\n`;
             };
 
             javascript.javascriptGenerator.forBlock['set_pixelated_look'] = function (block, generator) {
