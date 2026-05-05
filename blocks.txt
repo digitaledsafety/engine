@@ -1,0 +1,101 @@
+Generator Implementation Standards Report
+
+1. Executive Overview of Standards
+
+This report defines an attempt mandatory implementation standards for all current and future Blockly blocks within the 3D Engine ecosystem. As we scale, it is imperative that our visual programming interface mirrors professional coding practices to prevent technical debt and ensure long-term maintainability. These standards mandate a unified pattern designed to consolidate block usage, maximize runtime dynamicity, and simplify the 3D scene construction process. By transitioning to a value-block-first architecture, we provide developers and end-users with the logical flexibility required for complex, reactive 3D environments while streamlining the underlying JavaScript generation.
+
+2. Object Creation Architecture
+
+2.1 Value Block Assignment Pattern
+
+All object creation blocks must be implemented as value blocks with an output connection. We are formally deprecating the use of field_variable or field_input within creation blocks for the purpose of naming objects.
+
+This architectural shift ensures that object naming and storage are handled by the standard Blockly "set variable to" block. This avoids the necessity of intermediate variable storage and allows users to pass the output of a creation block directly into other functions (e.g., nesting a primitive creation block directly into a "parenting" or "material assignment" block).
+
+Logic Pattern Comparison:
+
+Correct Implementation (Value Block Output):
+
+// Logic: Creation block returns an object reference
+[set variable "myBox" to] [create box at x:0 y:0 z:0]
+
+
+Incorrect Implementation (Internal Naming):
+
+// Logic: Creation block handles its own variable assignment
+[create box and save as "myBox" at x:0 y:0 z:0]
+
+
+2.2 Component Consolidation Standards
+
+To maintain a clean, navigable toolbox, developers must consolidate related entities into single blocks utilizing internal dropdown menus. This prevents "toolbox bloat" and groups logically similar operations.
+
+Block Category	Consolidated Objects (Dropdown Options)
+create_primitive	Box, Sphere, Cylinder, Ground
+create_light	Directional, Hemispheric, Spot, Point
+
+3. Input and Asset Management
+
+3.1 Input Dynamicity (input_value vs. field_input)
+
+To support a truly dynamic 3D environment, input fields must be capable of receiving data from variables and mathematical operations.
+
+* Priority of input_value: This is the mandatory input type for all numerical parameters (specifically coordinates and scaling), URLs, and text content. This enables the use of math blocks and dynamic variables to drive scene transformations.
+* Restricted use of field_input: This type is strictly reserved for static, non-runtime configurations where dynamic input would be logically invalid.
+
+3.2 String and Asset Handling
+
+The standard Blockly text block has been intentionally removed from the primary toolbox to discourage the use of raw, hardcoded strings and to prevent inefficient data handling at runtime. All asset and text usage must follow these approved workflows:
+
+* Variables: Users are encouraged to store and retrieve strings via the variable system.
+* Asset Blocks: For 3D models, audio, and images, developers must use specific asset blocks that provide a dropdown menu of pre-validated assets.
+* Specialized URL Blocks: In instances requiring external imports (such as importMesh), the block must provide an input_value socket, allowing for the connection of either a variable or a specialized asset block.
+
+4. System-Managed Objects
+
+For interacting with global, read-only, or engine-maintained entities, developers must utilize the get_scene_object block (Type: get_scene_object). These are system-managed references and should be treated as global constants within the workspace.
+
+Available Entities:
+
+* player: Accesses the currently active player mesh.
+* camera: Accesses the active scene camera.
+* scene: Accesses the primary Babylon.js scene object.
+
+5. Technical Generator Specifications
+
+Generators must strictly adhere to the following JavaScript output patterns to ensure compatibility with the Babylon.js sceneManager and asynchronous loading requirements.
+
+5.1 Unique ID Generation
+
+Every object created by a block must be assigned a unique internal identifier. The generator must invoke the Blockly utility to create this ID and concatenate it with an 'id_' prefix.
+
+Implementation Pattern:
+
+const uniqueId = Blockly.utils.idGenerator.genUid();
+const code = `sceneManager.createMethod('id_${uniqueId}', ...);\n`;
+
+
+5.2 Return Patterns and Order Constants
+
+The generator's return format is determined by whether the operation is synchronous or asynchronous.
+
+A. Synchronous Creation Blocks
+
+Standard creation blocks that provide an output for variable assignment must return an array containing the code string and the function call order. Pattern:
+
+return [code, generator.ORDER_FUNCTION_CALL];
+
+
+B. Asynchronous Creation Blocks (e.g., Mesh Imports)
+
+For blocks involving asynchronous operations like importMesh, the generator must prefix the code with the await keyword and return the ORDER_AWAIT constant. Pattern:
+
+const code = `await sceneManager.importMesh('id_${uniqueId}', ...);\n`;
+return [code, generator.ORDER_AWAIT];
+
+
+5.3 Generator Checklist
+
+* ID Prefixing: All IDs must be prefixed with id_.
+* Method Injection: Use sceneManager.createMethod(...) for object instantiation.
+* Order Mapping: Ensure ORDER_AWAIT is used for all await calls to prevent logic-breaking race conditions in the generated script.
