@@ -2422,17 +2422,27 @@ ync shareProject() {
                 this.resumeEngine();
             }
 
-            setPopupTitle(target, title) {
+            _getPopupPanel(target) {
                 let popup = null;
                 if (typeof target === 'string') {
                     popup = this.uiManager.getControlByName(target);
-                } else if (target && target.name) { // It's an object, presumably the popup container
+                } else if (target && target.name) {
                     popup = target;
                 }
 
                 if (popup && popup.children && popup.children.length > 0) {
-                    const panel = popup.children[0]; // Assumes the panel is the first child
-                    const titleControl = panel.getChildByName(`${popup.name}_title`);
+                    return {
+                        panel: popup.children[0],
+                        name: popup.name
+                    };
+                }
+                return null;
+            }
+
+            setPopupTitle(target, title) {
+                const info = this._getPopupPanel(target);
+                if (info) {
+                    const titleControl = info.panel.getChildByName(`${info.name}_title`);
                     if (titleControl) {
                         titleControl.text = title;
                     }
@@ -2440,16 +2450,9 @@ ync shareProject() {
             }
 
             setPopupImage(target, imageUrl) {
-                let popup = null;
-                if (typeof target === 'string') {
-                    popup = this.uiManager.getControlByName(target);
-                } else if (target && target.name) {
-                    popup = target;
-                }
-
-                if (popup && popup.children && popup.children.length > 0) {
-                    const panel = popup.children[0];
-                    const imageControl = panel.getChildByName(`${popup.name}_image`);
+                const info = this._getPopupPanel(target);
+                if (info) {
+                    const imageControl = info.panel.getChildByName(`${info.name}_image`);
                     if (imageControl) {
                         imageControl.source = imageUrl;
                     }
@@ -2457,16 +2460,9 @@ ync shareProject() {
             }
 
             setPopupButtonText(target, buttonName, text) {
-                let popup = null;
-                if (typeof target === 'string') {
-                    popup = this.uiManager.getControlByName(target);
-                } else if (target && target.name) {
-                    popup = target;
-                }
-
-                if (popup && popup.children && popup.children.length > 0) {
-                    const panel = popup.children[0];
-                    const buttonControl = panel.getChildByName(buttonName);
+                const info = this._getPopupPanel(target);
+                if (info) {
+                    const buttonControl = info.panel.getChildByName(buttonName);
                     if (buttonControl && buttonControl.textBlock) {
                         buttonControl.textBlock.text = text;
                     }
@@ -2474,25 +2470,18 @@ ync shareProject() {
             }
 
             setPopupText(target, text) {
-                let popup = null;
-                if (typeof target === 'string') {
-                    popup = this.uiManager.getControlByName(target);
-                } else if (target && target.name) {
-                    popup = target;
-                }
-
-                if (popup && popup.children && popup.children.length > 0) {
-                    const panel = popup.children[0];
-                    let textControl = panel.getChildByName(`${popup.name}_text`);
+                const info = this._getPopupPanel(target);
+                if (info) {
+                    let textControl = info.panel.getChildByName(`${info.name}_text`);
                     if (textControl) {
                         textControl.text = text;
                     } else {
-                        const textBlock = new BABYLON.GUI.TextBlock(`${popup.name}_text`, text);
+                        const textBlock = new BABYLON.GUI.TextBlock(`${info.name}_text`, text);
                         textBlock.resizeToFit = true;
                         textBlock.color = "white";
                         textBlock.fontSize = 24;
                         textBlock.paddingBottom = "20px";
-                        panel.addControl(textBlock);
+                        info.panel.addControl(textBlock);
                     }
                 }
             }
@@ -2627,6 +2616,20 @@ ync shareProject() {
                 cylinderMesh.position.set(x, y, z);
                 this.objects[name] = cylinderMesh;
                 return cylinderMesh;
+            }
+
+            createCone(name, x, y, z) {
+                const coneMesh = BABYLON.MeshBuilder.CreateCylinder(name, { diameterTop: 0, diameterBottom: 1, height: 1 }, this.scene);
+                coneMesh.position.set(x, y, z);
+                this.objects[name] = coneMesh;
+                return coneMesh;
+            }
+
+            createTorus(name, x, y, z) {
+                const torusMesh = BABYLON.MeshBuilder.CreateTorus(name, { diameter: 1, thickness: 0.2 }, this.scene);
+                torusMesh.position.set(x, y, z);
+                this.objects[name] = torusMesh;
+                return torusMesh;
             }
 
             async createText(name, text, fontUrl, size = 1, resolution = 16, depth = 0.5) {
@@ -2873,7 +2876,7 @@ ync shareProject() {
                 return null;
             }
 
-            enablePhysics(target, mass, impostorType = 'BoxImpostor') {
+            enablePhysics(target, mass, friction = 0.2, restitution = 0.9, impostorType = 'BoxImpostor') {
                 let originalMesh;
                 if (typeof target === 'string') {
                     originalMesh = this._getMesh(target);
@@ -2928,7 +2931,7 @@ ync shareProject() {
 
                     // 4. Apply the physics impostor to this new box.
                     const impostor = BABYLON.PhysicsImpostor[impostorType];
-                    impostorBox.physicsImpostor = new BABYLON.PhysicsImpostor(impostorBox, impostor, { mass: mass, restitution: 0.9 }, this.scene);
+                    impostorBox.physicsImpostor = new BABYLON.PhysicsImpostor(impostorBox, impostor, { mass: mass, friction: friction, restitution: restitution }, this.scene);
 
                     // 5. Parent the original visual mesh to the new physics box.
                     // This makes the physics box the new "root" for all transformations.
@@ -2945,7 +2948,7 @@ ync shareProject() {
                 } else {
                     // It's a simple mesh (like a primitive), apply physics directly to it.
                     const impostor = BABYLON.PhysicsImpostor[impostorType];
-                    originalMesh.physicsImpostor = new BABYLON.PhysicsImpostor(originalMesh, impostor, { mass: mass, restitution: 0.9 }, this.scene);
+                    originalMesh.physicsImpostor = new BABYLON.PhysicsImpostor(originalMesh, impostor, { mass: mass, friction: friction, restitution: restitution }, this.scene);
                 }
             }
 
@@ -3307,7 +3310,7 @@ ync shareProject() {
                 }
             }
 
-            takeScreenshot() {
+            async takeScreenshot() {
                 const camera = this.scene.activeCamera;
                 if (!camera) return;
 
@@ -3331,28 +3334,31 @@ ync shareProject() {
                     camera.orthoTop = orthoSize;
                 }
 
-                BABYLON.Tools.CreateScreenshot(this.engine, camera, { width: width * 2, height: height * 2 }, (data) => {
-                    // Restore orthographic camera parameters
-                    if (oldOrtho) {
-                        camera.orthoLeft = oldOrtho.left;
-                        camera.orthoRight = oldOrtho.right;
-                        camera.orthoTop = oldOrtho.top;
-                        camera.orthoBottom = oldOrtho.bottom;
-                    }
+                return new Promise((resolve) => {
+                    BABYLON.Tools.CreateScreenshot(this.engine, camera, { width: width * 2, height: height * 2 }, (data) => {
+                        // Restore orthographic camera parameters
+                        if (oldOrtho) {
+                            camera.orthoLeft = oldOrtho.left;
+                            camera.orthoRight = oldOrtho.right;
+                            camera.orthoTop = oldOrtho.top;
+                            camera.orthoBottom = oldOrtho.bottom;
+                        }
 
-                    // Create a formatted timestamp (e.g., 2026-01-17_12-00-00)
-                    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-                    const fileName = `engine_${timestamp}.png`;
-            
-                    const link = document.createElement('a');
-                    link.setAttribute('download', fileName);
-                    link.setAttribute('href', data);
-                    
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                    
-                    console.log(`Downloaded: ${fileName}`);
+                        // Create a formatted timestamp (e.g., 2026-01-17_12-00-00)
+                        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+                        const fileName = `engine_${timestamp}.png`;
+
+                        const link = document.createElement('a');
+                        link.setAttribute('download', fileName);
+                        link.setAttribute('href', data);
+
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+
+                        console.log(`Downloaded: ${fileName}`);
+                        resolve();
+                    });
                 });
             }
 
@@ -4842,7 +4848,9 @@ ync shareProject() {
                         options: [
                             ['box', 'box'],
                             ['sphere', 'sphere'],
-                            ['cylinder', 'cylinder']
+                            ['cylinder', 'cylinder'],
+                            ['cone', 'cone'],
+                            ['torus', 'torus']
                         ],
                     },
                     { "type": "input_value", "name": "NAME", "check": "String" },
@@ -5263,19 +5271,21 @@ ync shareProject() {
             },
             {
                 type: 'enable_physics',
-                message0: 'Enable physics on %1 with mass %2 and impostor %3',
+                message0: 'Enable physics on %1 with mass %2 friction %3 restitution %4 and impostor %5',
                 args0: [
                     { type: 'input_value', name: 'NAME' },
                     { type: 'input_value', name: 'MASS', check: 'Number' },
+                    { type: 'input_value', name: 'FRICTION', check: 'Number' },
+                    { type: 'input_value', name: 'RESTITUTION', check: 'Number' },
                     {
                         type: 'field_dropdown',
                         name: 'IMPOSTOR',
                         options: [
-                            ['Box', 'BABYLON.PhysicsImpostor.BoxImpostor'],
-                            ['Sphere', 'BABYLON.PhysicsImpostor.SphereImpostor'],
-                            ['Cylinder', 'BABYLON.PhysicsImpostor.CylinderImpostor'],
-                            ['Plane', 'BABYLON.PhysicsImpostor.PlaneImpostor'],
-                            ['Mesh', 'BABYLON.PhysicsImpostor.MeshImpostor']
+                            ['Box', 'BoxImpostor'],
+                            ['Sphere', 'SphereImpostor'],
+                            ['Cylinder', 'CylinderImpostor'],
+                            ['Plane', 'PlaneImpostor'],
+                            ['Mesh', 'MeshImpostor']
                         ],
                     },                    
                 ],
@@ -6610,6 +6620,10 @@ if (${name}) {
                     code = `sceneManager.createSphere(${name}, ${x}, ${y}, ${z});\n`;
                 } else if (type === 'cylinder') {
                     code = `sceneManager.createCylinder(${name}, ${x}, ${y}, ${z});\n`;
+                } else if (type === 'cone') {
+                    code = `sceneManager.createCone(${name}, ${x}, ${y}, ${z});\n`;
+                } else if (type === 'torus') {
+                    code = `sceneManager.createTorus(${name}, ${x}, ${y}, ${z});\n`;
                 } else {
                     code = `sceneManager.createBox(${name}, ${x}, ${y}, ${z});\n`;
                 }
@@ -6843,10 +6857,10 @@ if (${name}) {
             javascript.javascriptGenerator.forBlock['enable_physics'] = function (block, generator) {
                 const name = generator.valueToCode(block, 'NAME', generator.ORDER_ATOMIC) || 'null';
                 const mass = generator.valueToCode(block, 'MASS', generator.ORDER_ATOMIC) || 1;
-                const impostorField = block.getFieldValue('IMPOSTOR');
-                // Extract the type from the full BABYLON path
-                const impostorType = impostorField.split('.').pop();                
-                return `sceneManager.enablePhysics(${name}, ${mass}, '${impostorType}');\n`;
+                const friction = generator.valueToCode(block, 'FRICTION', generator.ORDER_ATOMIC) || 0.2;
+                const restitution = generator.valueToCode(block, 'RESTITUTION', generator.ORDER_ATOMIC) || 0.9;
+                const impostorType = block.getFieldValue('IMPOSTOR');
+                return `sceneManager.enablePhysics(${name}, ${mass}, ${friction}, ${restitution}, '${impostorType}');\n`;
             };
 
             javascript.javascriptGenerator.forBlock['apply_force'] = function (block, generator) {
@@ -7070,7 +7084,7 @@ if (${name}) {
             };
 
             javascript.javascriptGenerator.forBlock['take_screenshot'] = function (block, generator) {
-                return `sceneManager.takeScreenshot();\n`;
+                return `await sceneManager.takeScreenshot();\n`;
             };
 
             javascript.javascriptGenerator.forBlock['set_pixelated_look'] = function (block, generator) {
