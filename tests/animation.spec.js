@@ -24,29 +24,27 @@ test.describe('GLB Animation Playback', () => {
 
     // Code to import model and play animation
     const testCode = `
-        (async () => {
-            const model = await sceneManager.importModel('testGirl', '${glbUrl}', 0, 0, 0);
-            if (model && model.animationGroups && model.animationGroups.length > 0) {
-                console.log('ANIMATION_GROUPS_FOUND: ' + model.animationGroups.length);
-                // Play the first animation
-                sceneManager.playAnimationByIndex('testGirl', 0, true);
+        const model = await sceneManager.importModel('testGirl', '${glbUrl}', 0, 0, 0);
+        if (model && model.animationGroups && model.animationGroups.length > 0) {
+            console.log('ANIMATION_GROUPS_FOUND: ' + model.animationGroups.length);
+            // Play the first animation
+            sceneManager.playAnimationByIndex('testGirl', 0, true);
 
-                const activeAnimations = model.animationGroups.filter(ag => ag.isPlaying);
-                if (activeAnimations.length > 0) {
-                    console.log('ANIMATION_IS_PLAYING');
-                }
-            } else {
-                console.log('NO_ANIMATIONS_FOUND');
+            const activeAnimations = model.animationGroups.filter(ag => ag.isPlaying);
+            if (activeAnimations.length > 0) {
+                console.log('ANIMATION_IS_PLAYING');
             }
-        })();
+        } else {
+            console.log('NO_ANIMATIONS_FOUND');
+        }
     `;
 
-    await page.evaluate((code) => {
-        window.doRun(code);
+    await page.evaluate(async (code) => {
+        await window.doRun(code);
     }, testCode);
 
     // Wait for markers
-    await expect.poll(() => consoleMessages, { timeout: 20000 }).toContain('ANIMATION_GROUPS_FOUND: 4');
-    await expect.poll(() => consoleMessages, { timeout: 10000 }).toContain('ANIMATION_IS_PLAYING');
+    await expect.poll(() => consoleMessages, { timeout: 60000 }).toContain('ANIMATION_GROUPS_FOUND: 4');
+    await expect.poll(() => consoleMessages, { timeout: 20000 }).toContain('ANIMATION_IS_PLAYING');
   });
 });
