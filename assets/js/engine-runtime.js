@@ -1,4 +1,5 @@
 // Creative Engine Runtime
+
 function isValidAssetURL(url) {
     if (typeof url !== "string") return false;
     const normalized = url.trim().toLowerCase();
@@ -7,47 +8,46 @@ function isValidAssetURL(url) {
     }
     return false;
 }
-function CustomLoadingScreen(/* variables needed, for example:*/ loadingUIText, loadingUIBackgroundColor, loadingUITextColor) {
-            //init the loader
-            this.loadingUIText = loadingUIText || "Loading...";
-            this.loadingUIBackgroundColor = loadingUIBackgroundColor || "black";
-            this.loadingUITextColor = loadingUITextColor || "white";
-        }
-        CustomLoadingScreen.prototype.displayLoadingUI = function () {
-            var loadingDiv = document.createElement("div");
-            loadingDiv.id = "customLoadingScreen";
-            const canvasContainer = this.root.querySelector('.canvas-container');
-            if (canvasContainer) {
-                loadingDiv.style.position = "absolute";
-                loadingDiv.style.top = "0";
-                loadingDiv.style.left = "0";
-                loadingDiv.style.width = "100%";
-                loadingDiv.style.height = "100%";
-                loadingDiv.style.backgroundColor = this.loadingUIBackgroundColor;
-                loadingDiv.style.color = this.loadingUITextColor;
-                loadingDiv.style.fontSize = "30px";
-                loadingDiv.style.display = "flex";
-                loadingDiv.style.justifyContent = "center";
-                loadingDiv.style.alignItems = "center";
-                loadingDiv.style.zIndex = "1001";
-                loadingDiv.innerHTML = this.loadingUIText;
-                canvasContainer.appendChild(loadingDiv);
-                this._loadingDiv = loadingDiv;
-            } else {
-                console.error("Canvas container not found for loading screen.");
-            }
-        };
-        CustomLoadingScreen.prototype.hideLoadingUI = function () {
-            if (this._loadingDiv) {
-                this._loadingDiv.parentNode.removeChild(this._loadingDiv);
-                this._loadingDiv = null;
-            }
-        };
+
+function CustomLoadingScreen(loadingUIText, loadingUIBackgroundColor, loadingUITextColor) {
+    this.loadingUIText = loadingUIText || "Loading...";
+    this.loadingUIBackgroundColor = loadingUIBackgroundColor || "black";
+    this.loadingUITextColor = loadingUITextColor || "white";
+}
+CustomLoadingScreen.prototype.displayLoadingUI = function () {
+    var loadingDiv = document.createElement("div");
+    loadingDiv.id = "customLoadingScreen";
+    const canvasContainer = document.querySelector('.canvas-container');
+    if (canvasContainer) {
+        loadingDiv.style.position = "absolute";
+        loadingDiv.style.top = "0";
+        loadingDiv.style.left = "0";
+        loadingDiv.style.width = "100%";
+        loadingDiv.style.height = "100%";
+        loadingDiv.style.backgroundColor = this.loadingUIBackgroundColor;
+        loadingDiv.style.color = this.loadingUITextColor;
+        loadingDiv.style.fontSize = "30px";
+        loadingDiv.style.display = "flex";
+        loadingDiv.style.justifyContent = "center";
+        loadingDiv.style.alignItems = "center";
+        loadingDiv.style.zIndex = "1001";
+        loadingDiv.innerHTML = this.loadingUIText;
+        canvasContainer.appendChild(loadingDiv);
+        this._loadingDiv = loadingDiv;
+    }
+};
+CustomLoadingScreen.prototype.hideLoadingUI = function () {
+    if (this._loadingDiv) {
+        this._loadingDiv.parentNode.removeChild(this._loadingDiv);
+        this._loadingDiv = null;
+    }
+};
+
 class AssetManager {
             constructor() {
                 this.db = null;
                 this.assets = [];
-                this.DB_NAME = 'AssetDB';
+                this.DB_NAME = 'AssetDB_Runtime';
                 this.DB_VERSION = 1;
                 this.OBJECT_STORE_NAME = 'assets';
                 this.initPromise = null;
@@ -180,7 +180,9 @@ class AssetManager {
             }
         }
 class BabylonSceneManager {
-            constructor(canvas, root = document, assetManager = null) { this.root = root; this.assetManager = assetManager;
+            constructor(canvas, root = document, assetManager = null) {
+                this.root = root;
+                this.assetManager = assetManager;
                 this._getElementById = (id) => this.root.getElementById ? this.root.getElementById(id) : this.root.querySelector("#" + id);
                 this.initAudioEngine();
                 this.canvas = canvas;
@@ -2244,14 +2246,17 @@ class CreativeEnginePlayer extends HTMLElement {
         `;
         const canvas = this.shadowRoot.getElementById("gameCanvas");
         this.sceneManager = new BabylonSceneManager(canvas, this.shadowRoot, this.assetManager);
+
         this.shadowRoot.getElementById("remixBtn").onclick = () => {
             const url = this.getAttribute("project-url");
             if (url) window.open(url, "_blank");
         };
+
         this.shadowRoot.getElementById("fullscreenBtn").onclick = () => {
             const container = this.shadowRoot.querySelector(".canvas-container");
             if (!document.fullscreenElement) { container.requestFullscreen(); } else { document.exitFullscreen(); }
         };
+
         if (this.hasAttribute("project-url")) { this.loadFromUrl(this.getAttribute("project-url")); }
         window.addEventListener("resize", () => { if(this.sceneManager) this.sceneManager.engine.resize(); });
     }
@@ -2275,9 +2280,11 @@ class CreativeEnginePlayer extends HTMLElement {
         this.sceneManager.clear();
         const allAssets = await this.assetManager.getAllAssets();
         for (const asset of allAssets) { await this.assetManager.deleteAsset(asset.name); }
-        for (const asset of projectData.assets) {
-            const data = this._base64ToBlob(asset.data, asset.type);
-            await this.assetManager.addAsset(new File([data], asset.name, { type: asset.type }));
+        if (projectData.assets) {
+            for (const asset of projectData.assets) {
+                const data = this._base64ToBlob(asset.data, asset.type);
+                await this.assetManager.addAsset(new File([data], asset.name, { type: asset.type }));
+            }
         }
         if (projectData.code) {
             const AsyncFunction = Object.getPrototypeOf(async function () { }).constructor;
