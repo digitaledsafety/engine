@@ -556,6 +556,7 @@
                     <button id="fullscreenBtn" class="btn btn-icon" title="Fullscreen" aria-label="Toggle Fullscreen">⛶ Fullscreen</button>
                     <button id="screenshotButton" class="btn btn-icon" title="Take Screenshot" aria-label="Take Screenshot">📸 Screenshot</button>
                     <button id="docsButton" class="btn btn-icon" title="Documentation" aria-label="Open Documentation">❓ Docs</button>
+                    <button id="clearButton" class="btn btn-icon" title="Clear Workspace" aria-label="Clear Workspace">🗑️ Clear</button>
                 </div>
             </div>
         </div>
@@ -1055,6 +1056,16 @@ workspace_data: "${base64WorkspaceData}"
                     if (error.name !== 'AbortError') {
                         alert('Error sharing project. See console for details.');
                     }
+                }
+            }
+
+            async newProject() {
+                if (confirm('Are you sure you want to clear the workspace? All unsaved changes and assets will be lost.')) {
+                    this.sceneManager.clear();
+                    await this._clearAllAssets();
+                    this.workspace.clear();
+                    loadAssetsIntoView();
+                    doRun();
                 }
             }
 
@@ -7351,6 +7362,9 @@ function ${generator.FUNCTION_NAME_PLACEHOLDER_}(c1, c2, ratio) {
         });
         document.getElementById('screenshotButton').addEventListener('click', () => {
             sceneManager.takeScreenshot();
+        });
+        document.getElementById('clearButton').addEventListener('click', () => {
+            projectManager.newProject();
         });
         const searchContainer = document.getElementById('search-container');
         const searchInput = document.getElementById('search-input');
