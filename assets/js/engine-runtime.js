@@ -44,10 +44,10 @@ CustomLoadingScreen.prototype.hideLoadingUI = function () {
 };
 
 class AssetManager {
-            constructor() {
+            constructor(dbName = 'AssetDB') {
                 this.db = null;
                 this.assets = [];
-                this.DB_NAME = 'AssetDB_Runtime';
+                this.DB_NAME = dbName;
                 this.DB_VERSION = 1;
                 this.OBJECT_STORE_NAME = 'assets';
                 this.initPromise = null;
@@ -1354,6 +1354,11 @@ class BabylonSceneManager {
 
             initInputListeners() {
                 this._onKeyDown = (event) => {
+                    // Only process keyboard input if the canvas or its parent is focused,
+                    // or if we are the only engine on the page (default case)
+                    if (this.root !== document && !this.root.contains(document.activeElement)) {
+                        return;
+                    }
                     this.inputState.keys[event.key.toLowerCase()] = true;
                 };
                 this._onKeyUp = (event) => {
@@ -2219,7 +2224,7 @@ class CreativeEnginePlayer extends HTMLElement {
         super();
         this.attachShadow({ mode: "open" });
         this.sceneManager = null;
-        this.assetManager = new AssetManager();
+        this.assetManager = null;
     }
     static get observedAttributes() { return ["project-url"]; }
     attributeChangedCallback(name, oldValue, newValue) {
@@ -2227,6 +2232,11 @@ class CreativeEnginePlayer extends HTMLElement {
     }
     connectedCallback() { this.render(); }
     render() {
+        // Derive a unique DB name for AssetManager based on project-url or a random ID
+        const url = this.getAttribute("project-url") || "default";
+        const uniqueId = btoa(url).substring(0, 16).replace(/[/+=]/g, "");
+        this.assetManager = new AssetManager(`AssetDB_Runtime_${uniqueId}`);
+
         this.shadowRoot.innerHTML = `
         <style>
             :host { display: block; width: 100%; height: 400px; position: relative; background: #000; overflow: hidden; font-family: sans-serif; }
@@ -2237,7 +2247,7 @@ class CreativeEnginePlayer extends HTMLElement {
             .btn-embed:hover { background: rgba(0,0,0,0.8); }
         </style>
         <div class="canvas-container">
-            <canvas id="gameCanvas"></canvas>
+            <canvas id="gameCanvas" tabindex="0"></canvas>
             <div id="embed-ui">
                 <button id="remixBtn" class="btn-embed">Remix</button>
                 <button id="fullscreenBtn" class="btn-embed">Fullscreen</button>

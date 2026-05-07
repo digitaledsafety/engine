@@ -677,10 +677,10 @@
         });
 
         class AssetManager {
-            constructor() {
+            constructor(dbName = 'AssetDB') {
                 this.db = null;
                 this.assets = [];
-                this.DB_NAME = 'AssetDB';
+                this.DB_NAME = dbName;
                 this.DB_VERSION = 1;
                 this.OBJECT_STORE_NAME = 'assets';
                 this.initPromise = null;
@@ -3440,6 +3440,11 @@ workspace_data: "${base64WorkspaceData}"
 
             initInputListeners() {
                 this._onKeyDown = (event) => {
+                    // Only process keyboard input if the canvas or its parent is focused,
+                    // or if we are the only engine on the page (default case)
+                    if (this.root !== document && !this.root.contains(document.activeElement)) {
+                        return;
+                    }
                     this.inputState.keys[event.key.toLowerCase()] = true;
                 };
                 this._onKeyUp = (event) => {
