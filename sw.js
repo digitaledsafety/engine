@@ -3,7 +3,8 @@ const criticalUrls = [
   '/',
   '/manifest.json',
   '/favicon.ico',
-  '/assets/icons/gamepad-2.svg'
+  '/assets/icons/gamepad-2.svg',
+  '/assets/js/engine-runtime.js'
 ];
 
 const externalUrls = [
