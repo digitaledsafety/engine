@@ -2375,10 +2375,8 @@ workspace_data: "${base64WorkspaceData}"
                 this.gameStartCallbacks.push(callback);
             }
 
-            async triggerGameStart() {
-                for (const callback of this.gameStartCallbacks) {
-                    await callback();
-                }
+            triggerGameStart() {
+                this.gameStartCallbacks.forEach(callback => callback());
             }
 
             broadcast(eventName, data) {
@@ -7284,8 +7282,17 @@ if (${name}) {
             doRun();
         }
 
-        async function doRun(code) {
-            let codeToRun = code || generateCode();
+        async function doRun(triggerStart = false, code) {
+            // Handle both call signatures: doRun(triggerStart) and doRun(code) - though usually it's doRun()
+            let codeToRun;
+            let finalTriggerStart = triggerStart;
+
+            if (typeof triggerStart === 'string') {
+                codeToRun = triggerStart;
+                finalTriggerStart = false; // Code-only runs don't auto-trigger start
+            } else {
+                codeToRun = code || generateCode();
+            }
 
             if (sceneManager) {
                 sceneManager.dispose();
@@ -7297,7 +7304,9 @@ if (${name}) {
                 const AsyncFunction = Object.getPrototypeOf(async function () { }).constructor;
                 const userGeneratedCode = new AsyncFunction('sceneManager', 'assetManager', codeToRun);
                 await userGeneratedCode(sceneManager, assetManager);
-                await sceneManager.triggerGameStart();
+                if (finalTriggerStart) {
+                    sceneManager.triggerGameStart();
+                }
             } catch (error) {
                 console.error('Error executing code:', error);
             } finally {
@@ -7462,7 +7471,7 @@ function ${generator.FUNCTION_NAME_PLACEHOLDER_}(c1, c2, ratio) {
         });
 
         document.getElementById('runButton').addEventListener('click', () => {
-            doRun();
+            doRun(true);
         });
         document.getElementById('saveButton').addEventListener('click', () => {
             projectManager.saveProject();
