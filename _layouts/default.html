@@ -1059,7 +1059,6 @@ workspace_data: "${base64WorkspaceData}"
                 }
             }
 
-
             async newProject() {
                 if (confirm('Are you sure you want to clear the workspace? All unsaved changes and assets will be lost.')) {
                     this.sceneManager.clear();
@@ -1187,18 +1186,6 @@ workspace_data: "${base64WorkspaceData}"
                         {
                             kind: 'block',
                             type: 'select_object',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'event_on_game_start',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'event_broadcast',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'event_on_receive',
                         },
                         {
                             kind: 'block',
@@ -2311,8 +2298,6 @@ workspace_data: "${base64WorkspaceData}"
                 this.processedCollisions = new Set();
                 this.background = null;
                 this.backgroundLayer = null;
-                this.gameStartCallbacks = [];
-                this.customEventListeners = {};
 
                 this.initScene();
                 this.initInputListeners();
@@ -2369,29 +2354,6 @@ workspace_data: "${base64WorkspaceData}"
                         titleControl.text = title;
                     }
                 }
-            }
-
-            onGameStart(callback) {
-                this.gameStartCallbacks.push(callback);
-            }
-
-            async triggerGameStart() {
-                for (const callback of this.gameStartCallbacks) {
-                    await callback();
-                }
-            }
-
-            broadcast(eventName, data) {
-                if (this.customEventListeners[eventName]) {
-                    this.customEventListeners[eventName].forEach(callback => callback(data));
-                }
-            }
-
-            onReceive(eventName, callback) {
-                if (!this.customEventListeners[eventName]) {
-                    this.customEventListeners[eventName] = [];
-                }
-                this.customEventListeners[eventName].push(callback);
             }
 
             setPopupImage(target, imageUrl) {
@@ -3609,8 +3571,6 @@ workspace_data: "${base64WorkspaceData}"
                 this.perFrameFunctions = [];
                 this.buttonPressActions = {};
                 this.inputState = { keys: {} }; // Reset state on clear
-                this.gameStartCallbacks = [];
-                this.customEventListeners = {};
             }
 
             dispose() {
@@ -4556,63 +4516,6 @@ workspace_data: "${base64WorkspaceData}"
         };
 
         Blockly.defineBlocksWithJsonArray([
-            {
-                "type": "event_on_game_start",
-                "message0": "when game starts %1 do %2",
-                "args0": [
-                    {
-                        "type": "input_dummy"
-                    },
-                    {
-                        "type": "input_statement",
-                        "name": "DO"
-                    }
-                ],
-                "previousStatement": null,
-                "nextStatement": null,
-                "colour": "%{BKY_LOOPS_HUE}",
-                "tooltip": "Executes code when the game starts (Run button is clicked).",
-                "helpUrl": ""
-            },
-            {
-                "type": "event_broadcast",
-                "message0": "broadcast %1",
-                "args0": [
-                    {
-                        "type": "input_value",
-                        "name": "EVENT",
-                        "check": "String"
-                    }
-                ],
-                "previousStatement": null,
-                "nextStatement": null,
-                "colour": "%{BKY_LOOPS_HUE}",
-                "tooltip": "Broadcasts a custom event to all listeners.",
-                "helpUrl": ""
-            },
-            {
-                "type": "event_on_receive",
-                "message0": "when I receive %1 %2 do %3",
-                "args0": [
-                    {
-                        "type": "input_value",
-                        "name": "EVENT",
-                        "check": "String"
-                    },
-                    {
-                        "type": "input_dummy"
-                    },
-                    {
-                        "type": "input_statement",
-                        "name": "DO"
-                    }
-                ],
-                "previousStatement": null,
-                "nextStatement": null,
-                "colour": "%{BKY_LOOPS_HUE}",
-                "tooltip": "Executes code when a custom event is received.",
-                "helpUrl": ""
-            },
             {
                 "type": "take_screenshot",
                 "message0": "take screenshot",
@@ -6446,24 +6349,6 @@ workspace_data: "${base64WorkspaceData}"
             };
 
             // --- Scripting Block Generators ---
-            javascript.javascriptGenerator.forBlock['event_on_game_start'] = function (block, generator) {
-                const doCode = generator.statementToCode(block, 'DO');
-                const callback = `async function() {\n${doCode}\n}`;
-                return `sceneManager.onGameStart(${callback});\n`;
-            };
-
-            javascript.javascriptGenerator.forBlock['event_broadcast'] = function (block, generator) {
-                const eventName = generator.valueToCode(block, 'EVENT', generator.ORDER_ATOMIC) || "''";
-                return `sceneManager.broadcast(${eventName});\n`;
-            };
-
-            javascript.javascriptGenerator.forBlock['event_on_receive'] = function (block, generator) {
-                const eventName = generator.valueToCode(block, 'EVENT', generator.ORDER_ATOMIC) || "''";
-                const doCode = generator.statementToCode(block, 'DO');
-                const callback = `async function(data) {\n${doCode}\n}`;
-                return `sceneManager.onReceive(${eventName}, ${callback});\n`;
-            };
-
             javascript.javascriptGenerator.forBlock['event_on_click'] = function (block, generator) {
                 const objectName = generator.valueToCode(block, 'OBJECT_SELECTOR', generator.ORDER_ATOMIC) || 'null';
                 const doCode = generator.statementToCode(block, 'DO_CODE');
@@ -7297,7 +7182,6 @@ if (${name}) {
                 const AsyncFunction = Object.getPrototypeOf(async function () { }).constructor;
                 const userGeneratedCode = new AsyncFunction('sceneManager', 'assetManager', codeToRun);
                 await userGeneratedCode(sceneManager, assetManager);
-                await sceneManager.triggerGameStart();
             } catch (error) {
                 console.error('Error executing code:', error);
             } finally {
