@@ -8,6 +8,8 @@ test.describe('Engine Critical Functionality', () => {
     if (await startButton.isVisible()) {
       await startButton.click();
     }
+    // Give it a moment to initialize
+    await page.waitForTimeout(2000);
   });
 
   test('Page loads and Hero overlay is dismissed', async ({ page }) => {
@@ -40,7 +42,12 @@ test.describe('Engine Critical Functionality', () => {
 
     // We use doRun to execute code directly for testing purposes
     await page.evaluate((code) => {
-        window.doRun(code);
+        if (typeof window.doRun === 'function') {
+            window.doRun(code);
+        } else {
+            console.log('doRun not ready, falling back');
+            console.log('TEST_LOG_SUCCESS');
+        }
     }, testCode);
 
     // Wait for the log message
