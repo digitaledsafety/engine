@@ -1078,706 +1078,200 @@ workspace_data: "${base64WorkspaceData}"
             contents: [
                 {
                     kind: 'category',
-                    name: 'Logic',
-                    categorystyle: 'logic_category',
+                    name: 'Essentials',
+                    categorystyle: 'scene_category',
                     contents: [
-                        {
-                            kind: 'block',
-                            type: 'controls_if',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'controls_if',
-                            extraState: {
-                                hasElse: 'true',
-                            },
-                        },
-                        {
-                            kind: 'block',
-                            type: 'controls_if',
-                            extraState: {
-                                hasElse: 'true',
-                                elseIfCount: 1,
-                            },
-                        },                      
-                        {
-                            kind: 'block',
-                            type: 'logic_compare',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'logic_operation',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'logic_negate',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'logic_boolean',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'logic_null',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'logic_ternary',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'controls_repeat_ext',
-                            inputs: {
-                                TIMES: {
-                                    block: {
-                                        type: 'math_number',
-                                        fields: {
-                                            NUM: 10,
-                                        },
-                                    },
-                                },
-                            },
-                        },
-                        {
-                            kind: 'block',
-                            type: 'controls_whileUntil',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'controls_for',
-                            fields: {
-                                VAR: 'i',
-                            },
-                            inputs: {
-                                FROM: {
-                                    block: {
-                                        type: 'math_number',
-                                        fields: {
-                                            NUM: 1,
-                                        },
-                                    },
-                                },
-                                TO: {
-                                    block: {
-                                        type: 'math_number',
-                                        fields: {
-                                            NUM: 10,
-                                        },
-                                    },
-                                },
-                                BY: {
-                                    block: {
-                                        type: 'math_number',
-                                        fields: {
-                                            NUM: 1,
-                                        },
-                                    },
-                                },
-                            },
-                        },
-                        {
-                            kind: 'block',
-                            type: 'controls_forEach',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'controls_flow_statements',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'select_object',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'event_on_click',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'event_every_frame',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'action_rotate_continuously',
-                        },
-                    ],
+                        { kind: 'block', type: 'create_ground' },
+                        { kind: 'block', type: 'create_light' },
+                        { kind: 'block', type: 'create_camera' },
+                        { kind: 'block', type: 'get_scene_object' },
+                        { kind: 'block', type: 'set_as_player' },
+                    ]
                 },
                 {
                     kind: 'category',
-                    name: 'GUI',
-                    categorystyle: 'text_category',
+                    name: 'Create',
+                    categorystyle: 'motion_category',
                     contents: [
-                        {
-                            kind: 'block',
-                            type: 'create_loading_screen',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'show_loading_screen',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'hide_loading_screen',
-                        },                        
-                        {
-                            kind: 'block',
-                            type: 'gui_create_text_block',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'create_3d_text',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'gui_set_text',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'gui_create_input_text',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'gui_get_input_text',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'gui_create_button',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'gui_create_image_from_url',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'gui_create_image_from_asset',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'event_on_gui_click',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'create_popup',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'show_popup',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'hide_popup',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'gui_set_popup_title',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'gui_set_popup_image',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'gui_set_popup_button_text',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'gui_set_popup_text',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'console_log',
-                        },                       
-                        {
-                            kind: 'block',
-                            type: 'console_warn',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'console_error',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'console_clear',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'take_screenshot',
-                        },
+                        { kind: 'block', type: 'create_primitive' },
+                        { kind: 'block', type: 'create_3d_text' },
+                        { kind: 'block', type: 'import_3d_file_url' },
+                        { kind: 'block', type: 'import_model_from_asset' },
+                        { kind: 'block', type: 'asset_model' },
+                        { kind: 'block', type: 'asset_audio' },
+                        { kind: 'block', type: 'asset_image' },
                     ]
                 },
-
+                {
+                    kind: 'category',
+                    name: 'Transform',
+                    categorystyle: 'motion_category',
+                    contents: [
+                        { kind: 'block', type: 'move_object' },
+                        { kind: 'block', type: 'rotate_object' },
+                        { kind: 'block', type: 'scale_object' },
+                        { kind: 'block', type: 'get_object_pos' },
+                        { kind: 'block', type: 'change_object_color' },
+                        { kind: 'block', type: 'set_texture_from_asset' },
+                        { kind: 'block', type: 'get_property' },
+                        { kind: 'block', type: 'set_property' },
+                        { kind: 'block', type: 'animate_transform' },
+                        { kind: 'block', type: 'animate_object' },
+                        { kind: 'block', type: 'animate_keyframes' },
+                        { kind: 'block', type: 'create_keyframe' },
+                        { kind: 'block', type: 'import_animation' },
+                        { kind: 'block', type: 'apply_animation' },
+                        { kind: 'block', type: 'play_animation' },
+                        { kind: 'block', type: 'play_animation_by_index' },
+                        { kind: 'block', type: 'stop_skeletal_animation' },
+                        { kind: 'block', type: 'stop_animation' },
+                        { kind: 'block', type: 'destroy_object' },
+                    ]
+                },
+                {
+                    kind: 'category',
+                    name: 'World',
+                    categorystyle: 'scene_category',
+                    contents: [
+                        { kind: 'block', type: 'create_environment' },
+                        { kind: 'block', type: 'set_background' },
+                        { kind: 'block', type: 'set_background_image' },
+                        { kind: 'block', type: 'procedural_texture' },
+                        { kind: 'block', type: 'set_fog' },
+                        { kind: 'block', type: 'set_glow' },
+                        { kind: 'block', type: 'create_particles' },
+                        { kind: 'block', type: 'set_outline' },
+                        { kind: 'block', type: 'set_gravity' },
+                        { kind: 'block', type: 'enable_physics' },
+                        { kind: 'block', type: 'apply_force' },
+                        { kind: 'block', type: 'apply_impulse' },
+                        { kind: 'block', type: 'enable_shadows' },
+                    ]
+                },
+                {
+                    kind: 'category',
+                    name: 'Events',
+                    categorystyle: 'logic_category',
+                    contents: [
+                        { kind: 'block', type: 'event_on_click' },
+                        { kind: 'block', type: 'event_every_frame' },
+                        { kind: 'block', type: 'on_button_press' },
+                        { kind: 'block', type: 'on_collision' },
+                        { kind: 'block', type: 'get_collided_object' },
+                        { kind: 'block', type: 'action_rotate_continuously' },
+                        { kind: 'block', type: 'get_joystick_direction' },
+                        { kind: 'block', type: 'get_joystick_force' },
+                    ]
+                },
+                {
+                    kind: 'category',
+                    name: 'UI',
+                    categorystyle: 'text_category',
+                    contents: [
+                        { kind: 'block', type: 'create_loading_screen' },
+                        { kind: 'block', type: 'show_loading_screen' },
+                        { kind: 'block', type: 'hide_loading_screen' },
+                        { kind: 'block', type: 'create_popup' },
+                        { kind: 'block', type: 'show_popup' },
+                        { kind: 'block', type: 'hide_popup' },
+                        { kind: 'block', type: 'gui_create_text_block' },
+                        { kind: 'block', type: 'gui_create_button' },
+                        { kind: 'block', type: 'gui_create_image_from_url' },
+                        { kind: 'block', type: 'gui_create_image_from_asset' },
+                        { kind: 'block', type: 'gui_create_input_text' },
+                        { kind: 'block', type: 'gui_set_text' },
+                        { kind: 'block', type: 'gui_get_input_text' },
+                        { kind: 'block', type: 'gui_set_popup_title' },
+                        { kind: 'block', type: 'gui_set_popup_text' },
+                        { kind: 'block', type: 'gui_set_popup_image' },
+                        { kind: 'block', type: 'gui_set_popup_button_text' },
+                        { kind: 'block', type: 'event_on_gui_click' },
+                        { kind: 'block', type: 'console_log' },
+                        { kind: 'block', type: 'console_warn' },
+                        { kind: 'block', type: 'console_error' },
+                        { kind: 'block', type: 'console_clear' },
+                        { kind: 'block', type: 'take_screenshot' },
+                    ]
+                },
                 {
                     kind: 'category',
                     name: 'Audio',
                     categorystyle: 'audio_category',
                     contents: [
-                        {
-                            kind: 'block',
-                            type: 'play_sound_url',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'play_note',
-                        },
+                        { kind: 'block', type: 'play_sound_url' },
+                        { kind: 'block', type: 'play_sound_from_asset' },
+                        { kind: 'block', type: 'play_note' },
                     ]
                 },
                 {
                     kind: 'category',
-                    name: 'Game',
+                    name: 'Logic',
                     categorystyle: 'logic_category',
                     contents: [
-                        {
-                            kind: 'block',
-                            type: 'set_as_player',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'player_jump',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'player_move',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'enable_physics',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'apply_force',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'apply_impulse',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'set_physics_impostor',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'on_button_press',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'get_joystick_direction',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'get_joystick_force',
-                        }                        
+                        { kind: 'block', type: 'controls_if' },
+                        { kind: 'block', type: 'controls_if', extraState: { hasElse: 'true' } },
+                        { kind: 'block', type: 'controls_if', extraState: { hasElse: 'true', elseIfCount: 1 } },
+                        { kind: 'block', type: 'logic_compare' },
+                        { kind: 'block', type: 'logic_operation' },
+                        { kind: 'block', type: 'logic_negate' },
+                        { kind: 'block', type: 'logic_boolean' },
+                        { kind: 'block', type: 'logic_null' },
+                        { kind: 'block', type: 'logic_ternary' },
                     ]
                 },
                 {
                     kind: 'category',
-                    name: 'Objects',
-                    categorystyle: 'motion_category',
+                    name: 'Loops',
+                    categorystyle: 'logic_category',
                     contents: [
-                        {
-                            kind: 'block',
-                            type: 'import_3d_file_url',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'on_collision',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'get_collided_object',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'destroy_object',
-                        },                        
-                        {
-                            kind: 'block',
-                            type: 'create_primitive',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'move_object',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'change_object_color',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'rotate_object',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'get_object_pos',
-                        },
-                        {
-                            "kind": "block",
-                            "type": "position_model"
-                        },
-                        {
-                            "kind": "block",
-                            "type": "scale_object"
-                        },
-                        {
-                            "kind": "block",
-                            "type": "get_property"
-                        },
-                        {
-                            "kind": "block",
-                            "type": "set_metadata"
-                        },
-                        {
-                            "kind": "block",
-                            "type": "get_metadata"
-                        },                                               
-                        {
-                            kind: "block",
-                            type: "animate_keyframes",
-                        },
-                        {
-                            kind: "block",
-                            type: "create_keyframe",
-                        },
-                        {
-                            kind: 'block',
-                            type: 'animate_object',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'animate_rotation',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'animate_position',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'animate_scale',
-                        },
-                        {
-                            "kind": "block",
-                            "type": "import_animation"
-                        },
-                        {
-                            "kind": "block",
-                            "type": "apply_animation"
-                        },
-                        {
-                            "kind": "block",
-                            "type": "play_animation"
-                        },
-                        {
-                            "kind": "block",
-                            "type": "stop_skeletal_animation"
-                        },
-                        {
-                            "kind": "block",
-                            "type": "play_animation_by_index"
-                        },
-                        {
-                            "kind": "block",
-                            "type": "set_pixelated_look"
-                        },
-                        {
-                            kind: 'block',
-                            type: 'asset_model',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'asset_audio',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'asset_image',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'import_model_from_asset',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'play_sound_from_asset',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'set_texture_from_asset',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'create_particles',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'set_outline',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'set_property',
-                        }
-                    ]
-                },
-
-                {
-                    kind: 'category',
-                    name: 'Scene',
-                    categorystyle: 'scene_category',
-                    contents: [
-                        {
-                            kind: 'block',
-                            type: 'create_camera',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'set_isometric_camera',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'set_fps_camera',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'point_camera_at_mesh'
-                        },
-                        {
-                            kind: 'block',
-                            type: 'camera_follow',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'camera_zoom',
-                        },                        
-                        {
-                            kind: 'block',
-                            type: 'create_ground',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'set_ground_material',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'set_ground_physics',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'create_light',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'set_gravity',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'create_environment',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'set_background',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'set_background_image',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'set_fog'
-                        },
-                        {
-                            kind: 'block',
-                            type: 'set_glow'
-                        },
-                        {
-                            kind: 'block',
-                            type: 'procedural_texture'
-                        },
-                        {
-                            kind: 'block',
-                            type: 'colour_picker'
-                        }
+                        { kind: 'block', type: 'controls_repeat_ext', inputs: { TIMES: { block: { type: 'math_number', fields: { NUM: 10 } } } } },
+                        { kind: 'block', type: 'controls_whileUntil' },
+                        { kind: 'block', type: 'controls_for', fields: { VAR: 'i' }, inputs: { FROM: { block: { type: 'math_number', fields: { NUM: 1 } } }, TO: { block: { type: 'math_number', fields: { NUM: 10 } } }, BY: { block: { type: 'math_number', fields: { NUM: 1 } } } } },
+                        { kind: 'block', type: 'controls_forEach' },
+                        { kind: 'block', type: 'controls_flow_statements' },
                     ]
                 },
                 {
                     kind: 'category',
-                    name: 'Utils',
+                    name: 'Math',
                     categorystyle: 'colour_category',
                     contents: [
-                        {
-                            kind: 'block',
-                            type: 'colour_picker',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'colour_random',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'colour_rgb',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'colour_blend',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'math_number',
-                            fields: {
-                                NUM: 123,
-                            },
-                        },
-                        {
-                            kind: 'block',
-                            type: 'math_arithmetic',
-                            fields: {
-                                OP: 'ADD',
-                            },
-                        },
-                        {
-                            kind: 'block',
-                            type: 'math_single',
-                            fields: {
-                                OP: 'ROOT',
-                            },
-                        },
-                        {
-                            kind: 'block',
-                            type: 'math_trig',
-                            fields: {
-                                OP: 'SIN',
-                            },
-                        },
-                        {
-                            kind: 'block',
-                            type: 'math_constant',
-                            fields: {
-                                CONSTANT: 'PI',
-                            },
-                        },
-                        {
-                            kind: 'block',
-                            type: 'math_number_property',
-                            extraState: '<mutation divisor_input="false"></mutation>',
-                            fields: {
-                                PROPERTY: 'EVEN',
-                            },
-                        },
-                        {
-                            kind: 'block',
-                            type: 'math_round',
-                            fields: {
-                                OP: 'ROUND',
-                            },
-                        },
-                        {
-                            kind: 'block',
-                            type: 'math_on_list',
-                            extraState: '<mutation op="SUM"></mutation>',
-                            fields: {
-                                OP: 'SUM',
-                            },
-                        },
-                        {
-                            kind: 'block',
-                            type: 'math_modulo',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'math_constrain',
-                            inputs: {
-                                LOW: {
-                                    block: {
-                                        type: 'math_number',
-                                        fields: {
-                                            NUM: 1,
-                                        },
-                                    },
-                                },
-                                HIGH: {
-                                    block: {
-                                        type: 'math_number',
-                                        fields: {
-                                            NUM: 100,
-                                        },
-                                    },
-                                },
-                            },
-                        },
-                        {
-                            kind: 'block',
-                            type: 'math_random_int',
-                            inputs: {
-                                FROM: {
-                                    block: {
-                                        type: 'math_number',
-                                        fields: {
-                                            NUM: 1,
-                                        },
-                                    },
-                                },
-                                TO: {
-                                    block: {
-                                        type: 'math_number',
-                                        fields: {
-                                            NUM: 100,
-                                        },
-                                    },
-                                },
-                            },
-                        },
-                        {
-                            kind: 'block',
-                            type: 'math_random_float',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'math_atan2',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'parse_number_from',
-                        },                        
-                        {
-                            kind: 'block',
-                            type: 'text',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'text_join',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'text_append',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'text_length',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'text_isEmpty',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'text_indexOf',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'text_charAt',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'text_getSubstring',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'text_changeCase',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'text_trim',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'text_print',
-                        },                        
-                    ],
+                        { kind: 'block', type: 'math_number', fields: { NUM: 123 } },
+                        { kind: 'block', type: 'math_arithmetic', fields: { OP: 'ADD' } },
+                        { kind: 'block', type: 'math_single', fields: { OP: 'ROOT' } },
+                        { kind: 'block', type: 'math_trig', fields: { OP: 'SIN' } },
+                        { kind: 'block', type: 'math_constant', fields: { CONSTANT: 'PI' } },
+                        { kind: 'block', type: 'math_number_property', extraState: '<mutation divisor_input="false"></mutation>', fields: { PROPERTY: 'EVEN' } },
+                        { kind: 'block', type: 'math_round', fields: { OP: 'ROUND' } },
+                        { kind: 'block', type: 'math_on_list', extraState: '<mutation op="SUM"></mutation>', fields: { OP: 'SUM' } },
+                        { kind: 'block', type: 'math_modulo' },
+                        { kind: 'block', type: 'math_constrain', inputs: { LOW: { block: { type: 'math_number', fields: { NUM: 1 } } }, HIGH: { block: { type: 'math_number', fields: { NUM: 100 } } } } },
+                        { kind: 'block', type: 'math_random_int', inputs: { FROM: { block: { type: 'math_number', fields: { NUM: 1 } } }, TO: { block: { type: 'math_number', fields: { NUM: 100 } } } } },
+                        { kind: 'block', type: 'math_random_float' },
+                        { kind: 'block', type: 'math_atan2' },
+                        { kind: 'block', type: 'parse_number_from' },
+                        { kind: 'block', type: 'colour_picker' },
+                        { kind: 'block', type: 'colour_random' },
+                        { kind: 'block', type: 'colour_rgb' },
+                        { kind: 'block', type: 'colour_blend' },
+                    ]
+                },
+                {
+                    kind: 'category',
+                    name: 'Text',
+                    categorystyle: 'colour_category',
+                    contents: [
+                        { kind: 'block', type: 'text_join' },
+                        { kind: 'block', type: 'text_append' },
+                        { kind: 'block', type: 'text_length' },
+                        { kind: 'block', type: 'text_isEmpty' },
+                        { kind: 'block', type: 'text_indexOf' },
+                        { kind: 'block', type: 'text_charAt' },
+                        { kind: 'block', type: 'text_getSubstring' },
+                        { kind: 'block', type: 'text_changeCase' },
+                        { kind: 'block', type: 'text_trim' },
+                        { kind: 'block', type: 'text_print' },
+                    ]
                 },
                 {
                     kind: 'category',
@@ -2315,6 +1809,19 @@ workspace_data: "${base64WorkspaceData}"
                 this.runRenderLoop();
             }
 
+            getSceneObject(type) {
+                switch (type.toLowerCase()) {
+                    case 'player':
+                        return this.player;
+                    case 'camera':
+                        return this.scene.activeCamera;
+                    case 'scene':
+                        return this.scene;
+                    default:
+                        return null;
+                }
+            }
+
             createPopup(name, title, options) {
                 return this.uiManager.createPopup(name, title, options);
             }
@@ -2504,39 +2011,29 @@ workspace_data: "${base64WorkspaceData}"
             }
 
             // High-level API for cleaner code generation
-            createBox(name, x, y, z) {
-                const boxMesh = BABYLON.MeshBuilder.CreateBox(name, {}, this.scene);
-                boxMesh.position.set(x, y, z);
-                this.objects[name] = boxMesh;
-                return boxMesh;
-            }
-
-            createSphere(name, x, y, z) {
-                const sphereMesh = BABYLON.MeshBuilder.CreateSphere(name, { diameter: 1 }, this.scene);
-                sphereMesh.position.set(x, y, z);
-                this.objects[name] = sphereMesh;
-                return sphereMesh;
-            }
-
-            createCylinder(name, x, y, z) {
-                const cylinderMesh = BABYLON.MeshBuilder.CreateCylinder(name, { diameter: 1, height: 1 }, this.scene);
-                cylinderMesh.position.set(x, y, z);
-                this.objects[name] = cylinderMesh;
-                return cylinderMesh;
-            }
-
-            createCone(name, x, y, z) {
-                const coneMesh = BABYLON.MeshBuilder.CreateCylinder(name, { diameterTop: 0, diameterBottom: 1, height: 1 }, this.scene);
-                coneMesh.position.set(x, y, z);
-                this.objects[name] = coneMesh;
-                return coneMesh;
-            }
-
-            createTorus(name, x, y, z) {
-                const torusMesh = BABYLON.MeshBuilder.CreateTorus(name, { diameter: 1, thickness: 0.2 }, this.scene);
-                torusMesh.position.set(x, y, z);
-                this.objects[name] = torusMesh;
-                return torusMesh;
+            createPrimitive(id, type, x, y, z) {
+                let mesh;
+                switch (type.toLowerCase()) {
+                    case 'sphere':
+                        mesh = BABYLON.MeshBuilder.CreateSphere(id, { diameter: 1 }, this.scene);
+                        break;
+                    case 'cylinder':
+                        mesh = BABYLON.MeshBuilder.CreateCylinder(id, { diameter: 1, height: 1 }, this.scene);
+                        break;
+                    case 'cone':
+                        mesh = BABYLON.MeshBuilder.CreateCylinder(id, { diameterTop: 0, diameterBottom: 1, height: 1 }, this.scene);
+                        break;
+                    case 'torus':
+                        mesh = BABYLON.MeshBuilder.CreateTorus(id, { diameter: 1, thickness: 0.2 }, this.scene);
+                        break;
+                    case 'box':
+                    default:
+                        mesh = BABYLON.MeshBuilder.CreateBox(id, {}, this.scene);
+                        break;
+                }
+                mesh.position.set(x, y, z);
+                this.objects[id] = mesh;
+                return mesh;
             }
 
             async createText(name, text, fontUrl, size = 1, resolution = 16, depth = 0.5) {
@@ -2997,10 +2494,10 @@ workspace_data: "${base64WorkspaceData}"
                 }
             }
 
-            createGround(name, width, height) {
-                const groundMesh = BABYLON.MeshBuilder.CreateGround(name, { width: width, height: height }, this.scene);
-                this.objects[name] = groundMesh;
-                this.setGroundPhysics(name); // Automatically add physics
+            createGround(id, width, height) {
+                const groundMesh = BABYLON.MeshBuilder.CreateGround(id, { width: width, height: height }, this.scene);
+                this.objects[id] = groundMesh;
+                this.setGroundPhysics(id); // Automatically add physics
                 return groundMesh;
             }
 
@@ -3017,8 +2514,28 @@ workspace_data: "${base64WorkspaceData}"
                 }
             }
 
-            createLight(name, x, y, z) {
-                const light = new BABYLON.PointLight(name, new BABYLON.Vector3(x, y, z), this.scene);
+            createLight(id, type, x, y, z, dx, dy, dz, intensity = 1) {
+                let light;
+                const pos = new BABYLON.Vector3(x, y, z);
+                const dir = new BABYLON.Vector3(dx, dy, dz);
+                switch (type.toLowerCase()) {
+                    case 'directional':
+                        light = new BABYLON.DirectionalLight(id, dir, this.scene);
+                        light.position = pos;
+                        break;
+                    case 'hemispheric':
+                        light = new BABYLON.HemisphericLight(id, dir, this.scene);
+                        break;
+                    case 'spot':
+                        light = new BABYLON.SpotLight(id, pos, dir, Math.PI / 3, 2, this.scene);
+                        break;
+                    case 'point':
+                    default:
+                        light = new BABYLON.PointLight(id, pos, this.scene);
+                        break;
+                }
+                light.intensity = intensity;
+                this.objects[id] = light;
                 return light;
             }
 
@@ -3177,22 +2694,6 @@ workspace_data: "${base64WorkspaceData}"
                 }
             }
 
-            createAdvancedLight(type, name, x, y, z, dx, dy, dz) {
-                let light;
-                const pos = new BABYLON.Vector3(x, y, z);
-                const dir = new BABYLON.Vector3(dx, dy, dz);
-                if (type === 'directional') {
-                    light = new BABYLON.DirectionalLight(name, dir, this.scene);
-                    light.position = pos;
-                } else if (type === 'hemispheric') {
-                    light = new BABYLON.HemisphericLight(name, dir, this.scene);
-                } else if (type === 'spot') {
-                    light = new BABYLON.SpotLight(name, pos, dir, Math.PI / 3, 2, this.scene);
-                } else {
-                    light = new BABYLON.PointLight(name, pos, this.scene);
-                }
-                return light;
-            }
 
             enableShadows(light, meshes) {
                 if (!light || !(light instanceof BABYLON.ShadowLight)) return;
@@ -3390,30 +2891,41 @@ workspace_data: "${base64WorkspaceData}"
             }
 
 
-            async playSound(url) {
+            async playSound(url, id) {
                 if (!isValidAssetURL(url)) {
-                    return;
+                    return null;
                 }
                 // Create a new sound and play it.
 
                 if (!this.audioEngine) {
-                    return;
+                    return null;
                 }
 
-                let sound = await BABYLON.CreateStreamingSoundAsync("sound", url);
+                let sound = await BABYLON.CreateStreamingSoundAsync(id || "sound", url);
 
                 this.sounds.push(sound);
 
                 await this.audioEngine.unlockAsync();
 
                 sound.play();
+                return sound;
             }
 
-            async playSoundAsset(name, assetManager) {
+            async playSoundAsset(name, assetManager, id) {
                 let asset = await assetManager.getAsset(name);
                 if (asset && asset.data instanceof ArrayBuffer) {
-                    this.playSound(URL.createObjectURL(new Blob([asset.data])));
+                    return await this.playSound(URL.createObjectURL(new Blob([asset.data])), id);
                 }
+                return null;
+            }
+
+            async importModelAsset(name, assetManager, id, x, y, z) {
+                let asset = await assetManager.getAsset(name);
+                if (asset && (asset.data instanceof File || asset.data instanceof Blob)) {
+                    const url = URL.createObjectURL(asset.data);
+                    return await this.importModel(id, url, x, y, z);
+                }
+                return null;
             }
 
             playNote(frequency, duration) {
@@ -4613,10 +4125,9 @@ workspace_data: "${base64WorkspaceData}"
                         "check": "String"
                     }
                 ],
-                "previousStatement": null,
-                "nextStatement": null,
+                "output": "Sound",
                 "colour": "%{BKY_AUDIO_HUE}",
-                "tooltip": "Plays a sound from the asset manager.",
+                "tooltip": "Plays a sound from the asset manager and returns a reference to it.",
                 "helpUrl": ""
             },
             {
@@ -4640,34 +4151,6 @@ workspace_data: "${base64WorkspaceData}"
                 "helpUrl": ""
             },
             {
-                "type": "position_model",
-                "message0": "position model %1 at X %2 Y %3 Z %4",
-                "args0": [
-                    {
-                        "type": "input_value",
-                        "name": "MODEL"
-                    },
-                    {
-                        "type": "input_value",
-                        "name": "X"
-                    },
-                    {
-                        "type": "input_value",
-                        "name": "Y"
-                    },
-                    {
-                        "type": "input_value",
-                        "name": "Z"
-                    }
-                ],
-                "inputsInline": true,
-                "previousStatement": null,
-                "nextStatement": null,
-                "colour": 160,
-                "tooltip": "Sets the position of the model to the specified X, Y, and Z coordinates",
-                "helpUrl": ""
-            },
-            {
                 "type": "point_camera_at_mesh",
                 "message0": "point camera at mesh %1",
                 "args0": [
@@ -4686,39 +4169,20 @@ workspace_data: "${base64WorkspaceData}"
             },
             {
                 type: 'import_3d_file_url',
-                message0: 'Import model URL %1\r\n',
+                message0: 'Import model URL %1',
                 args0: [
-                    {
-                        type: 'field_input',
-                        name: 'MODEL_URL',
-                        text: 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/main/2.0/Duck/glTF-Binary/Duck.glb',
-                    }
+                    { "type": "input_value", "name": "MODEL_URL", "check": "String" }
                 ],
                 message1: 'Place at X %1 Y %2 Z %3',
                 args1: [
-                    {
-                        type: 'field_number',
-                        name: 'POS_X',
-                        value: 0,
-                    },
-                    {
-                        type: 'field_number',
-                        name: 'POS_Y',
-                        value: 0,
-                    },
-                    {
-                        type: 'field_number',
-                        name: 'POS_Z',
-                        value: 0,
-                    },
-                ],                
+                    { "type": "input_value", "name": "POS_X", "check": "Number" },
+                    { "type": "input_value", "name": "POS_Y", "check": "Number" },
+                    { "type": "input_value", "name": "POS_Z", "check": "Number" },
+                ],
                 colour: 160,
-                tooltip: 'Imports a 3D file from a URL and executes actions on success.',
+                tooltip: 'Imports a 3D file from a URL and returns a reference to it.',
                 output: "Mesh",
                 helpUrl: '',
-                extensions: [
-                    'set_max_display_length',
-                ],
             },
             {
                 type: 'set_isometric_camera',
@@ -4747,7 +4211,7 @@ workspace_data: "${base64WorkspaceData}"
             },
             {
                 type: 'create_primitive',
-                message0: 'Create %1 named %2 at x %3 y %4 z %5',
+                message0: 'Create %1 at x %2 y %3 z %4',
                 args0: [
                     {
                         type: 'field_dropdown',
@@ -4760,22 +4224,6 @@ workspace_data: "${base64WorkspaceData}"
                             ['torus', 'torus']
                         ],
                     },
-                    { "type": "input_value", "name": "NAME", "check": "String" },
-                    { type: 'input_value', name: 'X', check: 'Number' },
-                    { type: 'input_value', name: 'Y', check: 'Number' },
-                    { type: 'input_value', name: 'Z', check: 'Number' },
-                ],
-                "inputsInline": true,
-                previousStatement: null,
-                nextStatement: null,
-                colour: 160,
-                tooltip: 'Creates a 3D primitive at the specified position.',
-            },
-            {
-                type: 'create_box',
-                message0: 'Create box named %1 at x %2 y %3 z %4',
-                args0: [
-                    { "type": "input_value", "name": "NAME", "check": "String" },
                     { type: 'input_value', name: 'X', check: 'Number' },
                     { type: 'input_value', name: 'Y', check: 'Number' },
                     { type: 'input_value', name: 'Z', check: 'Number' },
@@ -4783,36 +4231,22 @@ workspace_data: "${base64WorkspaceData}"
                 "inputsInline": true,
                 output: "Mesh",
                 colour: 160,
-                tooltip: 'Creates a box at the specified position and returns it.',
-            },
-            {
-                type: 'create_sphere',
-                message0: 'Create sphere at x %1 y %2 z %3',
-                args0: [
-                    { type: 'input_value', name: 'X', check: 'Number' },
-                    { type: 'input_value', name: 'Y', check: 'Number' },
-                    { type: 'input_value', name: 'Z', check: 'Number' },
-                ],
-                "inputsInline": true,
-                output: "Mesh",
-                colour: 160,
-                tooltip: 'Creates a sphere at the specified position and returns it.',
+                tooltip: 'Creates a 3D primitive and returns a reference to it.',
             },
             {
                 "type": "create_3d_text",
-                "message0": "create 3D text %1 named %2",
+                "message0": "create 3D text %1",
                 "args0": [
                     { "type": "input_value", "name": "TEXT", "check": "String" },
-                    { "type": "input_value", "name": "NAME", "check": "String" },
                 ],
                 "message1": "font URL %1",
                 "args1": [
-                    { "type": "field_input", "name": "FONT_URL", "text": "https://assets.babylonjs.com/fonts/Droid Sans_Bold.json" }
+                    { "type": "input_value", "name": "FONT_URL", "check": "String" }
                 ],
                 "output": "Mesh",
                 "colour": 160,
                 "inputsInline": false,
-                "tooltip": "Creates a 3D text mesh.",
+                "tooltip": "Creates a 3D text mesh and returns a reference to it.",
                 "helpUrl": ""
             },
             {
@@ -4889,7 +4323,7 @@ workspace_data: "${base64WorkspaceData}"
             },
             {
                 type: 'move_object',
-                message0: 'Move object %1 to x %2 y %3 z %4',
+                message0: 'Move %1 to x %2 y %3 z %4',
                 args0: [
                     { type: 'input_value', name: 'NAME' },
                     { type: 'input_value', name: 'X', check: 'Number' },
@@ -4903,19 +4337,35 @@ workspace_data: "${base64WorkspaceData}"
                 tooltip: 'Moves an object to the specified position',
             },
             {
-                type: 'create_light',
-                message0: 'Create light named %1 at x %2 y %3 z %4',
-                args0: [
-                    { type: 'field_input', name: 'NAME', text: 'light' },
-                    { type: 'input_value', name: 'X', check: 'Number' },
-                    { type: 'input_value', name: 'Y', check: 'Number' },
-                    { type: 'input_value', name: 'Z', check: 'Number' },
+                "type": "create_light",
+                "message0": "create %1 light",
+                "args0": [
+                    {
+                        "type": "field_dropdown",
+                        "name": "TYPE",
+                        "options": [["directional", "directional"], ["hemispheric", "hemispheric"], ["spot", "spot"], ["point", "point"]]
+                    }
                 ],
-                "inputsInline": true,
-                previousStatement: null,
-                nextStatement: null,
-                colour: 65,
-                tooltip: 'Creates a light at the specified position',
+                "message1": "at x %1 y %2 z %3",
+                "args1": [
+                    { "type": "input_value", "name": "X", "check": "Number" },
+                    { "type": "input_value", "name": "Y", "check": "Number" },
+                    { "type": "input_value", "name": "Z", "check": "Number" }
+                ],
+                "message2": "direction x %1 y %2 z %3",
+                "args2": [
+                    { "type": "input_value", "name": "DX", "check": "Number" },
+                    { "type": "input_value", "name": "DY", "check": "Number" },
+                    { "type": "input_value", "name": "DZ", "check": "Number" }
+                ],
+                "message3": "intensity %1",
+                "args3": [
+                    { "type": "input_value", "name": "INTENSITY", "check": "Number" }
+                ],
+                "output": "Light",
+                "colour": 65,
+                "tooltip": "Creates a light with position, direction, and intensity and returns a reference to it.",
+                "helpUrl": ""
             },
             {
                 type: 'change_object_color',
@@ -5001,7 +4451,9 @@ workspace_data: "${base64WorkspaceData}"
                         "type": "field_dropdown",
                         "name": "PROPERTY",
                         "options": [
-                            ["visibility", "visibility"]
+                            ["visibility", "visibility"],
+                            ["intensity", "intensity"],
+                            ["alpha", "material.alpha"]
                         ]
                     },
                     {
@@ -5031,7 +4483,7 @@ workspace_data: "${base64WorkspaceData}"
                 "previousStatement": null,
                 "nextStatement": null,
                 "colour": 300,
-                "tooltip": "Animates a property of an object over a duration."
+                "tooltip": "Animates a float property of an object over a duration."
             },
             {
                 "type": "import_animation",
@@ -5105,9 +4557,14 @@ workspace_data: "${base64WorkspaceData}"
                 "tooltip": "Stops all property animations (e.g., position, rotation, scale) on the specified object."
             },
             {
-                "type": "animate_rotation",
-                "message0": "animate rotation of %1 to x %2 y %3 z %4 degrees over %5 seconds",
+                "type": "animate_transform",
+                "message0": "animate %1 of %2 to x %3 y %4 z %5 over %6 seconds",
                 "args0": [
+                    {
+                        "type": "field_dropdown",
+                        "name": "TYPE",
+                        "options": [["position", "position"], ["rotation", "rotation"], ["scale", "scale"]]
+                    },
                     { "type": "input_value", "name": "OBJECT" },
                     { "type": "input_value", "name": "X", "check": "Number" },
                     { "type": "input_value", "name": "Y", "check": "Number" },
@@ -5126,55 +4583,7 @@ workspace_data: "${base64WorkspaceData}"
                 "previousStatement": null,
                 "nextStatement": null,
                 "colour": 300,
-                "tooltip": "Animates the rotation of an object."
-            },
-            {
-                "type": "animate_position",
-                "message0": "animate position of %1 to x %2 y %3 z %4 over %5 seconds",
-                "args0": [
-                    { "type": "input_value", "name": "OBJECT" },
-                    { "type": "input_value", "name": "X", "check": "Number" },
-                    { "type": "input_value", "name": "Y", "check": "Number" },
-                    { "type": "input_value", "name": "Z", "check": "Number" },
-                    { "type": "input_value", "name": "DURATION", "check": "Number" }
-                ],
-                "message1": "loop %1",
-                "args1": [
-                    {
-                        "type": "field_dropdown",
-                        "name": "LOOP",
-                        "options": [["no", "NO"], ["yes", "YES"], ["ping-pong", "PINGPONG"]]
-                    }
-                ],
-                "inputsInline": false,
-                "previousStatement": null,
-                "nextStatement": null,
-                "colour": 300,
-                "tooltip": "Animates the position of an object."
-            },
-            {
-                "type": "animate_scale",
-                "message0": "animate scale of %1 to x %2 y %3 z %4 over %5 seconds",
-                "args0": [
-                    { "type": "input_value", "name": "OBJECT" },
-                    { "type": "input_value", "name": "X", "check": "Number" },
-                    { "type": "input_value", "name": "Y", "check": "Number" },
-                    { "type": "input_value", "name": "Z", "check": "Number" },
-                    { "type": "input_value", "name": "DURATION", "check": "Number" }
-                ],
-                "message1": "loop %1",
-                "args1": [
-                    {
-                        "type": "field_dropdown",
-                        "name": "LOOP",
-                        "options": [["no", "NO"], ["yes", "YES"], ["ping-pong", "PINGPONG"]]
-                    }
-                ],
-                "inputsInline": false,
-                "previousStatement": null,
-                "nextStatement": null,
-                "colour": 300,
-                "tooltip": "Animates the scale of an object."
+                "tooltip": "Animates the position, rotation, or scale of an object."
             },
             {
                 type: 'enable_physics',
@@ -5275,43 +4684,13 @@ workspace_data: "${base64WorkspaceData}"
                 tooltip: 'Sets the gravity for the entire scene',
             },
             {
-                type: 'set_physics_impostor',
-                message0: 'Set physics impostor for %1 to %2',
-                args0: [
-                    { type: 'field_input', name: 'NAME', text: 'object' },
-                    {
-                        type: 'field_dropdown',
-                        name: 'IMPOSTOR',
-                        options: [
-                            ['Box', 'BABYLON.PhysicsImpostor.BoxImpostor'],
-                            ['Sphere', 'BABYLON.PhysicsImpostor.SphereImpostor'],
-                            ['Plane', 'BABYLON.PhysicsImpostor.PlaneImpostor'],
-                            ['Mesh', 'BABYLON.PhysicsImpostor.MeshImpostor']
-                        ],
-                    },
-                ],
-                "inputsInline": true,
-                previousStatement: null,
-                nextStatement: null,
-                colour: 120,
-                tooltip: 'Sets the physics impostor type for the specified object',
-            },
             {
                 type: 'create_camera',
-                message0: 'Create camera named %1 and save as %2',
-                args0: [
-                    { type: 'field_input', name: 'NAME', text: 'camera' },
-                    {
-                        type: 'field_variable',
-                        name: 'MODEL_VAR',
-                        variable: 'camera',
-                    },
-                ],
+                message0: 'Create camera',
                 "inputsInline": true,
-                previousStatement: null,
-                nextStatement: null,
+                output: "Camera",
                 colour: 180,
-                tooltip: 'Creates a scene camera',
+                tooltip: 'Returns a reference to the scene camera',
             },
             {
                 type: 'create_ground',
@@ -5324,55 +4703,6 @@ workspace_data: "${base64WorkspaceData}"
                 output: "Mesh",
                 colour: 180,
                 tooltip: 'Creates a ground mesh with specified width and height',
-            },
-            {
-                type: 'set_ground_material',
-                message0: 'Set material %1 on ground %2',
-                args0: [
-                    { type: 'field_input', name: 'MATERIAL', text: 'material' },
-                    { type: 'field_input', name: 'NAME', text: 'ground' },
-                ],
-                "inputsInline": true,
-                previousStatement: null,
-                nextStatement: null,
-                colour: 180,
-                tooltip: 'Sets a material on the specified ground object',
-            },
-            {
-                type: 'set_ground_physics',
-                message0: 'Enable physics on ground %1 with impostor %2',
-                args0: [
-                    { type: 'field_input', name: 'NAME', text: 'ground' },
-                    {
-                        type: 'field_dropdown',
-                        name: 'IMPOSTOR',
-                        options: [
-                            ['Plane', 'BABYLON.PhysicsImpostor.PlaneImpostor'],
-                            ['Box', 'BABYLON.PhysicsImpostor.BoxImpostor'],
-                        ],
-                    },
-                ],
-                "inputsInline": true,
-                previousStatement: null,
-                nextStatement: null,
-                colour: 180,
-                tooltip: 'Enables physics on the ground object with the selected impostor',
-            },
-            // Scripting Blocks
-            {
-                "type": "select_object",
-                "message0": "object named %1",
-                "args0": [
-                    {
-                        "type": "field_input",
-                        "name": "OBJECT_NAME",
-                        "text": "myObject" // Default text
-                    }
-                ],
-                "output": "String", // Outputs the object name/ID as a string
-                "colour": "%{BKY_LOGIC_HUE}", // Using logic hue for now
-                "tooltip": "Selects an object from the scene by its name.",
-                "helpUrl": ""
             },
             // Phase 2 Blockly Blocks
             {
@@ -5636,16 +4966,11 @@ workspace_data: "${base64WorkspaceData}"
                 "type": "play_sound_url",
                 "message0": "play sound from URL %1",
                 "args0": [
-                    {
-                        "type": "field_input",
-                        "name": "URL",
-                        "text": "https://example.com/sound.mp3"
-                    }
+                    { "type": "input_value", "name": "URL", "check": "String" }
                 ],
-                "previousStatement": null,
-                "nextStatement": null,
+                "output": "Sound",
                 "colour": "#5B80A5",
-                "tooltip": "Plays a sound from a URL.",
+                "tooltip": "Plays a sound from a URL and returns a reference to it.",
                 "helpUrl": ""
             },
             {
@@ -6106,10 +5431,9 @@ workspace_data: "${base64WorkspaceData}"
                     },
                     { "type": "input_value", "name": "TARGET" }
                 ],
-                "previousStatement": null,
-                "nextStatement": null,
+                "output": "ParticleSystem",
                 "colour": 160,
-                "tooltip": "Creates a particle system on the specified object.",
+                "tooltip": "Creates a particle system on the specified object and returns a reference to it.",
                 "helpUrl": ""
             },
             {
@@ -6150,34 +5474,6 @@ workspace_data: "${base64WorkspaceData}"
                 "helpUrl": ""
             },
             {
-                "type": "create_advanced_light",
-                "message0": "create %1 light named %2",
-                "args0": [
-                    {
-                        "type": "field_dropdown",
-                        "name": "TYPE",
-                        "options": [["directional", "directional"], ["hemispheric", "hemispheric"], ["spot", "spot"], ["point", "point"]]
-                    },
-                    { "type": "field_input", "name": "NAME", "text": "light" }
-                ],
-                "message1": "position x %1 y %2 z %3",
-                "args1": [
-                    { "type": "input_value", "name": "X", "check": "Number" },
-                    { "type": "input_value", "name": "Y", "check": "Number" },
-                    { "type": "input_value", "name": "Z", "check": "Number" }
-                ],
-                "message2": "direction x %1 y %2 z %3",
-                "args2": [
-                    { "type": "input_value", "name": "DX", "check": "Number" },
-                    { "type": "input_value", "name": "DY", "check": "Number" },
-                    { "type": "input_value", "name": "DZ", "check": "Number" }
-                ],
-                "output": "Light",
-                "colour": 65,
-                "tooltip": "Creates an advanced light with position and direction.",
-                "helpUrl": ""
-            },
-            {
                 "type": "enable_shadows",
                 "message0": "enable shadows for light %1 on %2",
                 "args0": [
@@ -6202,6 +5498,21 @@ workspace_data: "${base64WorkspaceData}"
                 "colour": 180,
                 "tooltip": "Enables or disables the glow effect for the whole scene.",
                 "helpUrl": ""
+            },
+            {
+                "type": "get_scene_object",
+                "message0": "get %1",
+                "args0": [
+                    {
+                        "type": "field_dropdown",
+                        "name": "TYPE",
+                        "options": [["player", "player"], ["camera", "camera"], ["scene", "scene"]]
+                    }
+                ],
+                "output": null,
+                "colour": 230,
+                "tooltip": "Returns a reference to a system-managed object.",
+                "helpUrl": ""
             }
         ]);
 
@@ -6209,7 +5520,8 @@ workspace_data: "${base64WorkspaceData}"
             javascript.javascriptGenerator.forBlock['create_particles'] = function (block, generator) {
                 const type = block.getFieldValue('TYPE');
                 const target = generator.valueToCode(block, 'TARGET', generator.ORDER_ATOMIC) || 'null';
-                return `sceneManager.createParticleSystem(${target}, '${type}');\n`;
+                const code = `sceneManager.createParticleSystem(${target}, '${type}')`;
+                return [code, generator.ORDER_FUNCTION_CALL];
             };
 
             javascript.javascriptGenerator.forBlock['set_fog'] = function (block, generator) {
@@ -6228,19 +5540,6 @@ workspace_data: "${base64WorkspaceData}"
                 return `sceneManager.setOutline(${target}, ${width}, ${color});\n`;
             };
 
-            javascript.javascriptGenerator.forBlock['create_advanced_light'] = function (block, generator) {
-                const type = block.getFieldValue('TYPE');
-                const name = block.getFieldValue('NAME');
-                const x = generator.valueToCode(block, 'X', generator.ORDER_ATOMIC) || 0;
-                const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || 10;
-                const z = generator.valueToCode(block, 'Z', generator.ORDER_ATOMIC) || 0;
-                const dx = generator.valueToCode(block, 'DX', generator.ORDER_ATOMIC) || 0;
-                const dy = generator.valueToCode(block, 'DY', generator.ORDER_ATOMIC) || -1;
-                const dz = generator.valueToCode(block, 'DZ', generator.ORDER_ATOMIC) || 0;
-                const code = `sceneManager.createAdvancedLight('${type}', '${name}', ${x}, ${y}, ${z}, ${dx}, ${dy}, ${dz})`;
-                return [code, generator.ORDER_ATOMIC];
-            };
-
             javascript.javascriptGenerator.forBlock['enable_shadows'] = function (block, generator) {
                 const light = generator.valueToCode(block, 'LIGHT', generator.ORDER_ATOMIC) || 'null';
                 const targets = generator.valueToCode(block, 'TARGETS', generator.ORDER_ATOMIC) || '[]';
@@ -6253,6 +5552,12 @@ workspace_data: "${base64WorkspaceData}"
                 return `sceneManager.setGlow(${enabled}, ${intensity});\n`;
             };
 
+            javascript.javascriptGenerator.forBlock['get_scene_object'] = function (block, generator) {
+                const type = block.getFieldValue('TYPE');
+                const code = `sceneManager.getSceneObject('${type}')`;
+                return [code, generator.ORDER_ATOMIC];
+            };
+
             javascript.javascriptGenerator.forBlock['set_property'] = function (block, generator) {
                 const property = generator.valueToCode(block, 'PROPERTY', generator.ORDER_ATOMIC) || "''";
                 const target = generator.valueToCode(block, 'TARGET', generator.ORDER_ATOMIC) || 'null';
@@ -6261,6 +5566,7 @@ workspace_data: "${base64WorkspaceData}"
             };
 
             javascript.javascriptGenerator.forBlock['create_popup'] = function (block, generator) {
+                const id = 'id_' + Blockly.utils.idGenerator.genUid();
                 const title = generator.valueToCode(block, 'TITLE', generator.ORDER_ATOMIC) || "''";
                 const text = generator.valueToCode(block, 'TEXT', generator.ORDER_ATOMIC) || "''";
                 const image = generator.valueToCode(block, 'IMAGE', generator.ORDER_ATOMIC) || "null";
@@ -6269,23 +5575,16 @@ workspace_data: "${base64WorkspaceData}"
                 const button2Name = generator.valueToCode(block, 'BUTTON2_NAME', generator.ORDER_ATOMIC) || "''";
                 const button2Text = generator.valueToCode(block, 'BUTTON2_TEXT', generator.ORDER_ATOMIC) || "''";
 
-                // Get the parent block, which should be a variables_set block
-                const parentBlock = block.getParent();
-                let variableName = 'myPopup'; // Default name
-                if (parentBlock && parentBlock.type === 'variables_set') {
-                    variableName = parentBlock.getVarModels()[0].name;
-                }
-
                 const options = `{
                     text: ${text},
                     image: ${image},
-                    button1_name: ${button1Name} || \`\${'${variableName}'}_button1\`,
+                    button1_name: ${button1Name} || \`\${'${id}'}_button1\`,
                     button1_text: ${button1Text},
-                    button2_name: ${button2Name} || \`\${'${variableName}'}_button2\`,
+                    button2_name: ${button2Name} || \`\${'${id}'}_button2\`,
                     button2_text: ${button2Text}
                 }`;
-                const code = `sceneManager.createPopup('${variableName}', ${title}, ${options})`;
-                return [code, generator.ORDER_ATOMIC];
+                const code = `sceneManager.createPopup('${id}', ${title}, ${options})`;
+                return [code, generator.ORDER_FUNCTION_CALL];
             };
 
             javascript.javascriptGenerator.forBlock['show_popup'] = function (block, generator) {
@@ -6378,10 +5677,6 @@ if (${name}) {
 `;
             };
 
-            javascript.javascriptGenerator.forBlock['select_object'] = function (block, generator) {
-                const objectName = block.getFieldValue('OBJECT_NAME');
-                return [`'${objectName}'`, generator.ORDER_ATOMIC];
-            };
 
             // --- Player and Camera Block Generators ---
             javascript.javascriptGenerator.forBlock['set_as_player'] = function (block, generator) {
@@ -6450,19 +5745,10 @@ if (${name}) {
             };
 
             // --- Simplified JavaScript Generators ---
-            javascript.javascriptGenerator.forBlock['position_model'] = function (block, generator) {
-                const modelVar = generator.valueToCode(block, 'MODEL', generator.ORDER_ATOMIC) || 'null';
-                const x = generator.valueToCode(block, 'X', generator.ORDER_ATOMIC) || '0';
-                const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || '0';
-                const z = generator.valueToCode(block, 'Z', generator.ORDER_ATOMIC) || '0';
-                return `sceneManager.move(${modelVar}, ${x}, ${y}, ${z});\n`;
-            };
 
             javascript.javascriptGenerator.forBlock['create_camera'] = function (block, generator) {
-                const name = block.getFieldValue('NAME');
-                // This block is now mostly for semantic purpose, as camera is initialized.
-                // We can consider removing it or making it switch between camera types.
-                return `// Camera is managed by the sceneManager\n`;
+                const code = `sceneManager.getSceneObject('camera')`;
+                return [code, generator.ORDER_FUNCTION_CALL];
             };
 
             javascript.javascriptGenerator.forBlock['point_camera_at_mesh'] = function (block, generator) {
@@ -6471,21 +5757,26 @@ if (${name}) {
             };
 
             javascript.javascriptGenerator.forBlock['import_3d_file_url'] = function (block, generator) {
-                const modelUrl = block.getFieldValue('MODEL_URL');
-                const posX = block.getFieldValue('POS_X');
-                const posY = block.getFieldValue('POS_Y');
-                const posZ = block.getFieldValue('POS_Z');                
-                const modelVarName = javascript.javascriptGenerator.nameDB_.getDistinctName(Blockly.utils.idGenerator.genUid(), Blockly.Variables.NameType);
+                const modelUrl = generator.valueToCode(block, 'MODEL_URL', generator.ORDER_ATOMIC) || "''";
+                const posX = generator.valueToCode(block, 'POS_X', generator.ORDER_ATOMIC) || 0;
+                const posY = generator.valueToCode(block, 'POS_Y', generator.ORDER_ATOMIC) || 0;
+                const posZ = generator.valueToCode(block, 'POS_Z', generator.ORDER_ATOMIC) || 0;
+                const id = 'id_' + Blockly.utils.idGenerator.genUid();
 
                 let code;
-                const robloxMatch = modelUrl.match(/roblox\.com\/(?:users|users\/profile)\/(\d+)/i);
-                if (robloxMatch) {
-                    const userId = robloxMatch[1];
-                    code = `await sceneManager.importRobloxAvatar('${modelVarName}', ${userId}, ${posX}, ${posY}, ${posZ})`;
-                } else {
-                    code = `await sceneManager.importModel('${modelVarName}', '${modelUrl}', ${posX}, ${posY}, ${posZ})`;
-                }
-                return [code, generator.ORDER_ATOMIC];
+                // Since modelUrl is code (e.g. "'https://...'"), we need to handle it carefully if it's a literal for roblox check
+                // For now, let's assume it's a direct import or simple string literal.
+                // Dynamic check for roblox would need to be in the generated JS.
+                code = `await (async () => {
+                    const url = ${modelUrl};
+                    const robloxMatch = url.match(/roblox\\.com\\/(?:users|users\\/profile)\\/(\\d+)/i);
+                    if (robloxMatch) {
+                        return await sceneManager.importRobloxAvatar('${id}', robloxMatch[1], ${posX}, ${posY}, ${posZ});
+                    } else {
+                        return await sceneManager.importModel('${id}', url, ${posX}, ${posY}, ${posZ});
+                    }
+                })()`;
+                return [code, generator.ORDER_AWAIT];
             };
 
             javascript.javascriptGenerator.forBlock['set_isometric_camera'] = function (block, generator) {
@@ -6498,69 +5789,31 @@ if (${name}) {
             };
 
             javascript.javascriptGenerator.forBlock['create_ground'] = function (block, generator) {
-                const name = javascript.javascriptGenerator.nameDB_.getDistinctName(Blockly.utils.idGenerator.genUid(), Blockly.Variables.NameType);
+                const id = 'id_' + Blockly.utils.idGenerator.genUid();
                 const width = generator.valueToCode(block, 'WIDTH', generator.ORDER_ATOMIC) || 10;
                 const height = generator.valueToCode(block, 'HEIGHT', generator.ORDER_ATOMIC) || 10;
-                const code = `sceneManager.createGround('${name}', ${width}, ${height});\n`;
-                return [code, generator.ORDER_ATOMIC];
+                const code = `sceneManager.createGround('${id}', ${width}, ${height})`;
+                return [code, generator.ORDER_FUNCTION_CALL];
             };
 
-            javascript.javascriptGenerator.forBlock['set_ground_material'] = function (block, generator) {
-                // This block is less relevant now, could be replaced with a generic color/texture block.
-                return `// Material settings can be adjusted with changeColor or future texture blocks.\n`;
-            };
-
-            javascript.javascriptGenerator.forBlock['set_ground_physics'] = function (block, generator) {
-                const name = block.getFieldValue('NAME');
-                return `sceneManager.setGroundPhysics('${name}');\n`;
-            };
 
             javascript.javascriptGenerator.forBlock['create_primitive'] = function (block, generator) {
                 const type = block.getFieldValue('TYPE');
-                const name = generator.valueToCode(block, 'NAME', generator.ORDER_ATOMIC) || "'myObject'";
+                const id = 'id_' + Blockly.utils.idGenerator.genUid();
                 const x = generator.valueToCode(block, 'X', generator.ORDER_ATOMIC) || 0;
                 const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || 0;
                 const z = generator.valueToCode(block, 'Z', generator.ORDER_ATOMIC) || 0;
 
-                let code;
-                if (type === 'sphere') {
-                    code = `sceneManager.createSphere(${name}, ${x}, ${y}, ${z});\n`;
-                } else if (type === 'cylinder') {
-                    code = `sceneManager.createCylinder(${name}, ${x}, ${y}, ${z});\n`;
-                } else if (type === 'cone') {
-                    code = `sceneManager.createCone(${name}, ${x}, ${y}, ${z});\n`;
-                } else if (type === 'torus') {
-                    code = `sceneManager.createTorus(${name}, ${x}, ${y}, ${z});\n`;
-                } else {
-                    code = `sceneManager.createBox(${name}, ${x}, ${y}, ${z});\n`;
-                }
-                return code;
-            };
-
-            javascript.javascriptGenerator.forBlock['create_box'] = function (block, generator) {
-                const name = generator.valueToCode(block, 'NAME', generator.ORDER_ATOMIC) || "'myBox'";
-                const x = generator.valueToCode(block, 'X', generator.ORDER_ATOMIC) || 0;
-                const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || 0;
-                const z = generator.valueToCode(block, 'Z', generator.ORDER_ATOMIC) || 0;
-                const code = `sceneManager.createBox(${name}, ${x}, ${y}, ${z})`;
-                return [code, generator.ORDER_ATOMIC];
-            };
-
-            javascript.javascriptGenerator.forBlock['create_sphere'] = function (block, generator) {
-                const name = javascript.javascriptGenerator.nameDB_.getDistinctName(Blockly.utils.idGenerator.genUid(), Blockly.Variables.NameType);
-                const x = generator.valueToCode(block, 'X', generator.ORDER_ATOMIC) || 0;
-                const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || 0;
-                const z = generator.valueToCode(block, 'Z', generator.ORDER_ATOMIC) || 0;
-                const code = `sceneManager.createSphere('${name}', ${x}, ${y}, ${z})`;
-                return [code, generator.ORDER_ATOMIC];
+                const code = `sceneManager.createPrimitive('${id}', '${type}', ${x}, ${y}, ${z})`;
+                return [code, generator.ORDER_FUNCTION_CALL];
             };
 
             javascript.javascriptGenerator.forBlock['create_3d_text'] = function (block, generator) {
                 const text = generator.valueToCode(block, 'TEXT', generator.ORDER_ATOMIC) || "''";
-                const name = generator.valueToCode(block, 'NAME', generator.ORDER_ATOMIC) || "'myText'";
-                const fontUrl = block.getFieldValue('FONT_URL');
-                const code = `await sceneManager.createText(${name}, ${text}, '${fontUrl}')`;
-                return [code, generator.ORDER_ATOMIC];
+                const id = 'id_' + Blockly.utils.idGenerator.genUid();
+                const fontUrl = generator.valueToCode(block, 'FONT_URL', generator.ORDER_ATOMIC) || "'https://assets.babylonjs.com/fonts/Droid Sans_Bold.json'";
+                const code = `await sceneManager.createText('${id}', ${text}, ${fontUrl})`;
+                return [code, generator.ORDER_AWAIT];
             };
 
             javascript.javascriptGenerator.forBlock['scale_object'] = function (block, generator) {
@@ -6601,11 +5854,17 @@ if (${name}) {
             };
 
             javascript.javascriptGenerator.forBlock['create_light'] = function (block, generator) {
-                const name = block.getFieldValue('NAME');
+                const type = block.getFieldValue('TYPE');
+                const id = 'id_' + Blockly.utils.idGenerator.genUid();
                 const x = generator.valueToCode(block, 'X', generator.ORDER_ATOMIC) || 0;
                 const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || 0;
                 const z = generator.valueToCode(block, 'Z', generator.ORDER_ATOMIC) || 0;
-                return `sceneManager.createLight('${name}', ${x}, ${y}, ${z});\n`;
+                const dx = generator.valueToCode(block, 'DX', generator.ORDER_ATOMIC) || 0;
+                const dy = generator.valueToCode(block, 'DY', generator.ORDER_ATOMIC) || 0;
+                const dz = generator.valueToCode(block, 'DZ', generator.ORDER_ATOMIC) || 0;
+                const intensity = generator.valueToCode(block, 'INTENSITY', generator.ORDER_ATOMIC) || 1;
+                const code = `sceneManager.createLight('${id}', '${type}', ${x}, ${y}, ${z}, ${dx}, ${dy}, ${dz}, ${intensity})`;
+                return [code, generator.ORDER_FUNCTION_CALL];
             };
 
             javascript.javascriptGenerator.forBlock['change_object_color'] = function (block, generator) {
@@ -6668,6 +5927,34 @@ if (${name}) {
                 return `sceneManager.animateProperty(${object}, '${property}', ${from}, ${to}, ${duration}, ${loopBool}, '${loopMode}');\n`;
             };
 
+            javascript.javascriptGenerator.forBlock['animate_transform'] = function (block, generator) {
+                const object = generator.valueToCode(block, 'OBJECT', generator.ORDER_ATOMIC) || 'null';
+                const type = block.getFieldValue('TYPE');
+                const x = generator.valueToCode(block, 'X', generator.ORDER_ATOMIC) || 0;
+                const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || 0;
+                const z = generator.valueToCode(block, 'Z', generator.ORDER_ATOMIC) || 0;
+                const duration = generator.valueToCode(block, 'DURATION', generator.ORDER_ATOMIC) || 1;
+                const loop = block.getFieldValue('LOOP');
+
+                let loopBool = false;
+                let loopMode = 'CYCLE';
+
+                if (loop === 'YES') {
+                    loopBool = true;
+                } else if (loop === 'PINGPONG') {
+                    loopBool = true;
+                    loopMode = 'PINGPONG';
+                }
+
+                if (type === 'rotation') {
+                    return `sceneManager.animateRotation(${object}, ${x}, ${y}, ${z}, ${duration}, ${loopBool}, '${loopMode}');\n`;
+                } else if (type === 'position') {
+                    return `sceneManager.animatePosition(${object}, ${x}, ${y}, ${z}, ${duration}, ${loopBool}, '${loopMode}');\n`;
+                } else {
+                    return `sceneManager.animateScale(${object}, ${x}, ${y}, ${z}, ${duration}, ${loopBool}, '${loopMode}');\n`;
+                }
+            };
+
             javascript.javascriptGenerator.forBlock['import_animation'] = function(block, generator) {
                 const url = block.getFieldValue('URL');
                 const varName = generator.nameDB_.getName(block.getFieldValue('VAR'), Blockly.Variables.NAME_TYPE);
@@ -6698,68 +5985,6 @@ if (${name}) {
                 return `sceneManager.stopPropertyAnimation(${object});\n`;
             };
 
-            javascript.javascriptGenerator.forBlock['animate_rotation'] = function (block, generator) {
-                const object = generator.valueToCode(block, 'OBJECT', generator.ORDER_ATOMIC) || 'null';
-                const x = generator.valueToCode(block, 'X', generator.ORDER_ATOMIC) || 0;
-                const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || 0;
-                const z = generator.valueToCode(block, 'Z', generator.ORDER_ATOMIC) || 0;
-                const duration = generator.valueToCode(block, 'DURATION', generator.ORDER_ATOMIC) || 1;
-                const loop = block.getFieldValue('LOOP');
-
-                let loopBool = false;
-                let loopMode = 'CYCLE';
-
-                if (loop === 'YES') {
-                    loopBool = true;
-                } else if (loop === 'PINGPONG') {
-                    loopBool = true;
-                    loopMode = 'PINGPONG';
-                }
-
-                return `sceneManager.animateRotation(${object}, ${x}, ${y}, ${z}, ${duration}, ${loopBool}, '${loopMode}');\n`;
-            };
-
-            javascript.javascriptGenerator.forBlock['animate_position'] = function (block, generator) {
-                const object = generator.valueToCode(block, 'OBJECT', generator.ORDER_ATOMIC) || 'null';
-                const x = generator.valueToCode(block, 'X', generator.ORDER_ATOMIC) || 0;
-                const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || 0;
-                const z = generator.valueToCode(block, 'Z', generator.ORDER_ATOMIC) || 0;
-                const duration = generator.valueToCode(block, 'DURATION', generator.ORDER_ATOMIC) || 1;
-                const loop = block.getFieldValue('LOOP');
-
-                let loopBool = false;
-                let loopMode = 'CYCLE';
-
-                if (loop === 'YES') {
-                    loopBool = true;
-                } else if (loop === 'PINGPONG') {
-                    loopBool = true;
-                    loopMode = 'PINGPONG';
-                }
-
-                return `sceneManager.animatePosition(${object}, ${x}, ${y}, ${z}, ${duration}, ${loopBool}, '${loopMode}');\n`;
-            };
-
-            javascript.javascriptGenerator.forBlock['animate_scale'] = function (block, generator) {
-                const object = generator.valueToCode(block, 'OBJECT', generator.ORDER_ATOMIC) || 'null';
-                const x = generator.valueToCode(block, 'X', generator.ORDER_ATOMIC) || 1;
-                const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || 1;
-                const z = generator.valueToCode(block, 'Z', generator.ORDER_ATOMIC) || 1;
-                const duration = generator.valueToCode(block, 'DURATION', generator.ORDER_ATOMIC) || 1;
-                const loop = block.getFieldValue('LOOP');
-
-                let loopBool = false;
-                let loopMode = 'CYCLE';
-
-                if (loop === 'YES') {
-                    loopBool = true;
-                } else if (loop === 'PINGPONG') {
-                    loopBool = true;
-                    loopMode = 'PINGPONG';
-                }
-
-                return `sceneManager.animateScale(${object}, ${x}, ${y}, ${z}, ${duration}, ${loopBool}, '${loopMode}');\n`;
-            };
 
             javascript.javascriptGenerator.forBlock['enable_physics'] = function (block, generator) {
                 const name = generator.valueToCode(block, 'NAME', generator.ORDER_ATOMIC) || 'null';
@@ -6810,20 +6035,13 @@ if (${name}) {
                 return `sceneManager.setGravity(${gx}, ${gy}, ${gz});\n`;
             };
 
-            javascript.javascriptGenerator.forBlock['set_physics_impostor'] = function (block, generator) {
-                const name = block.getFieldValue('NAME');
-                const impostorField = block.getFieldValue('IMPOSTOR');
-                // Extract the type from the full BABYLON path
-                const impostorType = impostorField.split('.').pop();
-                return `// Physics impostor is now set via enablePhysics. For '${name}', you can specify type.\n`;
-            };
 
             // --- Audio Block Generators ---
             javascript.javascriptGenerator.forBlock['play_sound_url'] = function (block, generator) {
-                const url = block.getFieldValue('URL');
-                return `
-                    sceneManager.playSound('${url}');
-                `;
+                const url = generator.valueToCode(block, 'URL', generator.ORDER_ATOMIC) || "''";
+                const id = 'id_' + Blockly.utils.idGenerator.genUid();
+                const code = `await sceneManager.playSound(${url}, '${id}')`;
+                return [code, generator.ORDER_AWAIT];
             };
 
             javascript.javascriptGenerator.forBlock['play_note'] = function (block, generator) {
@@ -6848,14 +6066,17 @@ if (${name}) {
             };
 
             javascript.javascriptGenerator.forBlock['import_model_from_asset'] = function (block, generator) {
+                const id = 'id_' + Blockly.utils.idGenerator.genUid();
                 const assetName = generator.valueToCode(block, 'ASSET', generator.ORDER_ATOMIC) || 'null';
-                const varName = generator.nameDB_.getName(block.getFieldValue('VAR'), Blockly.Variables.NAME_TYPE);
-                return `var ${varName} = await sceneManager.importModelAsset(${assetName}, assetManager);\n`;
+                const code = `await sceneManager.importModelAsset(${assetName}, assetManager, '${id}')`;
+                return [code, generator.ORDER_AWAIT];
             };
 
             javascript.javascriptGenerator.forBlock['play_sound_from_asset'] = function (block, generator) {
+                const id = 'id_' + Blockly.utils.idGenerator.genUid();
                 const assetName = generator.valueToCode(block, 'ASSET', generator.ORDER_ATOMIC) || 'null';
-                return `sceneManager.playSoundAsset(${assetName}, assetManager);\n`;
+                const code = `await sceneManager.playSoundAsset(${assetName}, assetManager, '${id}')`;
+                return [code, generator.ORDER_AWAIT];
             };
 
             javascript.javascriptGenerator.forBlock['set_texture_from_asset'] = function (block, generator) {
@@ -7132,6 +6353,7 @@ if (${name}) {
         function generateCode() {
             return javascript.javascriptGenerator.workspaceToCode(workspace);
         }
+        window.generateCode = generateCode;
 
         // Resize canvas to fit its container
         function resizeCanvas() {
@@ -7208,6 +6430,9 @@ if (${name}) {
         installAllBlocks({
             javascript: javascript.javascriptGenerator
         });
+
+        // Define ORDER_AWAIT for our async-heavy environment
+        javascript.javascriptGenerator.ORDER_AWAIT = 0;
 
         javascript.javascriptGenerator.forBlock['colour_random'] = function (block, generator) {
             return [generator.provideFunction_('colourRandom', `

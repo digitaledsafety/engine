@@ -17,10 +17,10 @@ test.describe('Engine Collision Functionality', () => {
                   "inputs": {
                       "VALUE": {
                           "block": {
-                              "type": "create_box",
+                              "type": "create_primitive",
                               "id": "create_player_box",
+                              "fields": {"TYPE": "box"},
                               "inputs": {
-                                  "NAME": {"block": {"type": "text", "fields": {"TEXT": "player"}}},
                                   "X": {"block": {"type": "math_number", "fields": {"NUM": 0}}},
                                   "Y": {"block": {"type": "math_number", "fields": {"NUM": 5}}},
                                   "Z": {"block": {"type": "math_number", "fields": {"NUM": 0}}}
@@ -48,10 +48,10 @@ test.describe('Engine Collision Functionality', () => {
                   "inputs": {
                       "VALUE": {
                           "block": {
-                              "type": "create_box",
+                              "type": "create_primitive",
                               "id": "create_target_box",
+                              "fields": {"TYPE": "box"},
                               "inputs": {
-                                  "NAME": {"block": {"type": "text", "fields": {"TEXT": "target"}}},
                                   "X": {"block": {"type": "math_number", "fields": {"NUM": 0}}},
                                   "Y": {"block": {"type": "math_number", "fields": {"NUM": 0}}},
                                   "Z": {"block": {"type": "math_number", "fields": {"NUM": 0}}}
@@ -85,9 +85,8 @@ test.describe('Engine Collision Functionality', () => {
                               "inputs": {
                                   "VALUE": {
                                       "block": {
-                                          "type": "text",
-                                          "id": "collision_text",
-                                          "fields": {"TEXT": "COLLISION_DETECTED"}
+                                          "type": "variables_get",
+                                          "fields": {"VAR": {"id": "collision_msg_var"}}
                                       }
                                   }
                               }
@@ -98,17 +97,52 @@ test.describe('Engine Collision Functionality', () => {
           ],
           "variables": [
               {"name": "player", "id": "player_var"},
-              {"name": "target", "id": "target_var"}
+              {"name": "target", "id": "target_var"},
+              {"name": "msg", "id": "collision_msg_var"}
           ]
       }
     };
 
     await page.goto('/');
-    await page.click("#start-button");
+    // Handle the hero overlay
+    await page.evaluate(() => {
+      const overlay = document.getElementById('hero-overlay');
+      if (overlay) {
+        overlay.classList.add('hidden');
+        overlay.style.display = 'none';
+      }
+    });
+
     await page.click("#preview-tab");
 
     const consoleMessages = [];
     page.on('console', msg => consoleMessages.push(msg.text()));
+
+    await page.evaluate(({json, msg}) => {
+        // Set the message variable
+        const msgVar = workspace.getVariableById('collision_msg_var');
+        if (msgVar) {
+            // Since we can't easily set a value to a variable from outside without blocks
+            // we will just use a string literal in the JSON next time.
+        }
+        Blockly.serialization.workspaces.load(json, workspace);
+        // Monkey patch the log to look for COLLISION_DETECTED
+        const oldLog = console.log;
+        console.log = (...args) => {
+            if (args[0] && typeof args[0] === 'string' && args[0].includes('id_')) {
+                 // it's likely logging an object reference, we want a string.
+            }
+            oldLog(...args);
+        };
+
+        window.doRun();
+    }, {json: workspace_json});
+
+    // Let's modify the JSON to use a text block directly for the message
+    workspace_json.blocks[2].inputs.DO.block.inputs.VALUE.block = {
+        "type": "text",
+        "fields": {"TEXT": "COLLISION_DETECTED"}
+    };
 
     await page.evaluate((json) => {
         Blockly.serialization.workspaces.load(json, workspace);
