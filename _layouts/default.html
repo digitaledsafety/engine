@@ -1511,6 +1511,18 @@ workspace_data: "${base64WorkspaceData}"
                         {
                             kind: 'block',
                             type: 'set_property',
+                        },
+                        {
+                            kind: 'block',
+                            type: 'look_at',
+                        },
+                        {
+                            kind: 'block',
+                            type: 'move_towards',
+                        },
+                        {
+                            kind: 'block',
+                            type: 'apply_mixamo_animation',
                         }
                     ]
                 },
@@ -1596,9 +1608,13 @@ workspace_data: "${base64WorkspaceData}"
                 },
                 {
                     kind: 'category',
-                    name: 'Utils',
-                    categorystyle: 'colour_category',
+                    name: 'Math',
+                    categorystyle: 'math_category',
                     contents: [
+                        {
+                            kind: 'block',
+                            type: 'get_distance',
+                        },
                         {
                             kind: 'block',
                             type: 'colour_picker',
@@ -3070,6 +3086,101 @@ workspace_data: "${base64WorkspaceData}"
                     const contactPoint = new BABYLON.Vector3(px, py, pz);
                     mesh.physicsImpostor.applyImpulse(impulse, contactPoint);
                 }
+            }
+
+            getDistance(target1, target2) {
+                const mesh1 = this._getMesh(target1);
+                const mesh2 = this._getMesh(target2);
+                if (mesh1 && mesh2) {
+                    mesh1.computeWorldMatrix(true);
+                    mesh2.computeWorldMatrix(true);
+                    return BABYLON.Vector3.Distance(mesh1.getAbsolutePosition(), mesh2.getAbsolutePosition());
+                }
+                return 0;
+            }
+
+            lookAt(target, goal) {
+                const mesh = this._getMesh(target);
+                const goalMesh = this._getMesh(goal);
+                if (mesh && goalMesh) {
+                    goalMesh.computeWorldMatrix(true);
+                    mesh.lookAt(goalMesh.getAbsolutePosition());
+                }
+            }
+
+            moveTowards(target, goal, speed) {
+                const mesh = this._getMesh(target);
+                const goalMesh = this._getMesh(goal);
+                if (mesh && goalMesh) {
+                    goalMesh.computeWorldMatrix(true);
+                    mesh.computeWorldMatrix(true);
+                    const targetPos = goalMesh.getAbsolutePosition();
+                    const currentPos = mesh.getAbsolutePosition();
+                    const direction = targetPos.subtract(currentPos);
+                    const distance = direction.length();
+
+                    if (distance > 0.1) {
+                        direction.normalize();
+                        const moveStep = direction.scale(speed * (this.engine.getDeltaTime() / 1000));
+                        if (moveStep.length() >= distance) {
+                            mesh.setAbsolutePosition(targetPos);
+                        } else {
+                            mesh.setAbsolutePosition(currentPos.add(moveStep));
+                        }
+                    } else {
+                        mesh.setAbsolutePosition(targetPos);
+                    }
+                }
+            }
+
+            applyMixamoAnimation(model, animation) {
+                const mesh = this._getMesh(model);
+                if (!mesh || !animation || !animation.animationGroups) return;
+
+                const cacheKey = `_retargeted_${animation.name || 'unnamed'}`;
+                if (mesh[cacheKey]) return;
+                mesh[cacheKey] = true;
+
+                const boneMapping = {
+                    "mixamorigHips": "hips",
+                    "mixamorigSpine": "spine",
+                    "mixamorigSpine1": "chest",
+                    "mixamorigSpine2": "upperChest",
+                    "mixamorigNeck": "neck",
+                    "mixamorigHead": "head",
+                    "mixamorigLeftShoulder": "leftShoulder",
+                    "mixamorigLeftArm": "leftUpperArm",
+                    "mixamorigLeftForeArm": "leftLowerArm",
+                    "mixamorigLeftHand": "leftHand",
+                    "mixamorigRightShoulder": "rightShoulder",
+                    "mixamorigRightArm": "rightUpperArm",
+                    "mixamorigRightForeArm": "rightLowerArm",
+                    "mixamorigRightHand": "rightHand",
+                    "mixamorigLeftUpLeg": "leftUpperLeg",
+                    "mixamorigLeftLeg": "leftLowerLeg",
+                    "mixamorigLeftFoot": "leftFoot",
+                    "mixamorigLeftToeBase": "leftToes",
+                    "mixamorigRightUpLeg": "rightUpperLeg",
+                    "mixamorigRightLeg": "rightLowerLeg",
+                    "mixamorigRightFoot": "rightFoot",
+                    "mixamorigRightToeBase": "rightToes"
+                };
+
+                animation.animationGroups.forEach(ag => {
+                    const newAg = ag.clone(ag.name + "_retargeted_" + mesh.name);
+                    newAg.targetedAnimations.forEach(ta => {
+                        const boneName = ta.target.name;
+                        const targetBoneName = boneMapping[boneName];
+                        if (targetBoneName) {
+                            const targetNode = mesh.getChildTransformNodes().find(n => n.name.toLowerCase().includes(targetBoneName.toLowerCase()));
+                            if (targetNode) {
+                                ta.target = targetNode;
+                            }
+                        }
+                    });
+                    if (!mesh.animationGroups) mesh.animationGroups = [];
+                    mesh.animationGroups.push(newAg);
+                });
             }
 
             getPosX(target) {
@@ -6202,6 +6313,54 @@ workspace_data: "${base64WorkspaceData}"
                 "colour": 180,
                 "tooltip": "Enables or disables the glow effect for the whole scene.",
                 "helpUrl": ""
+            },
+            {
+                "type": "get_distance",
+                "message0": "distance between %1 and %2",
+                "args0": [
+                    { "type": "input_value", "name": "TARGET1" },
+                    { "type": "input_value", "name": "TARGET2" }
+                ],
+                "output": "Number",
+                "colour": "%{BKY_MATH_HUE}",
+                "tooltip": "Returns the distance between two objects."
+            },
+            {
+                "type": "look_at",
+                "message0": "make %1 look at %2",
+                "args0": [
+                    { "type": "input_value", "name": "TARGET" },
+                    { "type": "input_value", "name": "GOAL" }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": "%{BKY_MOTION_HUE}",
+                "tooltip": "Makes an object look at another object."
+            },
+            {
+                "type": "move_towards",
+                "message0": "move %1 towards %2 with speed %3",
+                "args0": [
+                    { "type": "input_value", "name": "TARGET" },
+                    { "type": "input_value", "name": "GOAL" },
+                    { "type": "input_value", "name": "SPEED", "check": "Number" }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": "%{BKY_MOTION_HUE}",
+                "tooltip": "Moves an object towards another object."
+            },
+            {
+                "type": "apply_mixamo_animation",
+                "message0": "apply Mixamo animation %1 to VRM %2",
+                "args0": [
+                    { "type": "input_value", "name": "ANIMATION" },
+                    { "type": "input_value", "name": "MODEL" }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": "%{BKY_MOTION_HUE}",
+                "tooltip": "Retargets and applies a Mixamo animation to a VRM model."
             }
         ]);
 
@@ -6251,6 +6410,31 @@ workspace_data: "${base64WorkspaceData}"
                 const enabled = block.getFieldValue('ENABLED') === 'TRUE';
                 const intensity = generator.valueToCode(block, 'INTENSITY', generator.ORDER_ATOMIC) || 1;
                 return `sceneManager.setGlow(${enabled}, ${intensity});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['get_distance'] = function (block, generator) {
+                const target1 = generator.valueToCode(block, 'TARGET1', generator.ORDER_ATOMIC) || 'null';
+                const target2 = generator.valueToCode(block, 'TARGET2', generator.ORDER_ATOMIC) || 'null';
+                return [`sceneManager.getDistance(${target1}, ${target2})`, generator.ORDER_ATOMIC];
+            };
+
+            javascript.javascriptGenerator.forBlock['look_at'] = function (block, generator) {
+                const target = generator.valueToCode(block, 'TARGET', generator.ORDER_ATOMIC) || 'null';
+                const goal = generator.valueToCode(block, 'GOAL', generator.ORDER_ATOMIC) || 'null';
+                return `sceneManager.lookAt(${target}, ${goal});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['move_towards'] = function (block, generator) {
+                const target = generator.valueToCode(block, 'TARGET', generator.ORDER_ATOMIC) || 'null';
+                const goal = generator.valueToCode(block, 'GOAL', generator.ORDER_ATOMIC) || 'null';
+                const speed = generator.valueToCode(block, 'SPEED', generator.ORDER_ATOMIC) || 0;
+                return `sceneManager.moveTowards(${target}, ${goal}, ${speed});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['apply_mixamo_animation'] = function (block, generator) {
+                const animation = generator.valueToCode(block, 'ANIMATION', generator.ORDER_ATOMIC) || 'null';
+                const model = generator.valueToCode(block, 'MODEL', generator.ORDER_ATOMIC) || 'null';
+                return `sceneManager.applyMixamoAnimation(${model}, ${animation});\n`;
             };
 
             javascript.javascriptGenerator.forBlock['set_property'] = function (block, generator) {
