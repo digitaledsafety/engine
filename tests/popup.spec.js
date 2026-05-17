@@ -98,7 +98,7 @@ test.describe('Engine Popup with Variables', () => {
     expect(result.isVisible).toBe(true);
     expect(result.title).toBe("New Title");
     expect(result.buttonText).toBe("New Button Text");
-    expect(result.imageSource).toBe("https://www.babylonjs-playground.com/textures/babylon5.png");
+    expect(result.imageSource).toBe("https://proxy.functions.io/?url=https%3A%2F%2Fwww.babylonjs-playground.com%2Ftextures%2Fbabylon5.png");
 
     // Part 2: Hide the popup
     const isHidden = await page.evaluate(async () => {
