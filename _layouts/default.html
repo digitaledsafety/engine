@@ -610,6 +610,13 @@
             return false;
         }
 
+        function getProxiedUrl(url) {
+            if (!url || typeof url !== 'string') return url;
+            if (url.startsWith('blob:') || url.startsWith('data:')) return url;
+            if (url.startsWith('https://proxy.functions.io/?url=')) return url;
+            return `https://proxy.functions.io/?url=${encodeURIComponent(url)}`;
+        }
+
         // --- Hero Overlay Logic ---
         document.addEventListener('DOMContentLoaded', () => {
             const heroOverlay = document.getElementById('hero-overlay');
@@ -705,7 +712,7 @@
                 if (!isValidAssetURL(url)) {
                     return;
                 }
-                const proxyUrl = `https://proxy.fxio.workers.dev/corsproxy/?apiurl=${encodeURIComponent(url)}`;
+                const proxyUrl = getProxiedUrl(url);
                 try {
                     const response = await fetch(proxyUrl);
                     if (!response.ok) {
@@ -1578,6 +1585,10 @@ workspace_data: "${base64WorkspaceData}"
                         },
                         {
                             kind: 'block',
+                            type: 'transform_image',
+                        },
+                        {
+                            kind: 'block',
                             type: 'set_fog'
                         },
                         {
@@ -2361,7 +2372,7 @@ workspace_data: "${base64WorkspaceData}"
                 if (info) {
                     const imageControl = info.panel.getChildByName(`${info.name}_image`);
                     if (imageControl) {
-                        imageControl.source = imageUrl;
+                        imageControl.source = getProxiedUrl(imageUrl);
                     }
                 }
             }
@@ -2544,7 +2555,7 @@ workspace_data: "${base64WorkspaceData}"
                     return null;
                 }
                 try {
-                    const response = await fetch(fontUrl);
+                    const response = await fetch(getProxiedUrl(fontUrl));
                     if (!response.ok) {
                         throw new Error(`Failed to fetch font data from ${fontUrl}`);
                     }
@@ -2590,7 +2601,7 @@ workspace_data: "${base64WorkspaceData}"
                 }
                 try {
                     // Load model using SceneLoader
-                    const result = await BABYLON.SceneLoader.ImportMeshAsync(null, '', url, this.scene);
+                    const result = await BABYLON.SceneLoader.ImportMeshAsync(null, '', getProxiedUrl(url), this.scene);
                     if (result.meshes.length > 0) {
                         const rootMesh = result.meshes[0];
                         rootMesh.name = name;
@@ -2624,8 +2635,6 @@ workspace_data: "${base64WorkspaceData}"
 
             async importRobloxAvatar(name, userId, x = 0, y = 0, z = 0) {
                 try {
-                    const getProxiedUrl = (url) => `https://proxy.fxio.workers.dev/corsproxy/?apiurl=${encodeURIComponent(url)}`;
-
                     let thumbData = null;
                     const tryEndpoints = [
                         `https://apis.roblox.com/thumbnails/v1/users/avatar-3d?userId=${userId}`,
@@ -3305,7 +3314,7 @@ workspace_data: "${base64WorkspaceData}"
             setBackgroundImage(url) {
                 if (!isValidAssetURL(url)) return;
                 this._clearBackground();
-                this.backgroundLayer = new BABYLON.Layer("backgroundLayer", url, this.scene, true);
+                this.backgroundLayer = new BABYLON.Layer("backgroundLayer", getProxiedUrl(url), this.scene, true);
                 this.background = 'layer';
             }
 
@@ -3400,7 +3409,7 @@ workspace_data: "${base64WorkspaceData}"
                     return;
                 }
 
-                let sound = await BABYLON.CreateStreamingSoundAsync("sound", url);
+                let sound = await BABYLON.CreateStreamingSoundAsync("sound", getProxiedUrl(url));
 
                 this.sounds.push(sound);
 
@@ -3772,7 +3781,7 @@ workspace_data: "${base64WorkspaceData}"
                 }
                 try {
                     // Note: LoadAssetContainerAsync is better for animations as it doesn't add to scene automatically.
-                    const container = await BABYLON.SceneLoader.LoadAssetContainerAsync("", url, this.scene);
+                    const container = await BABYLON.SceneLoader.LoadAssetContainerAsync("", getProxiedUrl(url), this.scene);
                     if (container.animationGroups.length > 0) {
                         const animationGroup = container.animationGroups[0];
                         animationGroup.stop(); // Stop by default
@@ -4123,7 +4132,7 @@ workspace_data: "${base64WorkspaceData}"
                 if (!isValidAssetURL(url)) {
                     return null;
                 }
-                const image = new BABYLON.GUI.Image(name, url);
+                const image = new BABYLON.GUI.Image(name, getProxiedUrl(url));
                 image.width = options.width || "100px";
                 image.height = options.height || "100px";
                 image.top = options.top || "0px";
@@ -4195,7 +4204,7 @@ workspace_data: "${base64WorkspaceData}"
 
                 // Add Image if provided
                 if (options.image) {
-                    const image = new BABYLON.GUI.Image(`${name}_image`, options.image);
+                    const image = new BABYLON.GUI.Image(`${name}_image`, getProxiedUrl(options.image));
                     image.width = "150px";
                     image.height = "150px";
                     image.paddingBottom = "20px";
@@ -4539,6 +4548,49 @@ workspace_data: "${base64WorkspaceData}"
                 "colour": "#4C97FF",
                 "tooltip": "Sets the sampling mode of all textures on the object to Nearest to achieve a pixelated look.",
                 "helpUrl": ""
+            },
+            {
+                "type": "transform_image",
+                "message0": "transform image URL %1",
+                "args0": [
+                    { "type": "input_value", "name": "URL", "check": "String" }
+                ],
+                "message1": "width %1 height %2 fit %3",
+                "args1": [
+                    { "type": "input_value", "name": "WIDTH", "check": "Number" },
+                    { "type": "input_value", "name": "HEIGHT", "check": "Number" },
+                    {
+                        "type": "field_dropdown",
+                        "name": "FIT",
+                        "options": [
+                            ["scale-down", "scale-down"],
+                            ["contain", "contain"],
+                            ["cover", "cover"],
+                            ["crop", "crop"],
+                            ["pad", "pad"]
+                        ]
+                    }
+                ],
+                "message2": "quality %1 blur %2 sharpen %3 format %4",
+                "args2": [
+                    { "type": "input_value", "name": "QUALITY", "check": "Number" },
+                    { "type": "input_value", "name": "BLUR", "check": "Number" },
+                    { "type": "input_value", "name": "SHARPEN", "check": "Number" },
+                    {
+                        "type": "field_dropdown",
+                        "name": "FORMAT",
+                        "options": [
+                            ["auto", "auto"],
+                            ["webp", "webp"],
+                            ["avif", "avif"],
+                            ["json", "json"]
+                        ]
+                    }
+                ],
+                "output": "String",
+                "colour": "#59C059",
+                "tooltip": "Applies Cloudflare image transformations to an image URL.",
+                "helpUrl": "https://developers.cloudflare.com/images/optimization/features/"
             },
             {
                 "type": "set_background_image",
@@ -6997,6 +7049,38 @@ if (${name}) {
             javascript.javascriptGenerator.forBlock['set_pixelated_look'] = function (block, generator) {
                 const object = generator.valueToCode(block, 'OBJECT', generator.ORDER_ATOMIC) || 'null';
                 return `sceneManager.setSamplingMode(${object}, 'nearest');\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['transform_image'] = function (block, generator) {
+                const url = generator.valueToCode(block, 'URL', generator.ORDER_ATOMIC) || "''";
+                const width = generator.valueToCode(block, 'WIDTH', generator.ORDER_ATOMIC) || 'null';
+                const height = generator.valueToCode(block, 'HEIGHT', generator.ORDER_ATOMIC) || 'null';
+                const fit = block.getFieldValue('FIT');
+                const quality = generator.valueToCode(block, 'QUALITY', generator.ORDER_ATOMIC) || 'null';
+                const blur = generator.valueToCode(block, 'BLUR', generator.ORDER_ATOMIC) || 'null';
+                const sharpen = generator.valueToCode(block, 'SHARPEN', generator.ORDER_ATOMIC) || 'null';
+                const format = block.getFieldValue('FORMAT');
+
+                const paramsCode = `
+                    (() => {
+                        const p = [];
+                        const w = ${width};
+                        const h = ${height};
+                        const q = ${quality};
+                        const b = ${blur};
+                        const s = ${sharpen};
+                        if (w !== null) p.push('width=' + w);
+                        if (h !== null) p.push('height=' + h);
+                        if ('${fit}') p.push('fit=${fit}');
+                        if (q !== null) p.push('quality=' + q);
+                        if (b !== null) p.push('blur=' + b);
+                        if (s !== null) p.push('sharpen=' + s);
+                        if ('${format}') p.push('format=${format}');
+                        const params = p.join(',');
+                        return 'https://digitaleducationsafety.org/cdn-cgi/image/' + (params ? params + '/' : '') + ${url};
+                    })()
+                `;
+                return [paramsCode.trim(), generator.ORDER_ATOMIC];
             };
 
             javascript.javascriptGenerator.forBlock['set_background_image'] = function (block, generator) {
