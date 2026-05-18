@@ -569,10 +569,13 @@
             this.loadingUITextColor = loadingUITextColor || "white";
         }
         CustomLoadingScreen.prototype.displayLoadingUI = function () {
+            if (document.getElementById("customLoadingScreen")) {
+                return;
+            }
             var loadingDiv = document.createElement("div");
             loadingDiv.id = "customLoadingScreen";
             const canvasContainer = document.querySelector('.canvas-container');
-            if (canvasContainer) {            
+            if (canvasContainer) {
                 loadingDiv.style.position = "absolute";
                 loadingDiv.style.top = "0";
                 loadingDiv.style.left = "0";
@@ -1358,6 +1361,14 @@ workspace_data: "${base64WorkspaceData}"
                         },
                         {
                             kind: 'block',
+                            type: 'set_linear_velocity',
+                        },
+                        {
+                            kind: 'block',
+                            type: 'set_angular_velocity',
+                        },
+                        {
+                            kind: 'block',
                             type: 'set_physics_impostor',
                         },
                         {
@@ -1371,7 +1382,11 @@ workspace_data: "${base64WorkspaceData}"
                         {
                             kind: 'block',
                             type: 'get_joystick_force',
-                        }                        
+                        },
+                        {
+                            kind: 'block',
+                            type: 'clear_collision_cache',
+                        }
                     ]
                 },
                 {
@@ -2909,6 +2924,10 @@ workspace_data: "${base64WorkspaceData}"
                 }
             }
 
+            clearCollisionCache() {
+                this.processedCollisions.clear();
+            }
+
             onCollision(target1, target2, callback) {
                 const impostor1 = this._getPhysicsImpostor(target1);
 
@@ -3078,6 +3097,20 @@ workspace_data: "${base64WorkspaceData}"
                     const impulse = new BABYLON.Vector3(fx, fy, fz);
                     const contactPoint = new BABYLON.Vector3(px, py, pz);
                     mesh.physicsImpostor.applyImpulse(impulse, contactPoint);
+                }
+            }
+
+            setLinearVelocity(target, x, y, z) {
+                const mesh = this._getMesh(target);
+                if (mesh && mesh.physicsImpostor) {
+                    mesh.physicsImpostor.setLinearVelocity(new BABYLON.Vector3(x, y, z));
+                }
+            }
+
+            setAngularVelocity(target, x, y, z) {
+                const mesh = this._getMesh(target);
+                if (mesh && mesh.physicsImpostor) {
+                    mesh.physicsImpostor.setAngularVelocity(new BABYLON.Vector3(x, y, z));
                 }
             }
 
@@ -5314,6 +5347,36 @@ workspace_data: "${base64WorkspaceData}"
                 tooltip: 'To be used inside an onCollision callback'
             },
             {
+                type: 'set_linear_velocity',
+                message0: 'Set linear velocity of %1 to x: %2 y: %3 z: %4',
+                args0: [
+                    { type: 'input_value', name: 'OBJECT' },
+                    { type: 'input_value', name: 'X', check: 'Number' },
+                    { type: 'input_value', name: 'Y', check: 'Number' },
+                    { type: 'input_value', name: 'Z', check: 'Number' },
+                ],
+                "inputsInline": true,
+                previousStatement: null,
+                nextStatement: null,
+                colour: 120,
+                tooltip: 'Sets the linear velocity of the specified object',
+            },
+            {
+                type: 'set_angular_velocity',
+                message0: 'Set angular velocity of %1 to x: %2 y: %3 z: %4',
+                args0: [
+                    { type: 'input_value', name: 'OBJECT' },
+                    { type: 'input_value', name: 'X', check: 'Number' },
+                    { type: 'input_value', name: 'Y', check: 'Number' },
+                    { type: 'input_value', name: 'Z', check: 'Number' },
+                ],
+                "inputsInline": true,
+                previousStatement: null,
+                nextStatement: null,
+                colour: 120,
+                tooltip: 'Sets the angular velocity of the specified object',
+            },
+            {
                 type: 'set_gravity',
                 message0: 'Set scene gravity to x: %1 y: %2 z: %3',
                 args0: [
@@ -5622,6 +5685,15 @@ workspace_data: "${base64WorkspaceData}"
                 "extraState": {
                     "hasCollidedObjectVar": true
                 }
+            },
+            {
+                "type": "clear_collision_cache",
+                "message0": "clear collision cache",
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": "#5BA55B",
+                "tooltip": "Clears the history of processed collisions, allowing them to trigger again.",
+                "helpUrl": ""
             },
             {
                 "type": "destroy_object",
@@ -6470,6 +6542,10 @@ if (${name}) {
                 return `sceneManager.onCollision(${obj1}, ${obj2}, ${callback});\n`;
             };
 
+            javascript.javascriptGenerator.forBlock['clear_collision_cache'] = function (block, generator) {
+                return 'sceneManager.clearCollisionCache();\n';
+            };
+
             javascript.javascriptGenerator.forBlock['destroy_object'] = function (block, generator) {
                 const objectName = generator.valueToCode(block, 'OBJECT', generator.ORDER_ATOMIC) || 'null';
                 return `sceneManager.destroyObject(${objectName});\n`;
@@ -6843,6 +6919,22 @@ if (${name}) {
                 const py = generator.valueToCode(block, 'PY', generator.ORDER_ATOMIC) || 0;
                 const pz = generator.valueToCode(block, 'PZ', generator.ORDER_ATOMIC) || 0;
                 return `sceneManager.applyImpulse(${target}, ${fx}, ${fy}, ${fz}, ${px}, ${py}, ${pz});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['set_linear_velocity'] = function (block, generator) {
+                const target = generator.valueToCode(block, 'OBJECT', generator.ORDER_ATOMIC) || 'null';
+                const x = generator.valueToCode(block, 'X', generator.ORDER_ATOMIC) || 0;
+                const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || 0;
+                const z = generator.valueToCode(block, 'Z', generator.ORDER_ATOMIC) || 0;
+                return `sceneManager.setLinearVelocity(${target}, ${x}, ${y}, ${z});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['set_angular_velocity'] = function (block, generator) {
+                const target = generator.valueToCode(block, 'OBJECT', generator.ORDER_ATOMIC) || 'null';
+                const x = generator.valueToCode(block, 'X', generator.ORDER_ATOMIC) || 0;
+                const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || 0;
+                const z = generator.valueToCode(block, 'Z', generator.ORDER_ATOMIC) || 0;
+                return `sceneManager.setAngularVelocity(${target}, ${x}, ${y}, ${z});\n`;
             };
 
             javascript.javascriptGenerator.forBlock['get_object_pos'] = function (block, generator) {
