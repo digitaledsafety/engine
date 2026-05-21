@@ -603,7 +603,7 @@
         function isValidAssetURL(url) {
             if (typeof url !== 'string') return false;
             const normalized = url.trim().toLowerCase();
-            if (normalized.startsWith('https://') || normalized.startsWith('blob:')) {
+            if (normalized.startsWith('https://') || normalized.startsWith('blob:') || normalized.startsWith('data:')) {
                 return true;
             }
             console.error('Invalid URL:', url, 'Only HTTPS or blob URLs are allowed for assets.');
@@ -3230,8 +3230,15 @@ workspace_data: "${base64WorkspaceData}"
                 const camera = this.scene.activeCamera;
                 if (!camera) return;
 
-                const width = window.innerWidth;
-                const height = window.innerHeight;
+                let width = window.innerWidth;
+                let height = window.innerHeight;
+                let screenshotOptions = { width: width * 2, height: height * 2 };
+
+                if (this.backgroundImageWidth && this.backgroundImageHeight) {
+                    width = this.backgroundImageWidth;
+                    height = this.backgroundImageHeight;
+                    screenshotOptions = { width: width, height: height };
+                }
 
                 // Temporarily adjust orthographic camera aspect ratio if needed
                 let oldOrtho = null;
@@ -3251,7 +3258,7 @@ workspace_data: "${base64WorkspaceData}"
                 }
 
                 return new Promise((resolve) => {
-                    BABYLON.Tools.CreateScreenshot(this.engine, camera, { width: width * 2, height: height * 2 }, (data) => {
+                    BABYLON.Tools.CreateScreenshot(this.engine, camera, screenshotOptions, (data) => {
                         // Restore orthographic camera parameters
                         if (oldOrtho) {
                             camera.orthoLeft = oldOrtho.left;
@@ -3314,8 +3321,24 @@ workspace_data: "${base64WorkspaceData}"
             setBackgroundImage(url) {
                 if (!isValidAssetURL(url)) return;
                 this._clearBackground();
-                this.backgroundLayer = new BABYLON.Layer("backgroundLayer", getProxiedUrl(url), this.scene, true);
+
+                const proxiedUrl = getProxiedUrl(url);
+                this.backgroundLayer = new BABYLON.Layer("backgroundLayer", proxiedUrl, this.scene, true);
                 this.background = 'layer';
+
+                // Load image to get dimensions
+                const img = new Image();
+                img.onload = () => {
+                    this.backgroundImageWidth = img.naturalWidth;
+                    this.backgroundImageHeight = img.naturalHeight;
+
+                    const container = document.querySelector('.canvas-container');
+                    if (container) {
+                        container.style.aspectRatio = `${this.backgroundImageWidth} / ${this.backgroundImageHeight}`;
+                        resizeCanvas();
+                    }
+                };
+                img.src = proxiedUrl;
             }
 
             setFpsCamera(target) {
@@ -4048,6 +4071,13 @@ workspace_data: "${base64WorkspaceData}"
                         this.background.dispose();
                     }
                     this.background = null;
+                }
+                this.backgroundImageWidth = null;
+                this.backgroundImageHeight = null;
+                const container = document.querySelector('.canvas-container');
+                if (container) {
+                    container.style.aspectRatio = '';
+                    resizeCanvas();
                 }
                 if (this.backgroundLayer) {
                     this.backgroundLayer.dispose();
