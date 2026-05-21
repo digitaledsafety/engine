@@ -1,6 +1,7 @@
 ---
 layout: "default"
-title: "Example Workspace"
+title: "Example Project"
+description: "A simple example to get you started."
 workspace_data: "PLACEHOLDER"
 ---
 
