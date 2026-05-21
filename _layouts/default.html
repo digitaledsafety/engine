@@ -2595,7 +2595,7 @@ workspace_data: "${base64WorkspaceData}"
                 }
             }
 
-            async importModel(name, url, x, y, z) {
+            async importModel(name, url, x = 0, y = 0, z = 0) {
                 if (!isValidAssetURL(url)) {
                     return null;
                 }
@@ -2603,29 +2603,51 @@ workspace_data: "${base64WorkspaceData}"
                     // Load model using SceneLoader
                     const result = await BABYLON.SceneLoader.ImportMeshAsync(null, '', getProxiedUrl(url), this.scene);
                     if (result.meshes.length > 0) {
-                        const rootMesh = result.meshes[0];
-                        rootMesh.name = name;
-                        if (x !== undefined && y !== undefined && z !== undefined) {
-                            rootMesh.position = new BABYLON.Vector3(x, y, z);
+                        // Create a logical wrapper mesh
+                        const wrapper = new BABYLON.Mesh(name, this.scene);
+                        // Keep wrapper at 0,0,0 while we calculate and apply offsets
+                        wrapper.position.set(0, 0, 0);
+
+                        // Identify the top-level meshes from the import (usually just one root)
+                        const importedRoots = result.meshes.filter(m => !m.parent);
+                        importedRoots.forEach(m => m.parent = wrapper);
+
+                        // Calculate bounds of the imported content relative to its origin
+                        const boundingInfo = wrapper.getHierarchyBoundingVectors(true);
+                        const size = boundingInfo.max.subtract(boundingInfo.min);
+                        const height = size.y;
+
+                        // 1. Normalize height to a default of 2.0 units
+                        if (height > 0.001) {
+                            const targetHeight = 2.0;
+                            const scale = targetHeight / height;
+                            // We scale the contents, not the wrapper, so the wrapper remains at scale 1,1,1
+                            importedRoots.forEach(m => {
+                                m.scaling.scaleInPlace(scale);
+                            });
                         }
 
-                        // If it's a VRM model, normalize its height to a sane default
-                        if (url.toLowerCase().endsWith('.vrm')) {
-                            const boundingInfo = rootMesh.getHierarchyBoundingVectors(true);
-                            const height = boundingInfo.max.y - boundingInfo.min.y;
-                            if (height > 0.001) { // Avoid division by zero or tiny values
-                                const targetHeight = 2.0;
-                                const scale = targetHeight / height;
-                                rootMesh.scaling = new BABYLON.Vector3(scale, scale, scale);
-                            }
-                        }
+                        // 2. Auto-center and align base to origin
+                        // Recalculate bounds after scaling
+                        const scaledBounds = wrapper.getHierarchyBoundingVectors(true);
+                        const center = scaledBounds.max.add(scaledBounds.min).scale(0.5);
+
+                        // Shift imported content so its horizontal center is at 0 and its base is at 0 relative to wrapper
+                        importedRoots.forEach(m => {
+                            m.position.x -= center.x;
+                            m.position.y -= scaledBounds.min.y;
+                            m.position.z -= center.z;
+                        });
+
+                        // Now that geometry is centered at the wrapper's origin, move the wrapper to target position
+                        wrapper.position.set(x, y, z);
 
                         if (result.animationGroups && result.animationGroups.length > 0) {
-                            rootMesh.animationGroups = result.animationGroups;
+                            wrapper.animationGroups = result.animationGroups;
                         }
 
-                        this.objects[name] = rootMesh;
-                        return rootMesh;
+                        this.objects[name] = wrapper;
+                        return wrapper;
                     }
                 } catch (error) {
                     console.error(`Failed to load model from URL: ${url}`, error);
@@ -2748,10 +2770,17 @@ workspace_data: "${base64WorkspaceData}"
 
                     const result = await BABYLON.SceneLoader.ImportMeshAsync(null, "", objUrl, this.scene, null, ".obj");
                     if (result.meshes.length > 0) {
-                        const avatarRoot = new BABYLON.Mesh(name, this.scene);
-                        result.meshes.forEach((mesh) => {
-                            if (!mesh.parent) mesh.parent = avatarRoot;
-                            if (mesh.material) {
+                        const wrapper = new BABYLON.Mesh(name, this.scene);
+                        wrapper.position.set(0, 0, 0);
+
+                        const importedRoots = result.meshes.filter(m => !m.parent);
+                        importedRoots.forEach((mesh) => {
+                            mesh.parent = wrapper;
+                        });
+
+                        // Apply materials to all meshes in the hierarchy
+                        wrapper.getDescendants(false).forEach(mesh => {
+                            if (mesh instanceof BABYLON.AbstractMesh && mesh.material) {
                                 const matName = Object.keys(mtlData).find((k) => mesh.material.name.includes(k)) || mesh.material.name;
                                 const data = mtlData[matName];
                                 if (data) {
@@ -2768,23 +2797,32 @@ workspace_data: "${base64WorkspaceData}"
                             }
                         });
 
-                        const boundingInfo = avatarRoot.getHierarchyBoundingVectors(true);
-                        const height = boundingInfo.max.y - boundingInfo.min.y;
+                        const boundingInfo = wrapper.getHierarchyBoundingVectors(true);
+                        const size = boundingInfo.max.subtract(boundingInfo.min);
+                        const height = size.y;
+
                         if (height > 0.001) {
                             const targetHeight = 2.0;
                             const scale = targetHeight / height;
-                            avatarRoot.scaling = new BABYLON.Vector3(scale, scale, scale);
 
-                            const center = boundingInfo.max.add(boundingInfo.min).scale(0.5);
-                            avatarRoot.position.x = x - center.x * scale;
-                            avatarRoot.position.y = y - boundingInfo.min.y * scale;
-                            avatarRoot.position.z = z - center.z * scale;
-                        } else {
-                            avatarRoot.position = new BABYLON.Vector3(x, y, z);
+                            importedRoots.forEach(m => {
+                                m.scaling.scaleInPlace(scale);
+                            });
+
+                            const scaledBounds = wrapper.getHierarchyBoundingVectors(true);
+                            const center = scaledBounds.max.add(scaledBounds.min).scale(0.5);
+
+                            importedRoots.forEach(m => {
+                                m.position.x -= center.x;
+                                m.position.y -= scaledBounds.min.y;
+                                m.position.z -= center.z;
+                            });
                         }
 
-                        this.objects[name] = avatarRoot;
-                        return avatarRoot;
+                        wrapper.position.set(x, y, z);
+
+                        this.objects[name] = wrapper;
+                        return wrapper;
                     }
                 } catch (error) {
                     console.error("Failed to import Roblox avatar:", error);
