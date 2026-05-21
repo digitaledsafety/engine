@@ -39,13 +39,41 @@ self.addEventListener('install', event => {
 });
 
 self.addEventListener('fetch', event => {
+  const url = new URL(event.request.url);
+
+  // Strategy for HTML pages (including workspaces)
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request)
+        .then(response => {
+          const copy = response.clone();
+          event.waitUntil(
+            caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy))
+          );
+          return response;
+        })
+        .catch(() => caches.match(event.request))
+    );
+    return;
+  }
+
+  // Default strategy for assets
   event.respondWith(
     caches.match(event.request)
       .then(response => {
         if (response) {
           return response;
         }
-        return fetch(event.request);
+        return fetch(event.request).then(fetchRes => {
+          // Cache icons and other common assets as they are discovered
+          if (url.origin === location.origin && (url.pathname.includes('/assets/') || url.pathname.endsWith('.png') || url.pathname.endsWith('.svg'))) {
+             const copy = fetchRes.clone();
+             event.waitUntil(
+               caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy))
+             );
+          }
+          return fetchRes;
+        });
       })
   );
 });

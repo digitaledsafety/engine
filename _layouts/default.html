@@ -3,10 +3,10 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>Engine</title>
+    <title>{{ page.title | default: "Engine" }}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/svg+xml" href="{{ site.baseurl }}/assets/icons/gamepad-2.svg">
-    <link rel="manifest" href="{{ site.baseurl }}/manifest.json">
+    <link id="manifest-link" rel="manifest" href="{{ site.baseurl }}/manifest.json">
     <meta name="theme-color" content="#007bff">
     <script src="https://cdn.digitaleducationsafety.org/packages/babylon.js@8.36.1/babylon.js"></script>
     <script src="https://cdn.digitaleducationsafety.org/packages/babylon.js@8.36.1/babylon.gui.min.js"></script>
@@ -481,6 +481,50 @@
         }
     </style>
     <script>
+        // --- Dynamic PWA Manifest Logic ---
+        function updateManifest() {
+            const isWorkspace = window.location.pathname.includes('/workspaces/');
+            if (!isWorkspace) return;
+
+            // Extract project details from the page
+            const projectName = "{{ page.title | default: 'Engine' }}";
+            const projectDescription = "{{ page.description | default: 'An interactive 3D project.' }}";
+            const projectIcon = "{{ page.icon | default: '/assets/icons/gamepad-2.svg' }}";
+
+            const manifest = {
+                "name": projectName,
+                "short_name": projectName,
+                "description": projectDescription,
+                "start_url": window.location.pathname + "?mode=app",
+                "display": "fullscreen",
+                "background_color": "#ffffff",
+                "theme_color": "#007bff",
+                "icons": [
+                    {
+                        "src": projectIcon,
+                        "sizes": "any",
+                        "type": projectIcon.endsWith('.svg') ? "image/svg+xml" : "image/png"
+                    }
+                ]
+            };
+
+            // Add standard icons if using default or if we want fallbacks
+            if (projectIcon === "/assets/icons/gamepad-2.svg") {
+                manifest.icons.push(
+                    { "src": "/assets/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+                    { "src": "/assets/icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+                );
+            }
+
+            const stringManifest = JSON.stringify(manifest);
+            const blob = new Blob([stringManifest], {type: 'application/json'});
+            const manifestUrl = URL.createObjectURL(blob);
+            document.querySelector('#manifest-link').setAttribute('href', manifestUrl);
+        }
+
+        // Initialize manifest immediately
+        updateManifest();
+
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('{{ site.baseurl }}/sw.js').then(registration => {
@@ -7745,6 +7789,19 @@ function ${generator.FUNCTION_NAME_PLACEHOLDER_}(c1, c2, ratio) {
 
             if (urlParams.has('fullscreen')) {
                 enterPresentationMode();
+            }
+
+            // --- App Mode Logic ---
+            if (urlParams.get('mode') === 'app') {
+                const container = document.querySelector('.container');
+                const workspaceTab = document.getElementById('workspace-tab');
+                const previewTab = document.getElementById('preview-tab');
+                if (container && workspaceTab && previewTab) {
+                    container.classList.add('preview-active');
+                    previewTab.classList.add('active');
+                    workspaceTab.classList.remove('active');
+                    setTimeout(resizeCanvas, 100);
+                }
             }
 
             try {
