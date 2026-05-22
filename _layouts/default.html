@@ -3065,7 +3065,7 @@ workspace_data: "${base64WorkspaceData}"
                     const boundingInfo = this.player.getHierarchyBoundingVectors(true);
                     const height = boundingInfo.max.y - boundingInfo.min.y;
                     // Slightly longer ray to account for physics jitter/float
-                    const rayLength = (height / 2) + 0.8;
+                    const rayLength = (height / 2) + 0.3;
                     const ray = new BABYLON.Ray(this.player.getAbsolutePosition(), new BABYLON.Vector3(0, -1, 0), rayLength);
                     const pick = this.scene.pickWithRay(ray, (mesh) => mesh !== this.player && !mesh.isDescendantOf(this.player));
                     if (pick.hit) {
@@ -4912,7 +4912,7 @@ workspace_data: "${base64WorkspaceData}"
             },
             {
                 type: 'create_primitive',
-                message0: 'Create %1 named %2 at x %3 y %4 z %5',
+                message0: 'Create %1 at x %2 y %3 z %4',
                 args0: [
                     {
                         type: 'field_dropdown',
@@ -4925,22 +4925,19 @@ workspace_data: "${base64WorkspaceData}"
                             ['torus', 'torus']
                         ],
                     },
-                    { "type": "input_value", "name": "NAME", "check": "String" },
                     { type: 'input_value', name: 'X', check: 'Number' },
                     { type: 'input_value', name: 'Y', check: 'Number' },
                     { type: 'input_value', name: 'Z', check: 'Number' },
                 ],
                 "inputsInline": true,
-                previousStatement: null,
-                nextStatement: null,
+                output: "Mesh",
                 colour: 160,
-                tooltip: 'Creates a 3D primitive at the specified position.',
+                tooltip: 'Creates a 3D primitive at the specified position and returns it.',
             },
             {
                 type: 'create_box',
-                message0: 'Create box named %1 at x %2 y %3 z %4',
+                message0: 'Create box at x %1 y %2 z %3',
                 args0: [
-                    { "type": "input_value", "name": "NAME", "check": "String" },
                     { type: 'input_value', name: 'X', check: 'Number' },
                     { type: 'input_value', name: 'Y', check: 'Number' },
                     { type: 'input_value', name: 'Z', check: 'Number' },
@@ -6682,42 +6679,42 @@ if (${name}) {
 
             javascript.javascriptGenerator.forBlock['create_primitive'] = function (block, generator) {
                 const type = block.getFieldValue('TYPE');
-                const name = generator.valueToCode(block, 'NAME', generator.ORDER_ATOMIC) || "'myObject'";
+                const uniqueId = Blockly.utils.idGenerator.genUid();
                 const x = generator.valueToCode(block, 'X', generator.ORDER_ATOMIC) || 0;
                 const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || 0;
                 const z = generator.valueToCode(block, 'Z', generator.ORDER_ATOMIC) || 0;
 
                 let code;
                 if (type === 'sphere') {
-                    code = `sceneManager.createSphere(${name}, ${x}, ${y}, ${z});\n`;
+                    code = `sceneManager.createSphere('id_${uniqueId}', ${x}, ${y}, ${z})`;
                 } else if (type === 'cylinder') {
-                    code = `sceneManager.createCylinder(${name}, ${x}, ${y}, ${z});\n`;
+                    code = `sceneManager.createCylinder('id_${uniqueId}', ${x}, ${y}, ${z})`;
                 } else if (type === 'cone') {
-                    code = `sceneManager.createCone(${name}, ${x}, ${y}, ${z});\n`;
+                    code = `sceneManager.createCone('id_${uniqueId}', ${x}, ${y}, ${z})`;
                 } else if (type === 'torus') {
-                    code = `sceneManager.createTorus(${name}, ${x}, ${y}, ${z});\n`;
+                    code = `sceneManager.createTorus('id_${uniqueId}', ${x}, ${y}, ${z})`;
                 } else {
-                    code = `sceneManager.createBox(${name}, ${x}, ${y}, ${z});\n`;
+                    code = `sceneManager.createBox('id_${uniqueId}', ${x}, ${y}, ${z})`;
                 }
-                return code;
+                return [code, generator.ORDER_FUNCTION_CALL];
             };
 
             javascript.javascriptGenerator.forBlock['create_box'] = function (block, generator) {
-                const name = generator.valueToCode(block, 'NAME', generator.ORDER_ATOMIC) || "'myBox'";
+                const uniqueId = Blockly.utils.idGenerator.genUid();
                 const x = generator.valueToCode(block, 'X', generator.ORDER_ATOMIC) || 0;
                 const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || 0;
                 const z = generator.valueToCode(block, 'Z', generator.ORDER_ATOMIC) || 0;
-                const code = `sceneManager.createBox(${name}, ${x}, ${y}, ${z})`;
-                return [code, generator.ORDER_ATOMIC];
+                const code = `sceneManager.createBox('id_${uniqueId}', ${x}, ${y}, ${z})`;
+                return [code, generator.ORDER_FUNCTION_CALL];
             };
 
             javascript.javascriptGenerator.forBlock['create_sphere'] = function (block, generator) {
-                const name = javascript.javascriptGenerator.nameDB_.getDistinctName(Blockly.utils.idGenerator.genUid(), Blockly.Variables.NameType);
+                const uniqueId = Blockly.utils.idGenerator.genUid();
                 const x = generator.valueToCode(block, 'X', generator.ORDER_ATOMIC) || 0;
                 const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || 0;
                 const z = generator.valueToCode(block, 'Z', generator.ORDER_ATOMIC) || 0;
-                const code = `sceneManager.createSphere('${name}', ${x}, ${y}, ${z})`;
-                return [code, generator.ORDER_ATOMIC];
+                const code = `sceneManager.createSphere('id_${uniqueId}', ${x}, ${y}, ${z})`;
+                return [code, generator.ORDER_FUNCTION_CALL];
             };
 
             javascript.javascriptGenerator.forBlock['create_3d_text'] = function (block, generator) {
