@@ -1562,6 +1562,18 @@ workspace_data: "${base64WorkspaceData}"
                         {
                             kind: 'block',
                             type: 'set_property',
+                        },
+                        {
+                            kind: 'block',
+                            type: 'set_clipping_plane',
+                        },
+                        {
+                            kind: 'block',
+                            type: 'set_as_occluder',
+                        },
+                        {
+                            kind: 'block',
+                            type: 'enable_mask_brush',
                         }
                     ]
                 },
@@ -4147,6 +4159,103 @@ workspace_data: "${base64WorkspaceData}"
                 }
             }
 
+            setClippingPlane(target, x, y, z, d) {
+                const mesh = this._getMesh(target);
+                if (!mesh) return;
+
+                const plane = (x === 0 && y === 0 && z === 0) ? null : new BABYLON.Plane(x, y, z, d);
+
+                const applyToMesh = (m) => {
+                    if (m.material) {
+                        m.material.clipPlane = plane;
+                    }
+                };
+
+                applyToMesh(mesh);
+                mesh.getChildMeshes().forEach(applyToMesh);
+            }
+
+            setAsOccluder(target, isOccluder) {
+                const mesh = this._getMesh(target);
+                if (!mesh) return;
+
+                const applyOcclusion = (m) => {
+                    if (m.material) {
+                        m.material.disableColorWrite = isOccluder;
+                        // For occluders, we want them to render first but only into depth
+                        // This allows them to "punch holes" in everything else rendered after
+                        // However, standard depth writing often suffices if they are rendered before the target.
+                        // In Babylon, we can also use rendering groups or simply set the mesh to only write depth.
+                    }
+                    if (isOccluder) {
+                        m.visibility = 0.001; // Nearly invisible but still renders depth
+                    } else {
+                        m.visibility = 1.0;
+                    }
+                };
+
+                applyOcclusion(mesh);
+                mesh.getChildMeshes().forEach(applyOcclusion);
+            }
+
+            enableMaskBrush(target, brushSize = 20) {
+                const mesh = this._getMesh(target);
+                if (!mesh) return;
+
+                mesh.metadata = mesh.metadata || {};
+                mesh.metadata.brushSize = brushSize;
+
+                if (mesh._maskBrushEnabled) return;
+                mesh._maskBrushEnabled = true;
+
+                const meshes = [mesh, ...mesh.getChildMeshes()].filter(m => m.geometry);
+
+                meshes.forEach(m => {
+                    if (!m.material) return;
+                    m.material = m.material.clone(m.name + "_mask_mat");
+
+                    const tex = new BABYLON.DynamicTexture("maskTex_" + m.name, 1024, this.scene, true);
+                    const ctx = tex.getContext();
+                    ctx.fillStyle = "white";
+                    ctx.fillRect(0, 0, 1024, 1024);
+                    tex.update();
+
+                    m.material.opacityTexture = tex;
+                    m.material.opacityTexture.getAlphaFromRGB = true;
+                    m.material.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+
+                    m.metadata = m.metadata || {};
+                    m.metadata.maskTexture = tex;
+                });
+
+                const observer = this.scene.onPointerObservable.add((pointerInfo) => {
+                    if (pointerInfo.event.buttons !== 1) return;
+
+                    if (pointerInfo.type === BABYLON.PointerEventTypes.POINTERDOWN ||
+                        pointerInfo.type === BABYLON.PointerEventTypes.POINTERMOVE) {
+
+                        const pickResult = this.scene.pick(this.scene.pointerX, this.scene.pointerY, (m) => meshes.includes(m) || m.isDescendantOf(mesh));
+                        if (pickResult.hit && pickResult.getTextureCoordinates()) {
+                            const uv = pickResult.getTextureCoordinates();
+                            const m = pickResult.pickedMesh;
+                            const tex = m.metadata.maskTexture;
+                            if (tex) {
+                                const ctx = tex.getContext();
+                                ctx.fillStyle = "black";
+                                ctx.beginPath();
+                                ctx.arc(uv.x * 1024, (1 - uv.y) * 1024, mesh.metadata.brushSize, 0, 2 * Math.PI);
+                                ctx.fill();
+                                tex.update();
+                            }
+                        }
+                    }
+                });
+
+                mesh.onDisposeObservable.add(() => {
+                    this.scene.onPointerObservable.remove(observer);
+                });
+            }
+
             _clearBackground() {
                 if (this.background) {
                     if (this.background.dispose) {
@@ -6315,6 +6424,48 @@ workspace_data: "${base64WorkspaceData}"
                 "helpUrl": ""
             },
             {
+                "type": "set_clipping_plane",
+                "message0": "set clipping plane on %1 x %2 y %3 z %4 distance %5",
+                "args0": [
+                    { "type": "input_value", "name": "TARGET" },
+                    { "type": "input_value", "name": "X", "check": "Number" },
+                    { "type": "input_value", "name": "Y", "check": "Number" },
+                    { "type": "input_value", "name": "Z", "check": "Number" },
+                    { "type": "input_value", "name": "D", "check": "Number" }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": 210,
+                "tooltip": "Crops an object along a 3D plane. Set x,y,z to 0 to disable.",
+                "helpUrl": ""
+            },
+            {
+                "type": "set_as_occluder",
+                "message0": "set %1 as occluder %2",
+                "args0": [
+                    { "type": "input_value", "name": "TARGET" },
+                    { "type": "field_checkbox", "name": "IS_OCCLUDER", "checked": true }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": 210,
+                "tooltip": "Makes an object invisible but hides other objects behind it.",
+                "helpUrl": ""
+            },
+            {
+                "type": "enable_mask_brush",
+                "message0": "enable mask brush on %1 with size %2",
+                "args0": [
+                    { "type": "input_value", "name": "TARGET" },
+                    { "type": "input_value", "name": "SIZE", "check": "Number" }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": 210,
+                "tooltip": "Allows drawing transparency on the object in the preview window.",
+                "helpUrl": ""
+            },
+            {
                 "type": "create_advanced_light",
                 "message0": "create %1 light named %2",
                 "args0": [
@@ -6391,6 +6542,27 @@ workspace_data: "${base64WorkspaceData}"
                 const width = generator.valueToCode(block, 'WIDTH', generator.ORDER_ATOMIC) || 0.1;
                 const color = generator.valueToCode(block, 'COLOR', generator.ORDER_ATOMIC) || "'#ffffff'";
                 return `sceneManager.setOutline(${target}, ${width}, ${color});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['set_clipping_plane'] = function (block, generator) {
+                const target = generator.valueToCode(block, 'TARGET', generator.ORDER_ATOMIC) || 'null';
+                const x = generator.valueToCode(block, 'X', generator.ORDER_ATOMIC) || 0;
+                const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || 0;
+                const z = generator.valueToCode(block, 'Z', generator.ORDER_ATOMIC) || 0;
+                const d = generator.valueToCode(block, 'D', generator.ORDER_ATOMIC) || 0;
+                return `sceneManager.setClippingPlane(${target}, ${x}, ${y}, ${z}, ${d});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['set_as_occluder'] = function (block, generator) {
+                const target = generator.valueToCode(block, 'TARGET', generator.ORDER_ATOMIC) || 'null';
+                const isOccluder = block.getFieldValue('IS_OCCLUDER') === 'TRUE';
+                return `sceneManager.setAsOccluder(${target}, ${isOccluder});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['enable_mask_brush'] = function (block, generator) {
+                const target = generator.valueToCode(block, 'TARGET', generator.ORDER_ATOMIC) || 'null';
+                const size = generator.valueToCode(block, 'SIZE', generator.ORDER_ATOMIC) || 20;
+                return `sceneManager.enableMaskBrush(${target}, ${size});\n`;
             };
 
             javascript.javascriptGenerator.forBlock['create_advanced_light'] = function (block, generator) {
