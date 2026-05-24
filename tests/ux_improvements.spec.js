@@ -24,8 +24,8 @@ test.describe('UX Improvements', () => {
     const flyout = page.locator('.blocklyToolboxFlyout');
     await expect(flyout).toBeVisible();
 
-    // Check if "take screenshot" is in the flyout
-    const screenshotBlockText = page.locator('.blocklyText:has-text("take screenshot")');
+    // Check if "take" is in the flyout (partial match since it's "take %1 screenshot")
+    const screenshotBlockText = page.locator('.blocklyText:has-text("take")');
     await expect(screenshotBlockText.first()).toBeVisible();
   });
 
