@@ -27,6 +27,7 @@
     <script src="https://cdn.babylonjs.com/proceduralTexturesLibrary/babylon.fireProceduralTexture.min.js"></script>
     <script src="https://cdn.babylonjs.com/proceduralTexturesLibrary/babylon.roadProceduralTexture.min.js"></script>
     <script src="https://cdn.babylonjs.com/proceduralTexturesLibrary/babylon.brickProceduralTexture.min.js"></script>
+    <script src="https://cdn.babylonjs.com/materialsLibrary/babylon.gridMaterial.min.js"></script>
 
     <style>
         /* Basic Reset */
@@ -598,6 +599,8 @@
                     <button id="loadButton" class="btn btn-icon" title="Load" aria-label="Load Project">📂 Load</button>
                     <button id="shareButton" class="btn btn-icon" title="Share" aria-label="Share Project">🔗 Share</button>
                     <button id="fullscreenBtn" class="btn btn-icon" title="Fullscreen" aria-label="Toggle Fullscreen">⛶ Fullscreen</button>
+                    <button id="toggleGridButton" class="btn btn-icon" title="Toggle Grid" aria-label="Toggle Grid">🌐 Toggle Grid</button>
+                    <button id="viewCodeButton" class="btn btn-icon" title="View Code" aria-label="View Code">👁️ View Code</button>
                     <button id="screenshotButton" class="btn btn-icon" title="Take Screenshot" aria-label="Take Screenshot">📸 Screenshot</button>
                     <button id="docsButton" class="btn btn-icon" title="Documentation" aria-label="Open Documentation">❓ Docs</button>
                     <button id="clearButton" class="btn btn-icon" title="Clear Workspace" aria-label="Clear Workspace">🗑️ Clear</button>
@@ -1650,6 +1653,10 @@ workspace_data: "${base64WorkspaceData}"
                         },
                         {
                             kind: 'block',
+                            type: 'set_skybox_url'
+                        },
+                        {
+                            kind: 'block',
                             type: 'set_glow'
                         },
                         {
@@ -1796,6 +1803,10 @@ workspace_data: "${base64WorkspaceData}"
                         {
                             kind: 'block',
                             type: 'math_atan2',
+                        },
+                        {
+                            kind: 'block',
+                            type: 'get_distance_between'
                         },
                         {
                             kind: 'block',
@@ -3191,6 +3202,50 @@ workspace_data: "${base64WorkspaceData}"
                 return mesh ? mesh.position.z : 0;
             }
             
+            getDistance(target1, target2) {
+                const mesh1 = this._getMesh(target1);
+                const mesh2 = this._getMesh(target2);
+                if (!mesh1 || !mesh2) return 0;
+                return BABYLON.Vector3.Distance(mesh1.getAbsolutePosition(), mesh2.getAbsolutePosition());
+            }
+
+            setSkyboxUrl(url) {
+                if (!isValidAssetURL(url)) return;
+                if (this.background && this.background.name === "skyBox") {
+                    this.background.dispose();
+                }
+                const skybox = BABYLON.MeshBuilder.CreateBox("skyBox", { size: 1000.0 }, this.scene);
+                const skyboxMaterial = new BABYLON.StandardMaterial("skyBoxMaterial", this.scene);
+                skyboxMaterial.backFaceCulling = false;
+                skyboxMaterial.disableLighting = true;
+                skybox.infiniteDistance = true;
+                skyboxMaterial.reflectionTexture = new BABYLON.CubeTexture(getProxiedUrl(url), this.scene);
+                skyboxMaterial.reflectionTexture.coordinatesMode = BABYLON.Texture.SKYBOX_MODE;
+                skybox.material = skyboxMaterial;
+                this.background = skybox;
+            }
+
+            toggleGrid() {
+                if (this._grid) {
+                    this._grid.dispose();
+                    this._grid = null;
+                } else {
+                    const gridGround = BABYLON.MeshBuilder.CreateGround("gridGround", { width: 100, height: 100 }, this.scene);
+                    const gridMaterial = new BABYLON.GridMaterial("gridMaterial", this.scene);
+                    gridMaterial.majorUnitFrequency = 5;
+                    gridMaterial.minorUnitValue = 0.1;
+                    gridMaterial.gridRatio = 1;
+                    gridMaterial.backFaceCulling = false;
+                    gridMaterial.mainColor = new BABYLON.Color3(1, 1, 1);
+                    gridMaterial.lineColor = new BABYLON.Color3(0.5, 0.5, 0.5);
+                    gridMaterial.opacity = 0.5;
+                    gridGround.material = gridMaterial;
+                    gridGround.position.y = 0.01; // Slightly above ground to avoid z-fighting
+                    gridGround.isPickable = false;
+                    this._grid = gridGround;
+                }
+            }
+
             createParticleSystem(target, type) {
                 const mesh = this._getMesh(target);
                 if (!mesh) return;
@@ -6357,6 +6412,30 @@ workspace_data: "${base64WorkspaceData}"
                 "helpUrl": ""
             },
             {
+                "type": "get_distance_between",
+                "message0": "distance between %1 and %2",
+                "args0": [
+                    { "type": "input_value", "name": "TARGET1" },
+                    { "type": "input_value", "name": "TARGET2" }
+                ],
+                "output": "Number",
+                "colour": "%{BKY_MATH_HUE}",
+                "tooltip": "Calculates the distance between two objects.",
+                "helpUrl": ""
+            },
+            {
+                "type": "set_skybox_url",
+                "message0": "set skybox to URL %1",
+                "args0": [
+                    { "type": "input_value", "name": "URL", "check": "String" }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": 180,
+                "tooltip": "Sets the scene skybox using a cube texture URL.",
+                "helpUrl": ""
+            },
+            {
                 "type": "create_advanced_light",
                 "message0": "create %1 light named %2",
                 "args0": [
@@ -6433,6 +6512,18 @@ workspace_data: "${base64WorkspaceData}"
                 const width = generator.valueToCode(block, 'WIDTH', generator.ORDER_ATOMIC) || 0.1;
                 const color = generator.valueToCode(block, 'COLOR', generator.ORDER_ATOMIC) || "'#ffffff'";
                 return `sceneManager.setOutline(${target}, ${width}, ${color});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['get_distance_between'] = function (block, generator) {
+                const target1 = generator.valueToCode(block, 'TARGET1', generator.ORDER_ATOMIC) || 'null';
+                const target2 = generator.valueToCode(block, 'TARGET2', generator.ORDER_ATOMIC) || 'null';
+                const code = `sceneManager.getDistance(${target1}, ${target2})`;
+                return [code, generator.ORDER_ATOMIC];
+            };
+
+            javascript.javascriptGenerator.forBlock['set_skybox_url'] = function (block, generator) {
+                const url = generator.valueToCode(block, 'URL', generator.ORDER_ATOMIC) || "''";
+                return `sceneManager.setSkyboxUrl(${url});\n`;
             };
 
             javascript.javascriptGenerator.forBlock['create_advanced_light'] = function (block, generator) {
@@ -7494,19 +7585,60 @@ function ${generator.FUNCTION_NAME_PLACEHOLDER_}(c1, c2, ratio) {
             const assets = await assetManager.getAllAssets();
             assets.forEach(asset => {
                 const li = document.createElement('li');
-                li.textContent = asset.name;
+                li.style.display = 'flex';
+                li.style.alignItems = 'center';
+                li.style.gap = '10px';
+                li.style.padding = '10px';
+                li.style.borderBottom = '1px solid #ddd';
+
+                const previewContainer = document.createElement('div');
+                previewContainer.style.width = '50px';
+                previewContainer.style.height = '50px';
+                previewContainer.style.display = 'flex';
+                previewContainer.style.justifyContent = 'center';
+                previewContainer.style.alignItems = 'center';
+                previewContainer.style.backgroundColor = '#eee';
+                previewContainer.style.borderRadius = '4px';
+                previewContainer.style.overflow = 'hidden';
+
+                if (asset.type.startsWith('image/')) {
+                    const img = document.createElement('img');
+                    img.src = URL.createObjectURL(new Blob([asset.data], { type: asset.type }));
+                    img.style.width = '100%';
+                    img.style.height = '100%';
+                    img.style.objectFit = 'cover';
+                    previewContainer.appendChild(img);
+                } else if (asset.type.startsWith('audio/')) {
+                    previewContainer.textContent = '🎵';
+                    previewContainer.style.fontSize = '24px';
+                } else if (asset.type.startsWith('model/')) {
+                    previewContainer.textContent = '📦';
+                    previewContainer.style.fontSize = '24px';
+                } else {
+                    previewContainer.textContent = '📄';
+                    previewContainer.style.fontSize = '24px';
+                }
+
+                const nameLabel = document.createElement('span');
+                nameLabel.textContent = asset.name;
+                nameLabel.style.flex = '1';
+
                 const deleteButton = document.createElement('button');
                 deleteButton.textContent = 'Delete';
+                deleteButton.className = 'btn';
+                deleteButton.style.backgroundColor = '#dc3545';
                 deleteButton.onclick = async () => {
                     if (confirm(`Are you sure you want to delete "${asset.name}"?`)) {
                         await assetManager.deleteAsset(asset.name);
                         loadAssetsIntoView();
                     }
                 };
+
+                li.appendChild(previewContainer);
+                li.appendChild(nameLabel);
                 li.appendChild(deleteButton);
                 assetList.appendChild(li);
             });
-            // The toolbox will be updated dynamically by the block definitions.
         }
 
 
@@ -7550,8 +7682,21 @@ function ${generator.FUNCTION_NAME_PLACEHOLDER_}(c1, c2, ratio) {
         document.getElementById('docsButton').addEventListener('click', () => {
             window.open('docs/Home.html', '_blank');
         });
+        function viewCode() {
+            const code = generateCode();
+            alert("Generated Code:\n\n" + code);
+        }
+
         document.getElementById('screenshotButton').addEventListener('click', () => {
             sceneManager.takeScreenshot();
+        });
+        document.getElementById('toggleGridButton').addEventListener('click', () => {
+            if (window.sceneManager) {
+                window.sceneManager.toggleGrid();
+            }
+        });
+        document.getElementById('viewCodeButton').addEventListener('click', () => {
+            viewCode();
         });
         document.getElementById('clearButton').addEventListener('click', () => {
             projectManager.newProject();
