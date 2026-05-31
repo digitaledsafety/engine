@@ -609,19 +609,6 @@
         </div>
     </div>
     <script>
-        function getLoopParams(block) {
-            const loop = block.getFieldValue('LOOP');
-            let loopBool = false;
-            let loopMode = 'CYCLE';
-            if (loop === 'YES') {
-                loopBool = true;
-            } else if (loop === 'PINGPONG') {
-                loopBool = true;
-                loopMode = 'PINGPONG';
-            }
-            return { loopBool, loopMode };
-        }
-
         function CustomLoadingScreen(/* variables needed, for example:*/ loadingUIText, loadingUIBackgroundColor, loadingUITextColor) {
             //init the loader
             this.loadingUIText = loadingUIText || "Loading...";
@@ -3376,78 +3363,63 @@ workspace_data: "${base64WorkspaceData}"
                 }
             }
 
-            async takeScreenshot(ratioType = 'CURRENT') {
+            async takeScreenshot() {
                 const camera = this.scene.activeCamera;
                 if (!camera) return;
 
-                const capture = async (width, height, label) => {
-                    let screenshotOptions = { width: width, height: height };
+                let width = window.innerWidth;
+                let height = window.innerHeight;
+                let screenshotOptions = { width: width * 2, height: height * 2 };
 
-                    // Temporarily adjust orthographic camera aspect ratio if needed
-                    let oldOrtho = null;
-                    if (camera.mode === BABYLON.Camera.ORTHOGRAPHIC_CAMERA) {
-                        oldOrtho = {
-                            left: camera.orthoLeft,
-                            right: camera.orthoRight,
-                            top: camera.orthoTop,
-                            bottom: camera.orthoBottom
-                        };
-                        const aspectRatio = width / height;
-                        const orthoSize = 10;
-                        camera.orthoLeft = -orthoSize * aspectRatio;
-                        camera.orthoRight = orthoSize * aspectRatio;
-                        camera.orthoBottom = -orthoSize;
-                        camera.orthoTop = orthoSize;
-                    }
-
-                    return new Promise((resolve) => {
-                        BABYLON.Tools.CreateScreenshot(this.engine, camera, screenshotOptions, (data) => {
-                            if (oldOrtho) {
-                                camera.orthoLeft = oldOrtho.left;
-                                camera.orthoRight = oldOrtho.right;
-                                camera.orthoTop = oldOrtho.top;
-                                camera.orthoBottom = oldOrtho.bottom;
-                            }
-
-                            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-                            const fileName = `engine_${label}_${timestamp}.png`;
-
-                            const link = document.createElement('a');
-                            link.setAttribute('download', fileName);
-                            link.setAttribute('href', data);
-                            document.body.appendChild(link);
-                            link.click();
-                            document.body.removeChild(link);
-
-                            console.log(`Downloaded: ${fileName}`);
-                            resolve();
-                        });
-                    });
-                };
-
-                const ratios = {
-                    '1:1': { w: 2048, h: 2048 },
-                    '16:9': { w: 3840, h: 2160 },
-                    '9:16': { w: 2160, h: 3840 },
-                    '4:3': { w: 2048, h: 1536 }
-                };
-
-                if (ratioType === 'ALL') {
-                    for (const [label, dim] of Object.entries(ratios)) {
-                        await capture(dim.w, dim.h, label.replace(':', '-'));
-                    }
-                } else if (ratios[ratioType]) {
-                    const dim = ratios[ratioType];
-                    await capture(dim.w, dim.h, ratioType.replace(':', '-'));
-                } else {
-                    let width = window.innerWidth * 2;
-                    let height = window.innerHeight * 2;
-                    if (this.backgroundImageWidth && this.backgroundImageHeight) {
-                        width = this.backgroundImageWidth;
-                        height = this.backgroundImageHeight;
-                    }
-                    await capture(width, height, 'current');
+                if (this.backgroundImageWidth && this.backgroundImageHeight) {
+                    width = this.backgroundImageWidth;
+                    height = this.backgroundImageHeight;
+                    screenshotOptions = { width: width, height: height };
                 }
+
+                // Temporarily adjust orthographic camera aspect ratio if needed
+                let oldOrtho = null;
+                if (camera.mode === BABYLON.Camera.ORTHOGRAPHIC_CAMERA) {
+                    oldOrtho = {
+                        left: camera.orthoLeft,
+                        right: camera.orthoRight,
+                        top: camera.orthoTop,
+                        bottom: camera.orthoBottom
+                    };
+                    const aspectRatio = width / height;
+                    const orthoSize = 10;
+                    camera.orthoLeft = -orthoSize * aspectRatio;
+                    camera.orthoRight = orthoSize * aspectRatio;
+                    camera.orthoBottom = -orthoSize;
+                    camera.orthoTop = orthoSize;
+                }
+
+                return new Promise((resolve) => {
+                    BABYLON.Tools.CreateScreenshot(this.engine, camera, screenshotOptions, (data) => {
+                        // Restore orthographic camera parameters
+                        if (oldOrtho) {
+                            camera.orthoLeft = oldOrtho.left;
+                            camera.orthoRight = oldOrtho.right;
+                            camera.orthoTop = oldOrtho.top;
+                            camera.orthoBottom = oldOrtho.bottom;
+                        }
+
+                        // Create a formatted timestamp (e.g., 2026-01-17_12-00-00)
+                        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+                        const fileName = `engine_${timestamp}.png`;
+
+                        const link = document.createElement('a');
+                        link.setAttribute('download', fileName);
+                        link.setAttribute('href', data);
+
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+
+                        console.log(`Downloaded: ${fileName}`);
+                        resolve();
+                    });
+                });
             }
 
             setSamplingMode(target, mode) {
@@ -4722,21 +4694,7 @@ workspace_data: "${base64WorkspaceData}"
         Blockly.defineBlocksWithJsonArray([
             {
                 "type": "take_screenshot",
-                "message0": "take %1 screenshot",
-                "args0": [
-                    {
-                        "type": "field_dropdown",
-                        "name": "RATIO",
-                        "options": [
-                            ["current", "CURRENT"],
-                            ["1:1", "1:1"],
-                            ["16:9", "16:9"],
-                            ["9:16", "9:16"],
-                            ["4:3", "4:3"],
-                            ["all", "ALL"]
-                        ]
-                    }
-                ],
+                "message0": "take screenshot",
                 "previousStatement": null,
                 "nextStatement": null,
                 "colour": "#5BA55B",
@@ -6931,7 +6889,17 @@ if (${name}) {
                 const object = generator.valueToCode(block, 'OBJECT', generator.ORDER_ATOMIC) || 'null';
                 const property = block.getFieldValue('PROPERTY');
                 const keyframes = generator.valueToCode(block, 'KEYFRAMES', generator.ORDER_ATOMIC) || '[]';
-                const { loopBool, loopMode } = getLoopParams(block);
+                const loop = block.getFieldValue('LOOP');
+
+                let loopBool = false;
+                let loopMode = 'CYCLE';
+
+                if (loop === 'YES') {
+                    loopBool = true;
+                } else if (loop === 'PINGPONG') {
+                    loopBool = true;
+                    loopMode = 'PINGPONG';
+                }
 
                 return "sceneManager.animateKeyframes(" + object + ", '" + property + "', " + keyframes + ", " + loopBool + ", '" + loopMode + "');\n";
             };
@@ -6941,7 +6909,17 @@ if (${name}) {
                 const from = generator.valueToCode(block, 'FROM', generator.ORDER_ATOMIC) || 0;
                 const to = generator.valueToCode(block, 'TO', generator.ORDER_ATOMIC) || 0;
                 const duration = generator.valueToCode(block, 'DURATION', generator.ORDER_ATOMIC) || 1;
-                const { loopBool, loopMode } = getLoopParams(block);
+                const loop = block.getFieldValue('LOOP');
+
+                let loopBool = false;
+                let loopMode = 'CYCLE'; // Default string
+
+                if (loop === 'YES') {
+                    loopBool = true;
+                } else if (loop === 'PINGPONG') {
+                    loopBool = true;
+                    loopMode = 'PINGPONG';
+                }
 
                 return `sceneManager.animateProperty(${object}, '${property}', ${from}, ${to}, ${duration}, ${loopBool}, '${loopMode}');\n`;
             };
@@ -6982,7 +6960,17 @@ if (${name}) {
                 const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || 0;
                 const z = generator.valueToCode(block, 'Z', generator.ORDER_ATOMIC) || 0;
                 const duration = generator.valueToCode(block, 'DURATION', generator.ORDER_ATOMIC) || 1;
-                const { loopBool, loopMode } = getLoopParams(block);
+                const loop = block.getFieldValue('LOOP');
+
+                let loopBool = false;
+                let loopMode = 'CYCLE';
+
+                if (loop === 'YES') {
+                    loopBool = true;
+                } else if (loop === 'PINGPONG') {
+                    loopBool = true;
+                    loopMode = 'PINGPONG';
+                }
 
                 return `sceneManager.animateRotation(${object}, ${x}, ${y}, ${z}, ${duration}, ${loopBool}, '${loopMode}');\n`;
             };
@@ -6993,7 +6981,17 @@ if (${name}) {
                 const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || 0;
                 const z = generator.valueToCode(block, 'Z', generator.ORDER_ATOMIC) || 0;
                 const duration = generator.valueToCode(block, 'DURATION', generator.ORDER_ATOMIC) || 1;
-                const { loopBool, loopMode } = getLoopParams(block);
+                const loop = block.getFieldValue('LOOP');
+
+                let loopBool = false;
+                let loopMode = 'CYCLE';
+
+                if (loop === 'YES') {
+                    loopBool = true;
+                } else if (loop === 'PINGPONG') {
+                    loopBool = true;
+                    loopMode = 'PINGPONG';
+                }
 
                 return `sceneManager.animatePosition(${object}, ${x}, ${y}, ${z}, ${duration}, ${loopBool}, '${loopMode}');\n`;
             };
@@ -7004,7 +7002,17 @@ if (${name}) {
                 const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || 1;
                 const z = generator.valueToCode(block, 'Z', generator.ORDER_ATOMIC) || 1;
                 const duration = generator.valueToCode(block, 'DURATION', generator.ORDER_ATOMIC) || 1;
-                const { loopBool, loopMode } = getLoopParams(block);
+                const loop = block.getFieldValue('LOOP');
+
+                let loopBool = false;
+                let loopMode = 'CYCLE';
+
+                if (loop === 'YES') {
+                    loopBool = true;
+                } else if (loop === 'PINGPONG') {
+                    loopBool = true;
+                    loopMode = 'PINGPONG';
+                }
 
                 return `sceneManager.animateScale(${object}, ${x}, ${y}, ${z}, ${duration}, ${loopBool}, '${loopMode}');\n`;
             };
@@ -7239,8 +7247,7 @@ if (${name}) {
             };
 
             javascript.javascriptGenerator.forBlock['take_screenshot'] = function (block, generator) {
-                const ratio = block.getFieldValue('RATIO');
-                return `await sceneManager.takeScreenshot('${ratio}');\n`;
+                return `await sceneManager.takeScreenshot();\n`;
             };
 
             javascript.javascriptGenerator.forBlock['set_pixelated_look'] = function (block, generator) {
