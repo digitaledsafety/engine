@@ -1113,6 +1113,7 @@ workspace_data: "${base64WorkspaceData}"
                 }
             }
 
+
             async newProject() {
                 if (confirm('Are you sure you want to clear the workspace? All unsaved changes and assets will be lost.')) {
                     this.sceneManager.clear();
@@ -1613,6 +1614,10 @@ workspace_data: "${base64WorkspaceData}"
                         {
                             kind: 'block',
                             type: 'create_light',
+                        },
+                        {
+                            kind: 'block',
+                            type: 'set_light_property',
                         },
                         {
                             kind: 'block',
@@ -2422,6 +2427,15 @@ workspace_data: "${base64WorkspaceData}"
                 }
             }
 
+            setLightProperty(light, property, value) {
+                if (!light || !(light instanceof BABYLON.Light)) return;
+                if (property === 'intensity') {
+                    light.intensity = parseFloat(value);
+                } else if (property === 'diffuse') {
+                    light.diffuse = BABYLON.Color3.FromHexString(value);
+                }
+            }
+
             setPopupImage(target, imageUrl) {
                 const info = this._getPopupPanel(target);
                 if (info) {
@@ -3076,7 +3090,7 @@ workspace_data: "${base64WorkspaceData}"
                     const boundingInfo = this.player.getHierarchyBoundingVectors(true);
                     const height = boundingInfo.max.y - boundingInfo.min.y;
                     // Slightly longer ray to account for physics jitter/float
-                    const rayLength = (height / 2) + 0.8;
+                    const rayLength = (height / 2) + 0.1;
                     const ray = new BABYLON.Ray(this.player.getAbsolutePosition(), new BABYLON.Vector3(0, -1, 0), rayLength);
                     const pick = this.scene.pickWithRay(ray, (mesh) => mesh !== this.player && !mesh.isDescendantOf(this.player));
                     if (pick.hit) {
@@ -3538,16 +3552,14 @@ workspace_data: "${base64WorkspaceData}"
             destroyObject(target) {
                 const mesh = this._getMesh(target);
                 if (mesh) {
+                    // Remove from objects map if present
+                    for (const key in this.objects) {
+                        if (this.objects[key] === mesh) {
+                            delete this.objects[key];
+                            break;
+                        }
+                    }
                     mesh.dispose();
-                    let name;
-                    if (typeof target === 'string') {
-                        name = target;
-                    } else if (target && typeof target === 'object' && target.name) {
-                        name = target.name;
-                    }
-                    if (name && this.objects[name]) {
-                        delete this.objects[name];
-                    }
                 }
             }
 
@@ -3769,6 +3781,7 @@ workspace_data: "${base64WorkspaceData}"
             }
 
             _getMesh(target) {
+                if (target instanceof BABYLON.AbstractMesh) return target;
                 let name;
                 if (typeof target === 'string') {
                     name = target;
@@ -6446,6 +6459,24 @@ workspace_data: "${base64WorkspaceData}"
                 "colour": 180,
                 "tooltip": "Enables or disables the glow effect for the whole scene.",
                 "helpUrl": ""
+            },
+            {
+                "type": "set_light_property",
+                "message0": "set property %1 of light %2 to %3",
+                "args0": [
+                    {
+                        "type": "field_dropdown",
+                        "name": "PROPERTY",
+                        "options": [["intensity", "intensity"], ["diffuse color", "diffuse"]]
+                    },
+                    { "type": "input_value", "name": "LIGHT", "check": "Light" },
+                    { "type": "input_value", "name": "VALUE" }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": 65,
+                "tooltip": "Sets a property (intensity or diffuse color) of the specified light.",
+                "helpUrl": ""
             }
         ]);
 
@@ -6507,6 +6538,13 @@ workspace_data: "${base64WorkspaceData}"
                 const enabled = block.getFieldValue('ENABLED') === 'TRUE';
                 const intensity = generator.valueToCode(block, 'INTENSITY', generator.ORDER_ATOMIC) || 1;
                 return `sceneManager.setGlow(${enabled}, ${intensity});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['set_light_property'] = function (block, generator) {
+                const property = block.getFieldValue('PROPERTY');
+                const light = generator.valueToCode(block, 'LIGHT', generator.ORDER_ATOMIC) || 'null';
+                const value = generator.valueToCode(block, 'VALUE', generator.ORDER_ATOMIC) || 'null';
+                return `sceneManager.setLightProperty(${light}, '${property}', ${value});\n`;
             };
 
             javascript.javascriptGenerator.forBlock['set_property'] = function (block, generator) {
