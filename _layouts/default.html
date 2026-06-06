@@ -1594,7 +1594,11 @@ workspace_data: "${base64WorkspaceData}"
                         {
                             kind: 'block',
                             type: 'camera_zoom',
-                        },                        
+                        },
+                        {
+                            kind: 'block',
+                            type: 'set_camera_property',
+                        },
                         {
                             kind: 'block',
                             type: 'create_ground',
@@ -3065,7 +3069,7 @@ workspace_data: "${base64WorkspaceData}"
                     const boundingInfo = this.player.getHierarchyBoundingVectors(true);
                     const height = boundingInfo.max.y - boundingInfo.min.y;
                     // Slightly longer ray to account for physics jitter/float
-                    const rayLength = (height / 2) + 0.8;
+                    const rayLength = (height / 2) + 0.1;
                     const ray = new BABYLON.Ray(this.player.getAbsolutePosition(), new BABYLON.Vector3(0, -1, 0), rayLength);
                     const pick = this.scene.pickWithRay(ray, (mesh) => mesh !== this.player && !mesh.isDescendantOf(this.player));
                     if (pick.hit) {
@@ -3114,25 +3118,14 @@ workspace_data: "${base64WorkspaceData}"
             }
 
             setAsPlayer(target) {
-                let name;
-                if (typeof target === 'string') {
-                    name = target;
-                } else if (target && typeof target === 'object' && target.name) {
-                    name = target.name;
-                }
-                if (this.objects[name]) {
-                    this.player = this.objects[name];
+                const mesh = this._getMesh(target);
+                if (mesh) {
+                    this.player = mesh;
                 }
             }
 
             cameraFollow(target) {
-                let mesh = null;
-                if (typeof target === 'string') {
-                    mesh = this.objects[target];
-                } else if (target && typeof target === 'object') {
-                    // Assumes target is a mesh object
-                    mesh = target;
-                }
+                const mesh = this._getMesh(target);
 
                 if (mesh && this.scene.activeCamera) {
                     this.scene.activeCamera.lockedTarget = mesh;
@@ -3142,6 +3135,12 @@ workspace_data: "${base64WorkspaceData}"
             cameraZoom(value) {
                 if (this.scene.activeCamera && typeof this.scene.activeCamera.radius === 'number') {
                     this.scene.activeCamera.radius = Math.max(1, this.scene.activeCamera.radius - value);
+                }
+            }
+
+            setCameraProperty(property, value) {
+                if (this.scene.activeCamera) {
+                    this.scene.activeCamera[property] = value;
                 }
             }
 
@@ -3424,12 +3423,7 @@ workspace_data: "${base64WorkspaceData}"
             }
 
             setFpsCamera(target) {
-                let mesh = null;
-                if (typeof target === 'string') {
-                    mesh = this.objects[target];
-                } else if (target && typeof target === 'object') {
-                    mesh = target;
-                }
+                const mesh = this._getMesh(target);
 
                 if (!mesh) {
                     console.warn("setFpsCamera: Target object not found.");
@@ -3714,6 +3708,9 @@ workspace_data: "${base64WorkspaceData}"
             }
 
             _getMesh(target) {
+                if (target instanceof BABYLON.AbstractMesh) {
+                    return target;
+                }
                 let name;
                 if (typeof target === 'string') {
                     name = target;
@@ -4140,10 +4137,19 @@ workspace_data: "${base64WorkspaceData}"
                     const props = property.split('.');
                     let curr = mesh;
                     for (let i = 0; i < props.length - 1; i++) {
-                        if (curr[props[i]]) curr = curr[props[i]];
-                        else return;
+                        if (curr[props[i]] !== undefined && curr[props[i]] !== null) {
+                            curr = curr[props[i]];
+                        } else {
+                            console.warn(`setProperty: Property path '${property}' is invalid at '${props[i]}'`);
+                            return;
+                        }
                     }
-                    curr[props[props.length - 1]] = value;
+                    const lastProp = props[props.length - 1];
+                    if (curr[lastProp] !== undefined) {
+                        curr[lastProp] = value;
+                    } else {
+                        console.warn(`setProperty: Property '${lastProp}' does not exist on target.`);
+                    }
                 }
             }
 
@@ -5798,6 +5804,32 @@ workspace_data: "${base64WorkspaceData}"
                 "helpUrl": ""
             },
             {
+                "type": "set_camera_property",
+                "message0": "set camera %1 to %2",
+                "args0": [
+                    {
+                        "type": "field_dropdown",
+                        "name": "PROPERTY",
+                        "options": [
+                            ["inertia", "inertia"],
+                            ["wheel precision", "wheelPrecision"],
+                            ["angular sensibility", "angularSensibility"],
+                            ["move sensibility", "moveSensibility"]
+                        ]
+                    },
+                    {
+                        "type": "input_value",
+                        "name": "VALUE",
+                        "check": "Number"
+                    }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": "#A55B80",
+                "tooltip": "Sets a property on the active camera.",
+                "helpUrl": ""
+            },
+            {
                 "type": "play_sound_url",
                 "message0": "play sound from URL %1",
                 "args0": [
@@ -6562,6 +6594,12 @@ if (${name}) {
             javascript.javascriptGenerator.forBlock['camera_zoom'] = function (block, generator) {
                 const zoomValue = generator.valueToCode(block, 'ZOOM', generator.ORDER_ATOMIC) || 0;
                 return `sceneManager.cameraZoom(${zoomValue});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['set_camera_property'] = function (block, generator) {
+                const property = block.getFieldValue('PROPERTY');
+                const value = generator.valueToCode(block, 'VALUE', generator.ORDER_ATOMIC) || 0;
+                return `sceneManager.setCameraProperty('${property}', ${value});\n`;
             };
 
             // --- Gameplay Block Generators ---
@@ -7399,32 +7437,33 @@ if (${name}) {
         const projectManager = new ProjectManager(assetManager, workspace, sceneManager);
         window.projectManager = projectManager;
 
-        // Set up our default Blockly color blocks
-        // TODO: had to manually set up color block generators due to plugin incompatibility, fix later
+        // Set up our default Blockly color blocks and generators
         registerFieldColour();
         installAllBlocks({
             javascript: javascript.javascriptGenerator
         });
 
-        javascript.javascriptGenerator.forBlock['colour_random'] = function (block, generator) {
-            return [generator.provideFunction_('colourRandom', `
+        // Consolidate color generators
+        Object.assign(javascript.javascriptGenerator.forBlock, {
+            'colour_random': function (block, generator) {
+                return [generator.provideFunction_('colourRandom', `
 function ${generator.FUNCTION_NAME_PLACEHOLDER_}() {
   var num = Math.floor(Math.random() * 0x1000000);
   return '#' + ('00000' + num.toString(16)).substr(-6);
 }
 `) + '()', generator.ORDER_FUNCTION_CALL];
-        };
+            },
 
-        javascript.javascriptGenerator.forBlock['colour_picker'] = function (block, generator) {
-            const colour = block.getFieldValue('COLOUR');
-            return [`'${colour}'`, generator.ORDER_ATOMIC];
-        };
+            'colour_picker': function (block, generator) {
+                const colour = block.getFieldValue('COLOUR');
+                return [`'${colour}'`, generator.ORDER_ATOMIC];
+            },
 
-        javascript.javascriptGenerator.forBlock['colour_rgb'] = function (block, generator) {
-            const r = generator.valueToCode(block, 'RED', generator.ORDER_ATOMIC) || 0;
-            const g = generator.valueToCode(block, 'GREEN', generator.ORDER_ATOMIC) || 0;
-            const b = generator.valueToCode(block, 'BLUE', generator.ORDER_ATOMIC) || 0;
-            return [generator.provideFunction_('colourRgb', `
+            'colour_rgb': function (block, generator) {
+                const r = generator.valueToCode(block, 'RED', generator.ORDER_ATOMIC) || 0;
+                const g = generator.valueToCode(block, 'GREEN', generator.ORDER_ATOMIC) || 0;
+                const b = generator.valueToCode(block, 'BLUE', generator.ORDER_ATOMIC) || 0;
+                return [generator.provideFunction_('colourRgb', `
 function ${generator.FUNCTION_NAME_PLACEHOLDER_}(r, g, b) {
   r = Math.max(Math.min(Number(r), 100), 0) * 2.55;
   g = Math.max(Math.min(Number(g), 100), 0) * 2.55;
@@ -7435,13 +7474,13 @@ function ${generator.FUNCTION_NAME_PLACEHOLDER_}(r, g, b) {
   return '#' + r + g + b;
 }
 `) + `(${r}, ${g}, ${b})`, generator.ORDER_FUNCTION_CALL];
-        };
+            },
 
-        javascript.javascriptGenerator.forBlock['colour_blend'] = function (block, generator) {
-            const c1 = generator.valueToCode(block, 'COLOUR1', generator.ORDER_ATOMIC) || "'#000000'";
-            const c2 = generator.valueToCode(block, 'COLOUR2', generator.ORDER_ATOMIC) || "'#000000'";
-            const ratio = generator.valueToCode(block, 'RATIO', generator.ORDER_ATOMIC) || 0.5;
-            return [generator.provideFunction_('colourBlend', `
+            'colour_blend': function (block, generator) {
+                const c1 = generator.valueToCode(block, 'COLOUR1', generator.ORDER_ATOMIC) || "'#000000'";
+                const c2 = generator.valueToCode(block, 'COLOUR2', generator.ORDER_ATOMIC) || "'#000000'";
+                const ratio = generator.valueToCode(block, 'RATIO', generator.ORDER_ATOMIC) || 0.5;
+                return [generator.provideFunction_('colourBlend', `
 function ${generator.FUNCTION_NAME_PLACEHOLDER_}(c1, c2, ratio) {
   ratio = Math.max(Math.min(Number(ratio), 1), 0);
   var r1 = parseInt(c1.substring(1, 3), 16);
@@ -7459,7 +7498,8 @@ function ${generator.FUNCTION_NAME_PLACEHOLDER_}(c1, c2, ratio) {
   return '#' + r + g + b;
 }
 `) + `(${c1}, ${c2}, ${ratio})`, generator.ORDER_FUNCTION_CALL];
-        };
+            }
+        });
 
         assetManager.init().then(() => {
             console.log("Asset manager initialized");
