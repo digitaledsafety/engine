@@ -1240,6 +1240,10 @@ workspace_data: "${base64WorkspaceData}"
                         },
                         {
                             kind: 'block',
+                            type: 'get_scene_object',
+                        },
+                        {
+                            kind: 'block',
                             type: 'event_on_click',
                         },
                         {
@@ -1399,6 +1403,18 @@ workspace_data: "${base64WorkspaceData}"
                         {
                             kind: 'block',
                             type: 'apply_impulse',
+                        },
+                        {
+                            kind: 'block',
+                            type: 'set_linear_velocity',
+                        },
+                        {
+                            kind: 'block',
+                            type: 'set_angular_velocity',
+                        },
+                        {
+                            kind: 'block',
+                            type: 'clear_collision_cache',
                         },
                         {
                             kind: 'block',
@@ -2640,6 +2656,11 @@ workspace_data: "${base64WorkspaceData}"
             }
 
             async importModel(name, url, x = 0, y = 0, z = 0) {
+                const robloxMatch = url.match(/roblox\.com\/(?:users|users\/profile)\/(\d+)/i);
+                if (robloxMatch) {
+                    return this.importRobloxAvatar(name, robloxMatch[1], x, y, z);
+                }
+
                 if (!isValidAssetURL(url)) {
                     return null;
                 }
@@ -3154,6 +3175,20 @@ workspace_data: "${base64WorkspaceData}"
                 }
             }
 
+            setLinearVelocity(target, x, y, z) {
+                const mesh = this._getMesh(target);
+                if (mesh && mesh.physicsImpostor) {
+                    mesh.physicsImpostor.setLinearVelocity(new BABYLON.Vector3(x, y, z));
+                }
+            }
+
+            setAngularVelocity(target, x, y, z) {
+                const mesh = this._getMesh(target);
+                if (mesh && mesh.physicsImpostor) {
+                    mesh.physicsImpostor.setAngularVelocity(new BABYLON.Vector3(x, y, z));
+                }
+            }
+
             applyImpulse(target, fx, fy, fz, px, py, pz) {
                 const mesh = this._getMesh(target);
                 if (mesh && mesh.physicsImpostor) {
@@ -3161,6 +3196,10 @@ workspace_data: "${base64WorkspaceData}"
                     const contactPoint = new BABYLON.Vector3(px, py, pz);
                     mesh.physicsImpostor.applyImpulse(impulse, contactPoint);
                 }
+            }
+
+            clearCollisionCache() {
+                this.processedCollisions.clear();
             }
 
             getPosX(target) {
@@ -4851,39 +4890,25 @@ workspace_data: "${base64WorkspaceData}"
             },
             {
                 type: 'import_3d_file_url',
-                message0: 'Import model URL %1\r\n',
+                message0: 'Import model URL %1',
                 args0: [
                     {
-                        type: 'field_input',
-                        name: 'MODEL_URL',
-                        text: 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/main/2.0/Duck/glTF-Binary/Duck.glb',
+                        "type": "input_value",
+                        "name": "URL",
+                        "check": "String"
                     }
                 ],
                 message1: 'Place at X %1 Y %2 Z %3',
                 args1: [
-                    {
-                        type: 'field_number',
-                        name: 'POS_X',
-                        value: 0,
-                    },
-                    {
-                        type: 'field_number',
-                        name: 'POS_Y',
-                        value: 0,
-                    },
-                    {
-                        type: 'field_number',
-                        name: 'POS_Z',
-                        value: 0,
-                    },
-                ],                
-                colour: 160,
-                tooltip: 'Imports a 3D file from a URL and executes actions on success.',
-                output: "Mesh",
-                helpUrl: '',
-                extensions: [
-                    'set_max_display_length',
+                    { type: 'input_value', name: 'X', check: 'Number' },
+                    { type: 'input_value', name: 'Y', check: 'Number' },
+                    { type: 'input_value', name: 'Z', check: 'Number' },
                 ],
+                "inputsInline": true,
+                "output": "Mesh",
+                "colour": "%{BKY_MOTION_HUE}",
+                "tooltip": "Imports a 3D model (.glb) from a URL.",
+                "helpUrl": ""
             },
             {
                 type: 'set_isometric_camera',
@@ -4912,7 +4937,7 @@ workspace_data: "${base64WorkspaceData}"
             },
             {
                 type: 'create_primitive',
-                message0: 'Create %1 named %2 at x %3 y %4 z %5',
+                message0: 'Create %1 at x %2 y %3 z %4',
                 args0: [
                     {
                         type: 'field_dropdown',
@@ -4925,22 +4950,19 @@ workspace_data: "${base64WorkspaceData}"
                             ['torus', 'torus']
                         ],
                     },
-                    { "type": "input_value", "name": "NAME", "check": "String" },
                     { type: 'input_value', name: 'X', check: 'Number' },
                     { type: 'input_value', name: 'Y', check: 'Number' },
                     { type: 'input_value', name: 'Z', check: 'Number' },
                 ],
                 "inputsInline": true,
-                previousStatement: null,
-                nextStatement: null,
+                output: "Mesh",
                 colour: 160,
                 tooltip: 'Creates a 3D primitive at the specified position.',
             },
             {
                 type: 'create_box',
-                message0: 'Create box named %1 at x %2 y %3 z %4',
+                message0: 'Create box at x %1 y %2 z %3',
                 args0: [
-                    { "type": "input_value", "name": "NAME", "check": "String" },
                     { type: 'input_value', name: 'X', check: 'Number' },
                     { type: 'input_value', name: 'Y', check: 'Number' },
                     { type: 'input_value', name: 'Z', check: 'Number' },
@@ -4965,10 +4987,9 @@ workspace_data: "${base64WorkspaceData}"
             },
             {
                 "type": "create_3d_text",
-                "message0": "create 3D text %1 named %2",
+                "message0": "create 3D text %1",
                 "args0": [
                     { "type": "input_value", "name": "TEXT", "check": "String" },
-                    { "type": "input_value", "name": "NAME", "check": "String" },
                 ],
                 "message1": "font URL %1",
                 "args1": [
@@ -5069,16 +5090,14 @@ workspace_data: "${base64WorkspaceData}"
             },
             {
                 type: 'create_light',
-                message0: 'Create light named %1 at x %2 y %3 z %4',
+                message0: 'Create light at x %1 y %2 z %3',
                 args0: [
-                    { type: 'field_input', name: 'NAME', text: 'light' },
                     { type: 'input_value', name: 'X', check: 'Number' },
                     { type: 'input_value', name: 'Y', check: 'Number' },
                     { type: 'input_value', name: 'Z', check: 'Number' },
                 ],
                 "inputsInline": true,
-                previousStatement: null,
-                nextStatement: null,
+                output: "Light",
                 colour: 65,
                 tooltip: 'Creates a light at the specified position',
             },
@@ -5404,6 +5423,44 @@ workspace_data: "${base64WorkspaceData}"
                 tooltip: 'Applies an impulse to the specified object at a given point',
             },
             {
+                type: 'set_linear_velocity',
+                message0: 'Set linear velocity of %1 to x: %2 y: %3 z: %4',
+                args0: [
+                    { type: 'input_value', name: 'OBJECT' },
+                    { type: 'input_value', name: 'X', check: 'Number' },
+                    { type: 'input_value', name: 'Y', check: 'Number' },
+                    { type: 'input_value', name: 'Z', check: 'Number' },
+                ],
+                "inputsInline": true,
+                previousStatement: null,
+                nextStatement: null,
+                colour: 120,
+                tooltip: 'Sets the linear velocity of the specified object',
+            },
+            {
+                type: 'set_angular_velocity',
+                message0: 'Set angular velocity of %1 to x: %2 y: %3 z: %4',
+                args0: [
+                    { type: 'input_value', name: 'OBJECT' },
+                    { type: 'input_value', name: 'X', check: 'Number' },
+                    { type: 'input_value', name: 'Y', check: 'Number' },
+                    { type: 'input_value', name: 'Z', check: 'Number' },
+                ],
+                "inputsInline": true,
+                previousStatement: null,
+                nextStatement: null,
+                colour: 120,
+                tooltip: 'Sets the angular velocity of the specified object',
+            },
+            {
+                type: 'clear_collision_cache',
+                message0: 'clear collision cache',
+                previousStatement: null,
+                nextStatement: null,
+                colour: 120,
+                tooltip: 'Clears the collision cache to allow re-triggering of collisions.',
+            },
+            {
                 type: 'get_object_pos',
                 message0: 'Get %1 position of %2',
                 args0: [
@@ -5537,6 +5594,25 @@ workspace_data: "${base64WorkspaceData}"
                 "output": "String", // Outputs the object name/ID as a string
                 "colour": "%{BKY_LOGIC_HUE}", // Using logic hue for now
                 "tooltip": "Selects an object from the scene by its name.",
+                "helpUrl": ""
+            },
+            {
+                "type": "get_scene_object",
+                "message0": "scene %1",
+                "args0": [
+                    {
+                        "type": "field_dropdown",
+                        "name": "OBJECT",
+                        "options": [
+                            ["player", "player"],
+                            ["camera", "camera"],
+                            ["scene", "scene"]
+                        ]
+                    }
+                ],
+                "output": null,
+                "colour": "%{BKY_LOGIC_HUE}",
+                "tooltip": "Accesses system-managed objects like the player, camera, or the scene itself.",
                 "helpUrl": ""
             },
             // Phase 2 Blockly Blocks
@@ -5787,7 +5863,7 @@ workspace_data: "${base64WorkspaceData}"
                 "args0": [
                     {
                         "type": "input_value",
-                        "name": "ZOOM",
+                        "name": "VALUE",
                         "check": "Number"
                     }
                 ],
@@ -6316,14 +6392,13 @@ workspace_data: "${base64WorkspaceData}"
             },
             {
                 "type": "create_advanced_light",
-                "message0": "create %1 light named %2",
+                "message0": "create %1 light",
                 "args0": [
                     {
                         "type": "field_dropdown",
                         "name": "TYPE",
                         "options": [["directional", "directional"], ["hemispheric", "hemispheric"], ["spot", "spot"], ["point", "point"]]
-                    },
-                    { "type": "field_input", "name": "NAME", "text": "light" }
+                    }
                 ],
                 "message1": "position x %1 y %2 z %3",
                 "args1": [
@@ -6371,6 +6446,8 @@ workspace_data: "${base64WorkspaceData}"
         ]);
 
         {
+            javascript.javascriptGenerator.ORDER_AWAIT = 0; // Define await precedence
+
             javascript.javascriptGenerator.forBlock['create_particles'] = function (block, generator) {
                 const type = block.getFieldValue('TYPE');
                 const target = generator.valueToCode(block, 'TARGET', generator.ORDER_ATOMIC) || 'null';
@@ -6394,16 +6471,16 @@ workspace_data: "${base64WorkspaceData}"
             };
 
             javascript.javascriptGenerator.forBlock['create_advanced_light'] = function (block, generator) {
+                const uniqueId = 'id_' + Blockly.utils.idGenerator.genUid();
                 const type = block.getFieldValue('TYPE');
-                const name = block.getFieldValue('NAME');
                 const x = generator.valueToCode(block, 'X', generator.ORDER_ATOMIC) || 0;
                 const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || 10;
                 const z = generator.valueToCode(block, 'Z', generator.ORDER_ATOMIC) || 0;
                 const dx = generator.valueToCode(block, 'DX', generator.ORDER_ATOMIC) || 0;
                 const dy = generator.valueToCode(block, 'DY', generator.ORDER_ATOMIC) || -1;
                 const dz = generator.valueToCode(block, 'DZ', generator.ORDER_ATOMIC) || 0;
-                const code = `sceneManager.createAdvancedLight('${type}', '${name}', ${x}, ${y}, ${z}, ${dx}, ${dy}, ${dz})`;
-                return [code, generator.ORDER_ATOMIC];
+                const code = `sceneManager.createAdvancedLight('${type}', '${uniqueId}', ${x}, ${y}, ${z}, ${dx}, ${dy}, ${dz})`;
+                return [code, generator.ORDER_FUNCTION_CALL];
             };
 
             javascript.javascriptGenerator.forBlock['enable_shadows'] = function (block, generator) {
@@ -6548,6 +6625,19 @@ if (${name}) {
                 return [`'${objectName}'`, generator.ORDER_ATOMIC];
             };
 
+            javascript.javascriptGenerator.forBlock['get_scene_object'] = function (block, generator) {
+                const object = block.getFieldValue('OBJECT');
+                let code;
+                if (object === 'player') {
+                    code = 'sceneManager.player';
+                } else if (object === 'camera') {
+                    code = 'sceneManager.scene.activeCamera';
+                } else {
+                    code = 'sceneManager.scene';
+                }
+                return [code, generator.ORDER_ATOMIC];
+            };
+
             // --- Player and Camera Block Generators ---
             javascript.javascriptGenerator.forBlock['set_as_player'] = function (block, generator) {
                 const objectName = generator.valueToCode(block, 'OBJECT', generator.ORDER_ATOMIC) || 'null';
@@ -6560,7 +6650,7 @@ if (${name}) {
             };
 
             javascript.javascriptGenerator.forBlock['camera_zoom'] = function (block, generator) {
-                const zoomValue = generator.valueToCode(block, 'ZOOM', generator.ORDER_ATOMIC) || 0;
+                const zoomValue = generator.valueToCode(block, 'VALUE', generator.ORDER_ATOMIC) || 0;
                 return `sceneManager.cameraZoom(${zoomValue});\n`;
             };
 
@@ -6636,21 +6726,14 @@ if (${name}) {
             };
 
             javascript.javascriptGenerator.forBlock['import_3d_file_url'] = function (block, generator) {
-                const modelUrl = block.getFieldValue('MODEL_URL');
-                const posX = block.getFieldValue('POS_X');
-                const posY = block.getFieldValue('POS_Y');
-                const posZ = block.getFieldValue('POS_Z');                
-                const modelVarName = javascript.javascriptGenerator.nameDB_.getDistinctName(Blockly.utils.idGenerator.genUid(), Blockly.Variables.NameType);
+                const uniqueId = 'id_' + Blockly.utils.idGenerator.genUid();
+                const modelUrl = generator.valueToCode(block, 'URL', generator.ORDER_ATOMIC) || "''";
+                const x = generator.valueToCode(block, 'X', generator.ORDER_ATOMIC) || 0;
+                const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || 0;
+                const z = generator.valueToCode(block, 'Z', generator.ORDER_ATOMIC) || 0;
 
-                let code;
-                const robloxMatch = modelUrl.match(/roblox\.com\/(?:users|users\/profile)\/(\d+)/i);
-                if (robloxMatch) {
-                    const userId = robloxMatch[1];
-                    code = `await sceneManager.importRobloxAvatar('${modelVarName}', ${userId}, ${posX}, ${posY}, ${posZ})`;
-                } else {
-                    code = `await sceneManager.importModel('${modelVarName}', '${modelUrl}', ${posX}, ${posY}, ${posZ})`;
-                }
-                return [code, generator.ORDER_ATOMIC];
+                const code = `await sceneManager.importModel('${uniqueId}', ${modelUrl}, ${x}, ${y}, ${z})`;
+                return [code, generator.ORDER_AWAIT];
             };
 
             javascript.javascriptGenerator.forBlock['set_isometric_camera'] = function (block, generator) {
@@ -6682,50 +6765,50 @@ if (${name}) {
 
             javascript.javascriptGenerator.forBlock['create_primitive'] = function (block, generator) {
                 const type = block.getFieldValue('TYPE');
-                const name = generator.valueToCode(block, 'NAME', generator.ORDER_ATOMIC) || "'myObject'";
+                const uniqueId = 'id_' + Blockly.utils.idGenerator.genUid();
                 const x = generator.valueToCode(block, 'X', generator.ORDER_ATOMIC) || 0;
                 const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || 0;
                 const z = generator.valueToCode(block, 'Z', generator.ORDER_ATOMIC) || 0;
 
                 let code;
                 if (type === 'sphere') {
-                    code = `sceneManager.createSphere(${name}, ${x}, ${y}, ${z});\n`;
+                    code = `sceneManager.createSphere('${uniqueId}', ${x}, ${y}, ${z})`;
                 } else if (type === 'cylinder') {
-                    code = `sceneManager.createCylinder(${name}, ${x}, ${y}, ${z});\n`;
+                    code = `sceneManager.createCylinder('${uniqueId}', ${x}, ${y}, ${z})`;
                 } else if (type === 'cone') {
-                    code = `sceneManager.createCone(${name}, ${x}, ${y}, ${z});\n`;
+                    code = `sceneManager.createCone('${uniqueId}', ${x}, ${y}, ${z})`;
                 } else if (type === 'torus') {
-                    code = `sceneManager.createTorus(${name}, ${x}, ${y}, ${z});\n`;
+                    code = `sceneManager.createTorus('${uniqueId}', ${x}, ${y}, ${z})`;
                 } else {
-                    code = `sceneManager.createBox(${name}, ${x}, ${y}, ${z});\n`;
+                    code = `sceneManager.createBox('${uniqueId}', ${x}, ${y}, ${z})`;
                 }
-                return code;
+                return [code, generator.ORDER_FUNCTION_CALL];
             };
 
             javascript.javascriptGenerator.forBlock['create_box'] = function (block, generator) {
-                const name = generator.valueToCode(block, 'NAME', generator.ORDER_ATOMIC) || "'myBox'";
+                const uniqueId = 'id_' + Blockly.utils.idGenerator.genUid();
                 const x = generator.valueToCode(block, 'X', generator.ORDER_ATOMIC) || 0;
                 const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || 0;
                 const z = generator.valueToCode(block, 'Z', generator.ORDER_ATOMIC) || 0;
-                const code = `sceneManager.createBox(${name}, ${x}, ${y}, ${z})`;
-                return [code, generator.ORDER_ATOMIC];
+                const code = `sceneManager.createBox('${uniqueId}', ${x}, ${y}, ${z})`;
+                return [code, generator.ORDER_FUNCTION_CALL];
             };
 
             javascript.javascriptGenerator.forBlock['create_sphere'] = function (block, generator) {
-                const name = javascript.javascriptGenerator.nameDB_.getDistinctName(Blockly.utils.idGenerator.genUid(), Blockly.Variables.NameType);
+                const uniqueId = 'id_' + Blockly.utils.idGenerator.genUid();
                 const x = generator.valueToCode(block, 'X', generator.ORDER_ATOMIC) || 0;
                 const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || 0;
                 const z = generator.valueToCode(block, 'Z', generator.ORDER_ATOMIC) || 0;
-                const code = `sceneManager.createSphere('${name}', ${x}, ${y}, ${z})`;
-                return [code, generator.ORDER_ATOMIC];
+                const code = `sceneManager.createSphere('${uniqueId}', ${x}, ${y}, ${z})`;
+                return [code, generator.ORDER_FUNCTION_CALL];
             };
 
             javascript.javascriptGenerator.forBlock['create_3d_text'] = function (block, generator) {
+                const uniqueId = 'id_' + Blockly.utils.idGenerator.genUid();
                 const text = generator.valueToCode(block, 'TEXT', generator.ORDER_ATOMIC) || "''";
-                const name = generator.valueToCode(block, 'NAME', generator.ORDER_ATOMIC) || "'myText'";
                 const fontUrl = block.getFieldValue('FONT_URL');
-                const code = `await sceneManager.createText(${name}, ${text}, '${fontUrl}')`;
-                return [code, generator.ORDER_ATOMIC];
+                const code = `await sceneManager.createText('${uniqueId}', ${text}, '${fontUrl}')`;
+                return [code, generator.ORDER_AWAIT];
             };
 
             javascript.javascriptGenerator.forBlock['scale_object'] = function (block, generator) {
@@ -6766,11 +6849,12 @@ if (${name}) {
             };
 
             javascript.javascriptGenerator.forBlock['create_light'] = function (block, generator) {
-                const name = block.getFieldValue('NAME');
+                const uniqueId = 'id_' + Blockly.utils.idGenerator.genUid();
                 const x = generator.valueToCode(block, 'X', generator.ORDER_ATOMIC) || 0;
                 const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || 0;
                 const z = generator.valueToCode(block, 'Z', generator.ORDER_ATOMIC) || 0;
-                return `sceneManager.createLight('${name}', ${x}, ${y}, ${z});\n`;
+                const code = `sceneManager.createLight('${uniqueId}', ${x}, ${y}, ${z})`;
+                return [code, generator.ORDER_FUNCTION_CALL];
             };
 
             javascript.javascriptGenerator.forBlock['change_object_color'] = function (block, generator) {
@@ -6955,6 +7039,26 @@ if (${name}) {
                 const py = generator.valueToCode(block, 'PY', generator.ORDER_ATOMIC) || 0;
                 const pz = generator.valueToCode(block, 'PZ', generator.ORDER_ATOMIC) || 0;
                 return `sceneManager.applyImpulse(${target}, ${fx}, ${fy}, ${fz}, ${px}, ${py}, ${pz});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['set_linear_velocity'] = function (block, generator) {
+                const target = generator.valueToCode(block, 'OBJECT', generator.ORDER_ATOMIC) || 'null';
+                const x = generator.valueToCode(block, 'X', generator.ORDER_ATOMIC) || 0;
+                const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || 0;
+                const z = generator.valueToCode(block, 'Z', generator.ORDER_ATOMIC) || 0;
+                return `sceneManager.setLinearVelocity(${target}, ${x}, ${y}, ${z});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['set_angular_velocity'] = function (block, generator) {
+                const target = generator.valueToCode(block, 'OBJECT', generator.ORDER_ATOMIC) || 'null';
+                const x = generator.valueToCode(block, 'X', generator.ORDER_ATOMIC) || 0;
+                const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || 0;
+                const z = generator.valueToCode(block, 'Z', generator.ORDER_ATOMIC) || 0;
+                return `sceneManager.setAngularVelocity(${target}, ${x}, ${y}, ${z});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['clear_collision_cache'] = function (block, generator) {
+                return `sceneManager.clearCollisionCache();\n`;
             };
 
             javascript.javascriptGenerator.forBlock['get_object_pos'] = function (block, generator) {
