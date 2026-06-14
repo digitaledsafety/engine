@@ -20,6 +20,7 @@ test.describe('Engine Collision Functionality', () => {
                               "type": "create_box",
                               "id": "create_player_box",
                               "inputs": {
+                                  "NAME": {"block": {"type": "text", "fields": {"TEXT": "player"}}},
                                   "X": {"block": {"type": "math_number", "fields": {"NUM": 0}}},
                                   "Y": {"block": {"type": "math_number", "fields": {"NUM": 5}}},
                                   "Z": {"block": {"type": "math_number", "fields": {"NUM": 0}}}
@@ -50,6 +51,7 @@ test.describe('Engine Collision Functionality', () => {
                               "type": "create_box",
                               "id": "create_target_box",
                               "inputs": {
+                                  "NAME": {"block": {"type": "text", "fields": {"TEXT": "target"}}},
                                   "X": {"block": {"type": "math_number", "fields": {"NUM": 0}}},
                                   "Y": {"block": {"type": "math_number", "fields": {"NUM": 0}}},
                                   "Z": {"block": {"type": "math_number", "fields": {"NUM": 0}}}
