@@ -1651,9 +1651,13 @@ workspace_data: "${base64WorkspaceData}"
                 },
                 {
                     kind: 'category',
-                    name: 'Utils',
-                    categorystyle: 'colour_category',
+                    name: 'Math',
+                    categorystyle: 'math_category',
                     contents: [
+                        {
+                            kind: 'block',
+                            type: 'get_distance',
+                        },
                         {
                             kind: 'block',
                             type: 'colour_picker',
@@ -2999,9 +3003,10 @@ workspace_data: "${base64WorkspaceData}"
                     return;
                 }
 
+                const callbackId = Math.random().toString(36).substr(2, 9);
                 const collisionCallback = (main, collided) => {
                     const ids = [main.object.uniqueId, collided.object.uniqueId].sort();
-                    const collisionKey = `${ids[0]}-${ids[1]}`;
+                    const collisionKey = `${ids[0]}-${ids[1]}-${callbackId}`;
 
                     if (this.processedCollisions.has(collisionKey)) {
                         return;
@@ -3177,7 +3182,16 @@ workspace_data: "${base64WorkspaceData}"
                 const mesh = this._getMesh(target);
                 return mesh ? mesh.position.z : 0;
             }
-            
+
+            getDistance(target1, target2) {
+                const mesh1 = this._getMesh(target1);
+                const mesh2 = this._getMesh(target2);
+                if (mesh1 && mesh2) {
+                    return BABYLON.Vector3.Distance(mesh1.getAbsolutePosition(), mesh2.getAbsolutePosition());
+                }
+                return 0;
+            }
+
             createParticleSystem(target, type) {
                 const mesh = this._getMesh(target);
                 if (!mesh) return;
@@ -3493,6 +3507,10 @@ workspace_data: "${base64WorkspaceData}"
                     if (name && this.objects[name]) {
                         delete this.objects[name];
                     }
+                    if (mesh === this.player) {
+                        this.player = null;
+                    }
+                    this.perFrameFunctions = this.perFrameFunctions.filter(task => task.targetMesh !== mesh);
                 }
             }
 
@@ -5419,6 +5437,17 @@ workspace_data: "${base64WorkspaceData}"
                 tooltip: 'Returns the X, Y, or Z position of an object'
             },
             {
+                type: 'get_distance',
+                message0: 'distance from %1 to %2',
+                args0: [
+                    { type: 'input_value', name: 'OBJECT1' },
+                    { type: 'input_value', name: 'OBJECT2' }
+                ],
+                output: 'Number',
+                colour: 120,
+                tooltip: 'Returns the distance between two objects'
+            },
+            {
                 type: 'get_collided_object',
                 message0: 'collided object',
                 output: null,
@@ -6961,6 +6990,12 @@ if (${name}) {
                 const axis = block.getFieldValue('AXIS');
                 const target = generator.valueToCode(block, 'OBJECT', generator.ORDER_ATOMIC) || 'null';
                 return [`sceneManager.getPos${axis}(${target})`, javascript.Order.FUNCTION_CALL];
+            };
+
+            javascript.javascriptGenerator.forBlock['get_distance'] = function (block, generator) {
+                const obj1 = generator.valueToCode(block, 'OBJECT1', generator.ORDER_ATOMIC) || 'null';
+                const obj2 = generator.valueToCode(block, 'OBJECT2', generator.ORDER_ATOMIC) || 'null';
+                return [`sceneManager.getDistance(${obj1}, ${obj2})`, javascript.Order.FUNCTION_CALL];
             };
 
             javascript.javascriptGenerator.forBlock['get_collided_object'] = function (block, generator) {
