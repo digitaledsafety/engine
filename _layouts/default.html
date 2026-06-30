@@ -1641,6 +1641,10 @@ workspace_data: "${base64WorkspaceData}"
                         },
                         {
                             kind: 'block',
+                            type: 'set_oit'
+                        },
+                        {
+                            kind: 'block',
                             type: 'procedural_texture'
                         },
                         {
@@ -2689,6 +2693,13 @@ workspace_data: "${base64WorkspaceData}"
                         if (result.animationGroups && result.animationGroups.length > 0) {
                             wrapper.animationGroups = result.animationGroups;
                         }
+
+                        // Roblox GLB fixes: ensure transparency and two-sided rendering work correctly
+                        result.meshes.forEach(mesh => {
+                            if (mesh.material) {
+                                mesh.material.backFaceCulling = false;
+                            }
+                        });
 
                         this.objects[name] = wrapper;
                         return wrapper;
@@ -6367,6 +6378,18 @@ workspace_data: "${base64WorkspaceData}"
                 "colour": 180,
                 "tooltip": "Enables or disables the glow effect for the whole scene.",
                 "helpUrl": ""
+            },
+            {
+                "type": "set_oit",
+                "message0": "set order independent transparency %1",
+                "args0": [
+                    { "type": "field_checkbox", "name": "ENABLED", "checked": true }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": 180,
+                "tooltip": "Enables or disables order independent transparency for the scene.",
+                "helpUrl": ""
             }
         ]);
 
@@ -6416,6 +6439,11 @@ workspace_data: "${base64WorkspaceData}"
                 const enabled = block.getFieldValue('ENABLED') === 'TRUE';
                 const intensity = generator.valueToCode(block, 'INTENSITY', generator.ORDER_ATOMIC) || 1;
                 return `sceneManager.setGlow(${enabled}, ${intensity});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['set_oit'] = function (block, generator) {
+                const enabled = block.getFieldValue('ENABLED') === 'TRUE';
+                return `sceneManager.scene.useOrderIndependentTransparency = ${enabled};\n`;
             };
 
             javascript.javascriptGenerator.forBlock['set_property'] = function (block, generator) {
