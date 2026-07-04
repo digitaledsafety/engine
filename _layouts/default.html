@@ -3133,6 +3133,9 @@ workspace_data: "${base64WorkspaceData}"
                 }
                 if (this.objects[name]) {
                     this.player = this.objects[name];
+                    if (this.player.physicsImpostor) {
+                        this.player.physicsImpostor.setAngularFactor(BABYLON.Vector3.Zero());
+                    }
                 }
             }
 
