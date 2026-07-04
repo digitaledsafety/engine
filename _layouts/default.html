@@ -2563,10 +2563,50 @@ workspace_data: "${base64WorkspaceData}"
             }
 
             // High-level API for cleaner code generation
+            _tagMesh(mesh, logicalName) {
+                if (!mesh) return;
+                mesh.metadata = mesh.metadata || {};
+                mesh.metadata.logicalRoot = logicalName;
+                mesh.getDescendants(false).forEach(child => {
+                    child.metadata = child.metadata || {};
+                    child.metadata.logicalRoot = logicalName;
+                });
+            }
+
+            _normalizeAndCenter(wrapper, importedRoots) {
+                // Calculate bounds of the imported content relative to its origin
+                const boundingInfo = wrapper.getHierarchyBoundingVectors(true);
+                const size = boundingInfo.max.subtract(boundingInfo.min);
+                const height = size.y;
+
+                // 1. Normalize height to a default of 2.0 units
+                if (height > 0.001) {
+                    const targetHeight = 2.0;
+                    const scale = targetHeight / height;
+                    // We scale the contents, not the wrapper, so the wrapper remains at scale 1,1,1
+                    importedRoots.forEach(m => {
+                        m.scaling.scaleInPlace(scale);
+                    });
+                }
+
+                // 2. Auto-center and align base to origin
+                // Recalculate bounds after scaling
+                const scaledBounds = wrapper.getHierarchyBoundingVectors(true);
+                const center = scaledBounds.max.add(scaledBounds.min).scale(0.5);
+
+                // Shift imported content so its horizontal center is at 0 and its base is at 0 relative to wrapper
+                importedRoots.forEach(m => {
+                    m.position.x -= center.x;
+                    m.position.y -= scaledBounds.min.y;
+                    m.position.z -= center.z;
+                });
+            }
+
             createBox(name, x, y, z) {
                 const boxMesh = BABYLON.MeshBuilder.CreateBox(name, {}, this.scene);
                 boxMesh.position.set(x, y, z);
                 this.objects[name] = boxMesh;
+                this._tagMesh(boxMesh, name);
                 return boxMesh;
             }
 
@@ -2574,6 +2614,7 @@ workspace_data: "${base64WorkspaceData}"
                 const sphereMesh = BABYLON.MeshBuilder.CreateSphere(name, { diameter: 1 }, this.scene);
                 sphereMesh.position.set(x, y, z);
                 this.objects[name] = sphereMesh;
+                this._tagMesh(sphereMesh, name);
                 return sphereMesh;
             }
 
@@ -2581,6 +2622,7 @@ workspace_data: "${base64WorkspaceData}"
                 const cylinderMesh = BABYLON.MeshBuilder.CreateCylinder(name, { diameter: 1, height: 1 }, this.scene);
                 cylinderMesh.position.set(x, y, z);
                 this.objects[name] = cylinderMesh;
+                this._tagMesh(cylinderMesh, name);
                 return cylinderMesh;
             }
 
@@ -2588,6 +2630,7 @@ workspace_data: "${base64WorkspaceData}"
                 const coneMesh = BABYLON.MeshBuilder.CreateCylinder(name, { diameterTop: 0, diameterBottom: 1, height: 1 }, this.scene);
                 coneMesh.position.set(x, y, z);
                 this.objects[name] = coneMesh;
+                this._tagMesh(coneMesh, name);
                 return coneMesh;
             }
 
@@ -2595,7 +2638,16 @@ workspace_data: "${base64WorkspaceData}"
                 const torusMesh = BABYLON.MeshBuilder.CreateTorus(name, { diameter: 1, thickness: 0.2 }, this.scene);
                 torusMesh.position.set(x, y, z);
                 this.objects[name] = torusMesh;
+                this._tagMesh(torusMesh, name);
                 return torusMesh;
+            }
+
+            createCapsule(name, x, y, z) {
+                const capsuleMesh = BABYLON.MeshBuilder.CreateCapsule(name, { height: 2, radius: 0.5 }, this.scene);
+                capsuleMesh.position.set(x, y, z);
+                this.objects[name] = capsuleMesh;
+                this._tagMesh(capsuleMesh, name);
+                return capsuleMesh;
             }
 
             async createText(name, text, fontUrl, size = 1, resolution = 16, depth = 0.5) {
@@ -2660,32 +2712,7 @@ workspace_data: "${base64WorkspaceData}"
                         const importedRoots = result.meshes.filter(m => !m.parent);
                         importedRoots.forEach(m => m.parent = wrapper);
 
-                        // Calculate bounds of the imported content relative to its origin
-                        const boundingInfo = wrapper.getHierarchyBoundingVectors(true);
-                        const size = boundingInfo.max.subtract(boundingInfo.min);
-                        const height = size.y;
-
-                        // 1. Normalize height to a default of 2.0 units
-                        if (height > 0.001) {
-                            const targetHeight = 2.0;
-                            const scale = targetHeight / height;
-                            // We scale the contents, not the wrapper, so the wrapper remains at scale 1,1,1
-                            importedRoots.forEach(m => {
-                                m.scaling.scaleInPlace(scale);
-                            });
-                        }
-
-                        // 2. Auto-center and align base to origin
-                        // Recalculate bounds after scaling
-                        const scaledBounds = wrapper.getHierarchyBoundingVectors(true);
-                        const center = scaledBounds.max.add(scaledBounds.min).scale(0.5);
-
-                        // Shift imported content so its horizontal center is at 0 and its base is at 0 relative to wrapper
-                        importedRoots.forEach(m => {
-                            m.position.x -= center.x;
-                            m.position.y -= scaledBounds.min.y;
-                            m.position.z -= center.z;
-                        });
+                        this._normalizeAndCenter(wrapper, importedRoots);
 
                         // Now that geometry is centered at the wrapper's origin, move the wrapper to target position
                         wrapper.position.set(x, y, z);
@@ -2852,31 +2879,12 @@ workspace_data: "${base64WorkspaceData}"
                             }
                         });
 
-                        const boundingInfo = wrapper.getHierarchyBoundingVectors(true);
-                        const size = boundingInfo.max.subtract(boundingInfo.min);
-                        const height = size.y;
-
-                        if (height > 0.001) {
-                            const targetHeight = 2.0;
-                            const scale = targetHeight / height;
-
-                            importedRoots.forEach(m => {
-                                m.scaling.scaleInPlace(scale);
-                            });
-
-                            const scaledBounds = wrapper.getHierarchyBoundingVectors(true);
-                            const center = scaledBounds.max.add(scaledBounds.min).scale(0.5);
-
-                            importedRoots.forEach(m => {
-                                m.position.x -= center.x;
-                                m.position.y -= scaledBounds.min.y;
-                                m.position.z -= center.z;
-                            });
-                        }
+                        this._normalizeAndCenter(wrapper, importedRoots);
 
                         wrapper.position.set(x, y, z);
 
                         this.objects[name] = wrapper;
+                        this._tagMesh(wrapper, name);
                         return wrapper;
                     }
                 } catch (error) {
@@ -3019,12 +3027,17 @@ workspace_data: "${base64WorkspaceData}"
                     }
                     this.processedCollisions.add(collisionKey);
 
-                    // Find the original visible mesh that corresponds to the collided impostor.
-                    // If the impostor is the object itself, it will be returned.
-                    // If the impostor is a parent, we find the child that is registered in `this.objects`.
-                    const collidedMesh = Object.values(this.objects).find(
-                        o => o === collided.object || (o.parent && o.parent === collided.object)
-                    );
+                    // Use logicalRoot tag for O(1) lookup, fallback to parent search if not tagged
+                    let collidedMesh = null;
+                    if (collided.object.metadata && collided.object.metadata.logicalRoot) {
+                        collidedMesh = this.objects[collided.object.metadata.logicalRoot];
+                    }
+
+                    if (!collidedMesh) {
+                        collidedMesh = Object.values(this.objects).find(
+                            o => o === collided.object || (o.parent && o.parent === collided.object)
+                        );
+                    }
 
                     callback(collidedMesh || collided.object);
                 };
@@ -3683,6 +3696,7 @@ workspace_data: "${base64WorkspaceData}"
                 this.scene = new BABYLON.Scene(this.engine);
                 this.initScene();
                 this.uiManager = new UIManager(this.scene); // Re-initialize UIManager for the new scene
+                this.initJoystick(); // Re-initialize joystick for mobile if needed
                 this.objects = {};
                 this.materials = {};
 
@@ -3696,6 +3710,10 @@ workspace_data: "${base64WorkspaceData}"
                 this.perFrameFunctions = [];
                 this.buttonPressActions = {};
                 this.inputState = { keys: {} }; // Reset state on clear
+                this.background = null;
+                this.backgroundLayer = null;
+                this.environmentHelper = null;
+                this.glowLayer = null;
             }
 
             dispose() {
