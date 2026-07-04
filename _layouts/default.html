@@ -586,6 +586,7 @@
         <div class="nav-section-right">
             <button id="toggleToolboxButton" class="btn btn-icon" title="Add Blocks" aria-label="Add Blocks">➕</button>
             <button id="runButton" class="btn btn-run btn-icon" title="Run" aria-label="Run Code">▶</button>
+            <button id="stopButton" class="btn btn-icon" title="Stop" aria-label="Stop Code" style="background-color: #ff4d4d; margin-left: 5px;">⏹</button>
             <div class="dropdown-menu-container">
                 <button id="menuButton" class="btn btn-icon btn-menu-toggle" title="More actions" aria-label="More actions">⚙️</button>
                 <div id="dropdownMenu" class="dropdown-content">
@@ -3725,11 +3726,15 @@ workspace_data: "${base64WorkspaceData}"
             }
 
             _getMesh(target) {
+                if (!target) return null;
                 let name;
                 if (typeof target === 'string') {
                     name = target;
-                } else if (target && typeof target === 'object' && target.name) {
-                    name = target.name;
+                } else if (typeof target === 'object') {
+                    if (target.name && this.objects[target.name]) {
+                        return this.objects[target.name];
+                    }
+                    return target;
                 }
                 return this.objects[name];
             }
@@ -3738,13 +3743,16 @@ workspace_data: "${base64WorkspaceData}"
                 if (!target || !property) {
                     return null;
                 }
-                // Special handling for UI controls, which are not in the main 'objects' list
-                if (typeof target === 'string' && this.uiManager.controls[target]) {
-                    target = this.uiManager.controls[target];
+
+                let obj = this._getMesh(target);
+                if (!obj && typeof target === 'string' && this.uiManager.controls[target]) {
+                    obj = this.uiManager.controls[target];
                 }
 
+                if (!obj) return null;
+
                 const propertyPath = property.split('.');
-                let current = target;
+                let current = obj;
 
                 for (let i = 0; i < propertyPath.length; i++) {
                     if (current === null || current === undefined || typeof current[propertyPath[i]] === 'undefined') {
@@ -4146,10 +4154,14 @@ workspace_data: "${base64WorkspaceData}"
             }
 
             setProperty(target, property, value) {
-                let mesh = this._getMesh(target);
-                if (mesh && property) {
+                let obj = this._getMesh(target);
+                if (!obj && typeof target === 'string' && this.uiManager.controls[target]) {
+                    obj = this.uiManager.controls[target];
+                }
+
+                if (obj && property) {
                     const props = property.split('.');
-                    let curr = mesh;
+                    let curr = obj;
                     for (let i = 0; i < props.length - 1; i++) {
                         if (curr[props[i]]) curr = curr[props[i]];
                         else return;
@@ -7572,6 +7584,12 @@ function ${generator.FUNCTION_NAME_PLACEHOLDER_}(c1, c2, ratio) {
 
         document.getElementById('runButton').addEventListener('click', () => {
             doRun();
+        });
+        document.getElementById('stopButton').addEventListener('click', () => {
+            if (sceneManager) {
+                sceneManager.dispose();
+                sceneManager = null;
+            }
         });
         document.getElementById('saveButton').addEventListener('click', () => {
             projectManager.saveProject();
