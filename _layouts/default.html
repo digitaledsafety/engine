@@ -1589,6 +1589,14 @@ workspace_data: "${base64WorkspaceData}"
                         },
                         {
                             kind: 'block',
+                            type: 'set_camera_inertia'
+                        },
+                        {
+                            kind: 'block',
+                            type: 'set_camera_wheel_precision'
+                        },
+                        {
+                            kind: 'block',
                             type: 'camera_follow',
                         },
                         {
@@ -4131,6 +4139,18 @@ workspace_data: "${base64WorkspaceData}"
                 }
             }
 
+            setCameraInertia(value) {
+                if (this.scene.activeCamera) {
+                    this.scene.activeCamera.inertia = value;
+                }
+            }
+
+            setCameraWheelPrecision(value) {
+                if (this.scene.activeCamera) {
+                    this.scene.activeCamera.wheelPrecision = value;
+                }
+            }
+
             setGlow(enabled, intensity) {
                 if (enabled) {
                     if (!this.glowLayer) {
@@ -6367,6 +6387,30 @@ workspace_data: "${base64WorkspaceData}"
                 "helpUrl": ""
             },
             {
+                "type": "set_camera_inertia",
+                "message0": "set camera inertia to %1",
+                "args0": [
+                    { "type": "input_value", "name": "VALUE", "check": "Number" }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": 180,
+                "tooltip": "Sets the inertia of the active camera.",
+                "helpUrl": ""
+            },
+            {
+                "type": "set_camera_wheel_precision",
+                "message0": "set camera wheel precision to %1",
+                "args0": [
+                    { "type": "input_value", "name": "VALUE", "check": "Number" }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": 180,
+                "tooltip": "Sets the wheel precision of the active camera.",
+                "helpUrl": ""
+            },
+            {
                 "type": "set_glow",
                 "message0": "set glow enabled %1 intensity %2",
                 "args0": [
@@ -6433,6 +6477,16 @@ workspace_data: "${base64WorkspaceData}"
                 const light = generator.valueToCode(block, 'LIGHT', generator.ORDER_ATOMIC) || 'null';
                 const targets = generator.valueToCode(block, 'TARGETS', generator.ORDER_ATOMIC) || '[]';
                 return `sceneManager.enableShadows(${light}, ${targets});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['set_camera_inertia'] = function (block, generator) {
+                const value = generator.valueToCode(block, 'VALUE', generator.ORDER_ATOMIC) || 0.2;
+                return `sceneManager.setCameraInertia(${value});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['set_camera_wheel_precision'] = function (block, generator) {
+                const value = generator.valueToCode(block, 'VALUE', generator.ORDER_ATOMIC) || 10;
+                return `sceneManager.setCameraWheelPrecision(${value});\n`;
             };
 
             javascript.javascriptGenerator.forBlock['set_glow'] = function (block, generator) {
