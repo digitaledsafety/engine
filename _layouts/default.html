@@ -4567,7 +4567,7 @@ workspace_data: "${base64WorkspaceData}"
         };
 
         const workspace = Blockly.inject('blocklyDiv', {
-            toolbox: toolbox,
+            toolbox: toolbox, horizontalLayout: true, toolboxPosition: 'start',
             theme: Blockly.Themes.DigitalEducationSafety,
             undoStack: true,
             redoStack: true,
