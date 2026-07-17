@@ -6712,7 +6712,7 @@ if (${name}) {
                 const name = javascript.javascriptGenerator.nameDB_.getDistinctName(Blockly.utils.idGenerator.genUid(), Blockly.Variables.NameType);
                 const width = generator.valueToCode(block, 'WIDTH', generator.ORDER_ATOMIC) || 10;
                 const height = generator.valueToCode(block, 'HEIGHT', generator.ORDER_ATOMIC) || 10;
-                const code = `sceneManager.createGround('${name}', ${width}, ${height});\n`;
+                const code = `sceneManager.createGround('${name}', ${width}, ${height})`;
                 return [code, generator.ORDER_ATOMIC];
             };
 
@@ -7256,7 +7256,7 @@ if (${name}) {
 
             javascript.javascriptGenerator.forBlock['parse_number_from'] = function (block, generator) {
                 const string = generator.valueToCode(block, 'STRING', generator.ORDER_ATOMIC) || "''";
-                const code = `parseFloat(${string});\n`;
+                const code = `parseFloat(${string})`;
                 return [code, generator.ORDER_ATOMIC];
             };
 
