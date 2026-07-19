@@ -2562,6 +2562,12 @@ workspace_data: "${base64WorkspaceData}"
                 }
             }
 
+            _cleanupExisting(name) {
+                if (name && this.objects[name]) {
+                    this.destroyObject(name);
+                }
+            }
+
             // High-level API for cleaner code generation
             _tagMesh(mesh, logicalName) {
                 if (!mesh) return;
@@ -2603,6 +2609,7 @@ workspace_data: "${base64WorkspaceData}"
             }
 
             createBox(name, x, y, z) {
+                this._cleanupExisting(name);
                 const boxMesh = BABYLON.MeshBuilder.CreateBox(name, {}, this.scene);
                 boxMesh.position.set(x, y, z);
                 this.objects[name] = boxMesh;
@@ -2611,6 +2618,7 @@ workspace_data: "${base64WorkspaceData}"
             }
 
             createSphere(name, x, y, z) {
+                this._cleanupExisting(name);
                 const sphereMesh = BABYLON.MeshBuilder.CreateSphere(name, { diameter: 1 }, this.scene);
                 sphereMesh.position.set(x, y, z);
                 this.objects[name] = sphereMesh;
@@ -2619,6 +2627,7 @@ workspace_data: "${base64WorkspaceData}"
             }
 
             createCylinder(name, x, y, z) {
+                this._cleanupExisting(name);
                 const cylinderMesh = BABYLON.MeshBuilder.CreateCylinder(name, { diameter: 1, height: 1 }, this.scene);
                 cylinderMesh.position.set(x, y, z);
                 this.objects[name] = cylinderMesh;
@@ -2627,6 +2636,7 @@ workspace_data: "${base64WorkspaceData}"
             }
 
             createCone(name, x, y, z) {
+                this._cleanupExisting(name);
                 const coneMesh = BABYLON.MeshBuilder.CreateCylinder(name, { diameterTop: 0, diameterBottom: 1, height: 1 }, this.scene);
                 coneMesh.position.set(x, y, z);
                 this.objects[name] = coneMesh;
@@ -2635,6 +2645,7 @@ workspace_data: "${base64WorkspaceData}"
             }
 
             createTorus(name, x, y, z) {
+                this._cleanupExisting(name);
                 const torusMesh = BABYLON.MeshBuilder.CreateTorus(name, { diameter: 1, thickness: 0.2 }, this.scene);
                 torusMesh.position.set(x, y, z);
                 this.objects[name] = torusMesh;
@@ -2643,6 +2654,7 @@ workspace_data: "${base64WorkspaceData}"
             }
 
             createCapsule(name, x, y, z) {
+                this._cleanupExisting(name);
                 const capsuleMesh = BABYLON.MeshBuilder.CreateCapsule(name, { height: 2, radius: 0.5 }, this.scene);
                 capsuleMesh.position.set(x, y, z);
                 this.objects[name] = capsuleMesh;
@@ -2668,6 +2680,7 @@ workspace_data: "${base64WorkspaceData}"
                     }, this.scene);
 
                     if (textMesh) {
+                        this._cleanupExisting(name);
                         this.objects[name] = textMesh;
                         // Center the mesh pivot
                         const boundingInfo = textMesh.getHierarchyBoundingVectors();
@@ -2728,6 +2741,7 @@ workspace_data: "${base64WorkspaceData}"
                             }
                         });
 
+                        this._cleanupExisting(name);
                         this.objects[name] = wrapper;
                         return wrapper;
                     }
@@ -2883,6 +2897,7 @@ workspace_data: "${base64WorkspaceData}"
 
                         wrapper.position.set(x, y, z);
 
+                        this._cleanupExisting(name);
                         this.objects[name] = wrapper;
                         this._tagMesh(wrapper, name);
                         return wrapper;
@@ -3113,6 +3128,7 @@ workspace_data: "${base64WorkspaceData}"
             }
 
             createGround(name, width, height) {
+                this._cleanupExisting(name);
                 const groundMesh = BABYLON.MeshBuilder.CreateGround(name, { width: width, height: height }, this.scene);
                 this.objects[name] = groundMesh;
                 this.setGroundPhysics(name); // Automatically add physics
@@ -3507,6 +3523,7 @@ workspace_data: "${base64WorkspaceData}"
             destroyObject(target) {
                 const mesh = this._getMesh(target);
                 if (mesh) {
+                    const meshesToFilter = [mesh, ...mesh.getDescendants(false)];
                     mesh.dispose();
                     let name;
                     if (typeof target === 'string') {
@@ -3517,6 +3534,9 @@ workspace_data: "${base64WorkspaceData}"
                     if (name && this.objects[name]) {
                         delete this.objects[name];
                     }
+                    this.perFrameFunctions = this.perFrameFunctions.filter(
+                        task => !meshesToFilter.includes(task.targetMesh)
+                    );
                 }
             }
 
