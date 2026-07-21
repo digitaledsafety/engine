@@ -27,17 +27,21 @@ test.describe('Engine New Features', () => {
       sceneManager.setAsPlayer(player);
       sceneManager.enablePhysics(player, 1, 'BoxImpostor');
 
-      // Wait for physics to settle
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Wait for 30 frames to let physics settle the player on the ground
+      for (let i = 0; i < 30; i++) {
+        await new Promise(resolve => sceneManager.scene.onAfterRenderObservable.addOnce(resolve));
+      }
 
       // 2. Initial jump (should work)
       const initialY = player.position.y;
       sceneManager.playerJump(10);
 
-      // Wait a bit to be in the air
-      await new Promise(resolve => setTimeout(resolve, 200));
+      // Wait for 15 frames to be in the air
+      for (let i = 0; i < 15; i++) {
+        await new Promise(resolve => sceneManager.scene.onAfterRenderObservable.addOnce(resolve));
+      }
       const inAirY = player.position.y;
-      const jump1Success = inAirY > initialY;
+      const jump1Success = inAirY > initialY + 0.1;
 
       // 3. Try to jump again while in air
       const velBefore = player.physicsImpostor.getLinearVelocity().y;

@@ -2416,6 +2416,10 @@ workspace_data: "${base64WorkspaceData}"
             }
 
             setPopupImage(target, imageUrl) {
+                if (!isValidAssetURL(imageUrl)) {
+                    console.warn(`Invalid popup image URL ignored: ${imageUrl}`);
+                    return;
+                }
                 const info = this._getPopupPanel(target);
                 if (info) {
                     const imageControl = info.panel.getChildByName(`${info.name}_image`);
@@ -4365,11 +4369,15 @@ workspace_data: "${base64WorkspaceData}"
 
                 // Add Image if provided
                 if (options.image) {
-                    const image = new BABYLON.GUI.Image(`${name}_image`, getProxiedUrl(options.image));
-                    image.width = "150px";
-                    image.height = "150px";
-                    image.paddingBottom = "20px";
-                    panel.addControl(image);
+                    if (isValidAssetURL(options.image)) {
+                        const image = new BABYLON.GUI.Image(`${name}_image`, getProxiedUrl(options.image));
+                        image.width = "150px";
+                        image.height = "150px";
+                        image.paddingBottom = "20px";
+                        panel.addControl(image);
+                    } else {
+                        console.warn(`Invalid popup image URL ignored: ${options.image}`);
+                    }
                 }
 
                 // Add Title
