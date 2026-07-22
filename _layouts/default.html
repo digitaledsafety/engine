@@ -2686,6 +2686,7 @@ workspace_data: "${base64WorkspaceData}"
                         const boundingInfo = textMesh.getHierarchyBoundingVectors();
                         const center = boundingInfo.max.add(boundingInfo.min).scale(0.5);
                         textMesh.setPivotPoint(center);
+                        this._tagMesh(textMesh, name);
                         return textMesh;
                     }
                     return null;
@@ -2743,6 +2744,7 @@ workspace_data: "${base64WorkspaceData}"
 
                         this._cleanupExisting(name);
                         this.objects[name] = wrapper;
+                        this._tagMesh(wrapper, name);
                         return wrapper;
                     }
                 } catch (error) {

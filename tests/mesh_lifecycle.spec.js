@@ -76,4 +76,77 @@ test.describe('Mesh Lifecycle and Resource Cleanup', () => {
     });
     expect(perFrameCount).toBe(0);
   });
+
+  test('importModel tags the wrapper and all nested meshes with logicalRoot', async ({ page }) => {
+    await page.evaluate(async () => {
+      // Mock ImportMeshAsync
+      const originalImportMeshAsync = BABYLON.SceneLoader.ImportMeshAsync;
+      BABYLON.SceneLoader.ImportMeshAsync = async () => {
+        const root = new BABYLON.Mesh("importedRoot", window.sceneManager.scene);
+        const child1 = new BABYLON.Mesh("child1", window.sceneManager.scene);
+        child1.parent = root;
+        return {
+          meshes: [root, child1],
+          animationGroups: []
+        };
+      };
+
+      try {
+        await window.sceneManager.importModel('testImportModel', 'data:text/plain;base64,AAAA');
+      } finally {
+        // Restore
+        BABYLON.SceneLoader.ImportMeshAsync = originalImportMeshAsync;
+      }
+    });
+
+    // Check that metadata.logicalRoot is correctly set to 'testImportModel'
+    const taggingInfo = await page.evaluate(() => {
+      const wrapper = window.sceneManager.objects['testImportModel'];
+      if (!wrapper) return null;
+
+      const descendants = wrapper.getDescendants(false);
+      return {
+        wrapperRoot: wrapper.metadata ? wrapper.metadata.logicalRoot : null,
+        descendantsRoot: descendants.map(d => d.metadata ? d.metadata.logicalRoot : null)
+      };
+    });
+
+    expect(taggingInfo).not.toBeNull();
+    expect(taggingInfo.wrapperRoot).toBe('testImportModel');
+    expect(taggingInfo.descendantsRoot).toEqual(['testImportModel', 'testImportModel']);
+  });
+
+  test('createText tags the text mesh with logicalRoot', async ({ page }) => {
+    await page.evaluate(async () => {
+      // Mock fetch to return some valid font data so BABYLON.MeshBuilder.CreateText succeeds
+      const originalFetch = window.fetch;
+      window.fetch = async () => {
+        return {
+          ok: true,
+          json: async () => ({})
+        };
+      };
+
+      // Mock BABYLON.MeshBuilder.CreateText directly to avoid font parsing dependencies
+      const originalCreateText = BABYLON.MeshBuilder.CreateText;
+      BABYLON.MeshBuilder.CreateText = () => {
+        return new BABYLON.Mesh("textMesh", window.sceneManager.scene);
+      };
+
+      try {
+        await window.sceneManager.createText('testText', 'Hello World', 'data:application/json,{}');
+      } finally {
+        window.fetch = originalFetch;
+        BABYLON.MeshBuilder.CreateText = originalCreateText;
+      }
+    });
+
+    const textTaggingInfo = await page.evaluate(() => {
+      const textMesh = window.sceneManager.objects['testText'];
+      if (!textMesh) return null;
+      return textMesh.metadata ? textMesh.metadata.logicalRoot : null;
+    });
+
+    expect(textTaggingInfo).toBe('testText');
+  });
 });
