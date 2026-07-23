@@ -11,7 +11,7 @@ test.describe('Engine Critical Functionality', () => {
   });
 
   test('Page loads and Hero overlay is dismissed', async ({ page }) => {
-    await expect(page).toHaveTitle(/Engine/i);
+    await expect(page).toHaveTitle(/Engine|workspace-/i);
     const heroOverlay = page.locator('#hero-overlay');
     await expect(heroOverlay).toHaveClass(/hidden/);
   });

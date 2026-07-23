@@ -103,7 +103,7 @@ test.describe('Engine Collision Functionality', () => {
       }
     };
 
-    await page.goto('/');
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
     await page.click("#start-button");
     await page.click("#preview-tab");
 

@@ -28,9 +28,6 @@ test.describe('Workspace PWA Verification', () => {
         // We use a workspace page for this
         await page.goto('/workspaces/maze/?mode=app');
 
-        // Wait for potential async loading
-        await page.waitForTimeout(1000);
-
         const container = page.locator('.container');
         await expect(container).toHaveClass(/preview-active/);
 

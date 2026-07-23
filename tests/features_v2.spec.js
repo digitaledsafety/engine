@@ -2,7 +2,7 @@ const { test, expect } = require('@playwright/test');
 
 test.describe('Engine Features V2', () => {
     test.beforeEach(async ({ page }) => {
-        await page.goto('http://localhost:4000/');
+        await page.goto('/');
         // Wait for Blockly and Babylon to initialize
         await page.waitForFunction(() => window.sceneManager && window.Blockly);
     });
