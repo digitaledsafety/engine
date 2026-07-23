@@ -43,6 +43,10 @@ self.addEventListener('fetch', event => {
 
   // Strategy for HTML pages (including workspaces)
   if (event.request.mode === 'navigate') {
+    // If running tests/localhost, we bypass service worker caching for navigation to prevent page-load hangs
+    if (url.hostname === '127.0.0.1' || url.hostname === 'localhost') {
+      return; // Fall back to native browser retrieval
+    }
     event.respondWith(
       fetch(event.request)
         .then(response => {

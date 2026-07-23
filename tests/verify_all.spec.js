@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 test('verify all changes', async ({ page }) => {
-  await page.goto('http://127.0.0.1:4000');
+  await page.goto('/');
   await page.click('#start-button');
   await page.waitForFunction(() => typeof window.workspace !== 'undefined');
 
@@ -21,12 +21,10 @@ test('verify all changes', async ({ page }) => {
   // 3. Verify Search Functionality
   const searchInput = page.locator('#search-input');
   await searchInput.fill('create_primitive');
-  await page.waitForTimeout(1000);
-  const hasSearchResults = await page.evaluate(() => {
+  await page.waitForFunction(() => {
     const labels = Array.from(document.querySelectorAll('.blocklyToolboxCategoryLabel'));
     return labels.some(l => l.textContent.includes('Search Results'));
   });
-  expect(hasSearchResults).toBe(true);
 
   // Verify search result contents
   const blocksInSearch = await page.evaluate(() => {

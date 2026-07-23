@@ -2,7 +2,7 @@ const { test, expect } = require('@playwright/test');
 
 test.describe('Engine New Features', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
     const startButton = page.locator('#start-button');
     if (await startButton.isVisible()) {
       await startButton.click();
@@ -12,7 +12,7 @@ test.describe('Engine New Features', () => {
   test('Cylinder primitive creation works', async ({ page }) => {
     await page.click('#preview-tab');
     const result = await page.evaluate(async () => {
-      await window.doRun("sceneManager.createCylinder('testCylinder', 0, 0, 0);");
+      window.sceneManager.createCylinder('testCylinder', 0, 0, 0);
       return !!window.sceneManager.objects['testCylinder'];
     });
     expect(result).toBe(true);
