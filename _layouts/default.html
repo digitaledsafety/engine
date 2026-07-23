@@ -2447,6 +2447,8 @@ workspace_data: "${base64WorkspaceData}"
                 this.inactivityTimer = null;
                 this.uiManager = new UIManager(this.scene);
                 this.processedCollisions = new Set();
+                this.registeredCollisionPairs = new Set();
+                this.pendingCollisions = [];
                 this.background = null;
                 this.backgroundLayer = null;
 
@@ -3087,6 +3089,7 @@ workspace_data: "${base64WorkspaceData}"
                     const impostor = BABYLON.PhysicsImpostor[impostorType];
                     originalMesh.physicsImpostor = new BABYLON.PhysicsImpostor(originalMesh, impostor, { mass: mass, friction: friction, restitution: restitution }, this.scene);
                 }
+                this.processPendingCollisions();
             }
 
             _getPhysicsImpostor(target) {
@@ -3131,55 +3134,85 @@ workspace_data: "${base64WorkspaceData}"
             }
 
             onCollision(target1, target2, callback) {
-                const impostor1 = this._getPhysicsImpostor(target1);
+                this.pendingCollisions.push({
+                    target1: target1,
+                    target2: target2,
+                    callback: callback
+                });
+                this.processPendingCollisions();
+            }
 
-                if (!impostor1) {
-                    console.warn("onCollision: target1 is not a valid physics object.", target1);
+            processPendingCollisions() {
+                if (!this.pendingCollisions || this.pendingCollisions.length === 0) {
                     return;
                 }
 
-                const collisionCallback = (main, collided) => {
-                    const ids = [main.object.uniqueId, collided.object.uniqueId].sort();
-                    const collisionKey = `${ids[0]}-${ids[1]}`;
+                const stillPending = [];
 
-                    if (this.processedCollisions.has(collisionKey)) {
-                        return;
-                    }
-                    this.processedCollisions.add(collisionKey);
+                for (const item of this.pendingCollisions) {
+                    const { target1, target2, callback } = item;
 
-                    // Use logicalRoot tag for O(1) lookup, fallback to parent search if not tagged
-                    let collidedMesh = null;
-                    if (collided.object.metadata && collided.object.metadata.logicalRoot) {
-                        collidedMesh = this.objects[collided.object.metadata.logicalRoot];
-                    }
+                    const resolved1 = this._resolveTarget(target1);
+                    const resolved2 = this._resolveTarget(target2);
 
-                    if (!collidedMesh) {
-                        collidedMesh = Object.values(this.objects).find(
-                            o => o === collided.object || (o.parent && o.parent === collided.object)
-                        );
+                    const impostor1 = this._getPhysicsImpostor(resolved1);
+
+                    if (!impostor1) {
+                        stillPending.push(item);
+                        continue;
                     }
 
-                    callback(collidedMesh || collided.object);
-                };
+                    const collisionCallback = (main, collided) => {
+                        const ids = [main.object.uniqueId, collided.object.uniqueId].sort();
+                        const collisionKey = `${ids[0]}-${ids[1]}`;
 
-                if (!Array.isArray(target2)) {
-                    const impostor2 = this._getPhysicsImpostor(target2);
-                    if (impostor2) {
-                        impostor1.registerOnPhysicsCollide(impostor2, collisionCallback);
+                        if (this.processedCollisions.has(collisionKey)) {
+                            return;
+                        }
+                        this.processedCollisions.add(collisionKey);
+
+                        let collidedMesh = null;
+                        if (collided.object.metadata && collided.object.metadata.logicalRoot) {
+                            collidedMesh = this.objects[collided.object.metadata.logicalRoot];
+                        }
+
+                        if (!collidedMesh) {
+                            collidedMesh = Object.values(this.objects).find(
+                                o => o === collided.object || (o.parent && o.parent === collided.object)
+                            );
+                        }
+
+                        callback(collidedMesh || collided.object);
+                    };
+
+                    if (!Array.isArray(resolved2)) {
+                        const impostor2 = this._getPhysicsImpostor(resolved2);
+                        if (impostor2) {
+                            const pairKey = `${impostor1.object.uniqueId}-${impostor2.object.uniqueId}`;
+                            if (!this.registeredCollisionPairs.has(pairKey)) {
+                                this.registeredCollisionPairs.add(pairKey);
+                                impostor1.registerOnPhysicsCollide(impostor2, collisionCallback);
+                            }
+                        } else {
+                            stillPending.push(item);
+                        }
                     } else {
-                        console.warn("onCollision: target2 is not a valid physics object.", target2);
-                    }
-                } else {
-                    const targetImpostors = target2
-                        .map(item => this._getPhysicsImpostor(item))
-                        .filter(impostor => impostor != null);
+                        const targetImpostors = resolved2
+                            .map(x => this._getPhysicsImpostor(x))
+                            .filter(impostor => impostor != null);
 
-                    if (targetImpostors.length > 0) {
-                        impostor1.registerOnPhysicsCollide(targetImpostors, collisionCallback);
-                    } else {
-                        console.warn("onCollision: target2 list contains no valid physics objects.", target2);
+                        for (const impostor2 of targetImpostors) {
+                            const pairKey = `${impostor1.object.uniqueId}-${impostor2.object.uniqueId}`;
+                            if (!this.registeredCollisionPairs.has(pairKey)) {
+                                this.registeredCollisionPairs.add(pairKey);
+                                impostor1.registerOnPhysicsCollide(impostor2, collisionCallback);
+                            }
+                        }
+                        stillPending.push(item);
                     }
                 }
+
+                this.pendingCollisions = stillPending;
             }
 
             onClick(name, callback) {
@@ -3728,6 +3761,7 @@ workspace_data: "${base64WorkspaceData}"
                 let lastTime = performance.now();
                 this.engine.runRenderLoop(() => {
                     this.processedCollisions.clear();
+                    this.processPendingCollisions();
                     const currentTime = performance.now();
                     const deltaTime = currentTime - lastTime;
                     lastTime = currentTime;
@@ -3826,6 +3860,8 @@ workspace_data: "${base64WorkspaceData}"
                 this.objects = {};
                 this.pendingObjectEvents = {};
                 this.materials = {};
+                this.registeredCollisionPairs.clear();
+                this.pendingCollisions = [];
 
                 // Dispose all sounds
                 for (let i = 0; i < this.sounds.length; i++) {
@@ -3879,6 +3915,7 @@ workspace_data: "${base64WorkspaceData}"
 
             triggerSceneStart() {
                 this.onSceneStartObservable.notifyObservers();
+                this.processPendingCollisions();
             }
 
             // --- Global Event Bus ---
@@ -3930,6 +3967,17 @@ workspace_data: "${base64WorkspaceData}"
                 if (targetMesh && targetMesh.customObservables && targetMesh.customObservables[eventName]) {
                     targetMesh.customObservables[eventName].notifyObservers();
                 }
+            }
+
+            _resolveTarget(target) {
+                if (typeof target === 'function') {
+                    try {
+                        return target();
+                    } catch (e) {
+                        return null;
+                    }
+                }
+                return target;
             }
 
             _getMesh(target) {
@@ -6944,8 +6992,8 @@ if (${name}) {
                     // We can then execute the DO code.
                     ${doCode}
                 }`;
-                // The generated code should call the onCollision method with the callback.
-                return `sceneManager.onCollision(${obj1}, ${obj2}, ${callback});\n`;
+                // The generated code should call the onCollision method with the callback using getters.
+                return `sceneManager.onCollision(() => ${obj1}, () => ${obj2}, ${callback});\n`;
             };
 
             javascript.javascriptGenerator.forBlock['destroy_object'] = function (block, generator) {
