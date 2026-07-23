@@ -1240,17 +1240,108 @@ workspace_data: "${base64WorkspaceData}"
                         },
                         {
                             kind: 'block',
+                            type: 'action_rotate_continuously',
+                        },
+                    ],
+                },
+                {
+                    kind: 'category',
+                    name: 'Events',
+                    categorystyle: 'event_category',
+                    contents: [
+                        {
+                            kind: 'block',
+                            type: 'event_on_scene_start',
+                        },
+                        {
+                            kind: 'block',
+                            type: 'event_broadcast',
+                            inputs: {
+                                EVENT_NAME: {
+                                    shadow: {
+                                        type: 'text',
+                                        fields: {
+                                            TEXT: 'message1'
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            kind: 'block',
+                            type: 'event_on_receive',
+                            inputs: {
+                                EVENT_NAME: {
+                                    shadow: {
+                                        type: 'text',
+                                        fields: {
+                                            TEXT: 'message1'
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            kind: 'block',
+                            type: 'event_object_trigger',
+                            inputs: {
+                                OBJECT_NAME: {
+                                    shadow: {
+                                        type: 'select_object',
+                                    }
+                                },
+                                EVENT_NAME: {
+                                    shadow: {
+                                        type: 'text',
+                                        fields: {
+                                            TEXT: 'hit'
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            kind: 'block',
+                            type: 'event_on_object_receive',
+                            inputs: {
+                                OBJECT_NAME: {
+                                    shadow: {
+                                        type: 'select_object',
+                                    }
+                                },
+                                EVENT_NAME: {
+                                    shadow: {
+                                        type: 'text',
+                                        fields: {
+                                            TEXT: 'hit'
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            kind: 'block',
                             type: 'event_on_click',
+                            inputs: {
+                                OBJECT_SELECTOR: {
+                                    shadow: {
+                                        type: 'select_object',
+                                    }
+                                }
+                            }
                         },
                         {
                             kind: 'block',
                             type: 'event_every_frame',
-                        },
-                        {
-                            kind: 'block',
-                            type: 'action_rotate_continuously',
-                        },
-                    ],
+                            inputs: {
+                                OBJECT_SELECTOR: {
+                                    shadow: {
+                                        type: 'select_object',
+                                    }
+                                }
+                            }
+                        }
+                    ]
                 },
                 {
                     kind: 'category',
@@ -2357,6 +2448,9 @@ workspace_data: "${base64WorkspaceData}"
                 this.processedCollisions = new Set();
                 this.background = null;
                 this.backgroundLayer = null;
+
+                this.globalEventBus = {};
+                this.onSceneStartObservable = new BABYLON.Observable();
 
                 this.initScene();
                 this.initInputListeners();
@@ -3736,6 +3830,9 @@ workspace_data: "${base64WorkspaceData}"
                 this.backgroundLayer = null;
                 this.environmentHelper = null;
                 this.glowLayer = null;
+
+                this.globalEventBus = {};
+                this.onSceneStartObservable = new BABYLON.Observable();
             }
 
             dispose() {
@@ -3762,6 +3859,50 @@ workspace_data: "${base64WorkspaceData}"
 
             getMeshNames() {
                 return Object.keys(this.objects);
+            }
+
+            // --- Scene Start Events ---
+            onSceneStart(callback) {
+                this.onSceneStartObservable.add(callback);
+            }
+
+            triggerSceneStart() {
+                this.onSceneStartObservable.notifyObservers();
+            }
+
+            // --- Global Event Bus ---
+            onGlobalEvent(eventName, callback) {
+                if (!this.globalEventBus[eventName]) {
+                    this.globalEventBus[eventName] = new BABYLON.Observable();
+                }
+                this.globalEventBus[eventName].add(callback);
+            }
+
+            broadcastGlobalEvent(eventName) {
+                if (this.globalEventBus[eventName]) {
+                    this.globalEventBus[eventName].notifyObservers();
+                }
+            }
+
+            // --- Local Object Observables ---
+            onObjectEvent(target, eventName, callback) {
+                let targetMesh = this._getMesh(target);
+                if (targetMesh) {
+                    if (!targetMesh.customObservables) {
+                        targetMesh.customObservables = {};
+                    }
+                    if (!targetMesh.customObservables[eventName]) {
+                        targetMesh.customObservables[eventName] = new BABYLON.Observable();
+                    }
+                    targetMesh.customObservables[eventName].add(callback);
+                }
+            }
+
+            triggerObjectEvent(target, eventName) {
+                let targetMesh = this._getMesh(target);
+                if (targetMesh && targetMesh.customObservables && targetMesh.customObservables[eventName]) {
+                    targetMesh.customObservables[eventName].notifyObservers();
+                }
             }
 
             _getMesh(target) {
@@ -4488,7 +4629,8 @@ workspace_data: "${base64WorkspaceData}"
                 'physics_category': { 'colour': '#A55B80' },    // Kept original for physics
                 'gameplay_category': { 'colour': '#FF6347' },   // Red for gameplay actions
                 'assets_category': { 'colour': '#FF8C1A' },      // Orange for assets
-                'search_category': { 'colour': '#999999' }      // Grey for search results
+                'search_category': { 'colour': '#999999' },     // Grey for search results
+                'event_category': { 'colour': '#FF5C5C' }       // Coral red/orange for events
             },
             'blockStyles': {
                 'logic_blocks': { 'colourPrimary': '#4C97FF', 'colourSecondary': '#6CA7FF', 'colourTertiary': '#3C87EF' },
@@ -4502,7 +4644,8 @@ workspace_data: "${base64WorkspaceData}"
                 'scene_blocks': { 'colourPrimary': '#59C059', 'colourSecondary': '#73C873', 'colourTertiary': '#4FAA4F' },
                 'physics_blocks': { 'colourPrimary': '#A55B80', 'colourSecondary': '#B57B90', 'colourTertiary': '#954B70' },
                 'gameplay_blocks': { 'colourPrimary': '#FF6347', 'colourSecondary': '#FF7D66', 'colourTertiary': '#E65A40' },
-                'assets_blocks': { 'colourPrimary': '#FF8C1A', 'colourSecondary': '#FFA347', 'colourTertiary': '#E67E00' }
+                'assets_blocks': { 'colourPrimary': '#FF8C1A', 'colourSecondary': '#FFA347', 'colourTertiary': '#E67E00' },
+                'event_blocks': { 'colourPrimary': '#FF5C5C', 'colourSecondary': '#FF7C7C', 'colourTertiary': '#E05353' }
             },
             'componentStyles': {
                 'workspaceBackgroundColour': '#F9F9F9',
@@ -5610,7 +5753,7 @@ workspace_data: "${base64WorkspaceData}"
                 ],
                 "previousStatement": null,
                 "nextStatement": null,
-                "colour": "%{BKY_LOOPS_HUE}",
+                "style": "event_blocks",
                 "tooltip": "Executes code when the specified object is clicked.",
                 "helpUrl": ""
             },
@@ -5633,7 +5776,7 @@ workspace_data: "${base64WorkspaceData}"
                 ],
                 "previousStatement": null,
                 "nextStatement": null,
-                "colour": "%{BKY_LOOPS_HUE}",
+                "style": "event_blocks",
                 "tooltip": "Executes code for the specified object every frame.",
                 "helpUrl": ""
             },
@@ -6430,6 +6573,112 @@ workspace_data: "${base64WorkspaceData}"
                 "colour": 180,
                 "tooltip": "Enables or disables order independent transparency for the scene.",
                 "helpUrl": ""
+            },
+            {
+                "type": "event_on_scene_start",
+                "message0": "when scene starts %1 do %2",
+                "args0": [
+                    {
+                        "type": "input_dummy"
+                    },
+                    {
+                        "type": "input_statement",
+                        "name": "DO_CODE"
+                    }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "style": "event_blocks",
+                "tooltip": "Executes the code within this block when the scene finishes loading and starts.",
+                "helpUrl": ""
+            },
+            {
+                "type": "event_broadcast",
+                "message0": "broadcast event %1",
+                "args0": [
+                    {
+                        "type": "input_value",
+                        "name": "EVENT_NAME",
+                        "check": "String"
+                    }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "style": "event_blocks",
+                "tooltip": "Broadcasts a global event with the given name to all listeners.",
+                "helpUrl": ""
+            },
+            {
+                "type": "event_on_receive",
+                "message0": "when event %1 is received %2 do %3",
+                "args0": [
+                    {
+                        "type": "input_value",
+                        "name": "EVENT_NAME",
+                        "check": "String"
+                    },
+                    {
+                        "type": "input_dummy"
+                    },
+                    {
+                        "type": "input_statement",
+                        "name": "DO_CODE"
+                    }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "style": "event_blocks",
+                "tooltip": "Executes the code within this block when the specified global event is broadcast.",
+                "helpUrl": ""
+            },
+            {
+                "type": "event_object_trigger",
+                "message0": "trigger event %2 on object %1",
+                "args0": [
+                    {
+                        "type": "input_value",
+                        "name": "OBJECT_NAME",
+                        "check": "String"
+                    },
+                    {
+                        "type": "input_value",
+                        "name": "EVENT_NAME",
+                        "check": "String"
+                    }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "style": "event_blocks",
+                "tooltip": "Triggers a local event on the specified object.",
+                "helpUrl": ""
+            },
+            {
+                "type": "event_on_object_receive",
+                "message0": "when object %1 receives event %2 %3 do %4",
+                "args0": [
+                    {
+                        "type": "input_value",
+                        "name": "OBJECT_NAME",
+                        "check": "String"
+                    },
+                    {
+                        "type": "input_value",
+                        "name": "EVENT_NAME",
+                        "check": "String"
+                    },
+                    {
+                        "type": "input_dummy"
+                    },
+                    {
+                        "type": "input_statement",
+                        "name": "DO_CODE"
+                    }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "style": "event_blocks",
+                "tooltip": "Executes the code when the specified object receives the local event.",
+                "helpUrl": ""
             }
         ]);
 
@@ -6582,17 +6831,46 @@ workspace_data: "${base64WorkspaceData}"
             };
 
             // --- Scripting Block Generators ---
+            javascript.javascriptGenerator.forBlock['event_on_scene_start'] = function (block, generator) {
+                const doCode = generator.statementToCode(block, 'DO_CODE');
+                return `sceneManager.onSceneStart(async function() {\n${doCode}\n});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['event_broadcast'] = function (block, generator) {
+                const eventName = generator.valueToCode(block, 'EVENT_NAME', generator.ORDER_ATOMIC) || "''";
+                return `sceneManager.broadcastGlobalEvent(${eventName});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['event_on_receive'] = function (block, generator) {
+                const eventName = generator.valueToCode(block, 'EVENT_NAME', generator.ORDER_ATOMIC) || "''";
+                const doCode = generator.statementToCode(block, 'DO_CODE');
+                return `sceneManager.onGlobalEvent(${eventName}, async function() {\n${doCode}\n});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['event_object_trigger'] = function (block, generator) {
+                const objectName = generator.valueToCode(block, 'OBJECT_NAME', generator.ORDER_ATOMIC) || "''";
+                const eventName = generator.valueToCode(block, 'EVENT_NAME', generator.ORDER_ATOMIC) || "''";
+                return `sceneManager.triggerObjectEvent(${objectName}, ${eventName});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['event_on_object_receive'] = function (block, generator) {
+                const objectName = generator.valueToCode(block, 'OBJECT_NAME', generator.ORDER_ATOMIC) || "''";
+                const eventName = generator.valueToCode(block, 'EVENT_NAME', generator.ORDER_ATOMIC) || "''";
+                const doCode = generator.statementToCode(block, 'DO_CODE');
+                return `sceneManager.onObjectEvent(${objectName}, ${eventName}, async function() {\n${doCode}\n});\n`;
+            };
+
             javascript.javascriptGenerator.forBlock['event_on_click'] = function (block, generator) {
                 const objectName = generator.valueToCode(block, 'OBJECT_SELECTOR', generator.ORDER_ATOMIC) || 'null';
                 const doCode = generator.statementToCode(block, 'DO_CODE');
-                const callback = `function(thisMesh) {\n${doCode}\n}`;
+                const callback = `async function(thisMesh) {\n${doCode}\n}`;
                 return `sceneManager.onClick(${objectName}, ${callback});\n`;
             };
 
             javascript.javascriptGenerator.forBlock['event_every_frame'] = function (block, generator) {
                 const objectName = generator.valueToCode(block, 'OBJECT_SELECTOR', generator.ORDER_ATOMIC) || 'null';
                 const doCode = generator.statementToCode(block, 'DO_CODE');
-                const callback = `function(${objectName}) {\n${doCode}\n}`;
+                const callback = `async function(${objectName}) {\n${doCode}\n}`;
                 return `sceneManager.everyFrame(${objectName}, ${callback});\n`;
             };
 
@@ -7447,6 +7725,7 @@ if (${name}) {
                 const AsyncFunction = Object.getPrototypeOf(async function () { }).constructor;
                 const userGeneratedCode = new AsyncFunction('sceneManager', 'assetManager', codeToRun);
                 await userGeneratedCode(sceneManager, assetManager);
+                sceneManager.triggerSceneStart();
             } catch (error) {
                 console.error('Error executing code:', error);
             } finally {
