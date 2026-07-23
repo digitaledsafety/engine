@@ -128,31 +128,61 @@ test.describe('Event System and Observables Functionality', () => {
           "languageVersion": 0,
           "blocks": [
               {
-                  "type": "variables_set",
-                  "id": "coin_set",
+                  "type": "event_on_object_receive",
                   "x": 10,
                   "y": 10,
-                  "fields": {"VAR": {"id": "coin_var"}},
                   "inputs": {
-                      "VALUE": {
+                      "OBJECT_NAME": {
                           "block": {
-                              "type": "create_sphere",
+                              "type": "select_object",
+                              "fields": {"OBJECT_NAME": "coin"}
+                          }
+                      },
+                      "EVENT_NAME": {
+                          "block": {
+                              "type": "text",
+                              "fields": {"TEXT": "collected"}
+                          }
+                      },
+                      "DO_CODE": {
+                          "block": {
+                              "type": "console_log",
                               "inputs": {
-                                  "X": {"block": {"type": "math_number", "fields": {"NUM": 0}}},
-                                  "Y": {"block": {"type": "math_number", "fields": {"NUM": 1}}},
-                                  "Z": {"block": {"type": "math_number", "fields": {"NUM": 0}}}
+                                  "VALUE": {
+                                      "block": {
+                                          "type": "text",
+                                          "fields": {"TEXT": "COIN_COLLECTED_LOCAL"}
+                                      }
+                                  }
                               }
                           }
                       }
+                  }
+              },
+              {
+                  "type": "create_primitive",
+                  "x": 10,
+                  "y": 200,
+                  "fields": {"TYPE": "sphere"},
+                  "inputs": {
+                      "NAME": {
+                          "block": {
+                              "type": "text",
+                              "fields": {"TEXT": "coin"}
+                          }
+                      },
+                      "X": {"block": {"type": "math_number", "fields": {"NUM": 0}}},
+                      "Y": {"block": {"type": "math_number", "fields": {"NUM": 1}}},
+                      "Z": {"block": {"type": "math_number", "fields": {"NUM": 0}}}
                   },
                   "next": {
                       "block": {
-                          "type": "event_on_object_receive",
+                          "type": "event_object_trigger",
                           "inputs": {
                               "OBJECT_NAME": {
                                   "block": {
-                                      "type": "variables_get",
-                                      "fields": {"VAR": {"id": "coin_var"}}
+                                      "type": "select_object",
+                                      "fields": {"OBJECT_NAME": "coin"}
                                   }
                               },
                               "EVENT_NAME": {
@@ -160,46 +190,11 @@ test.describe('Event System and Observables Functionality', () => {
                                       "type": "text",
                                       "fields": {"TEXT": "collected"}
                                   }
-                              },
-                              "DO_CODE": {
-                                  "block": {
-                                      "type": "console_log",
-                                      "inputs": {
-                                          "VALUE": {
-                                              "block": {
-                                                  "type": "text",
-                                                  "fields": {"TEXT": "COIN_COLLECTED_LOCAL"}
-                                              }
-                                          }
-                                      }
-                                  }
-                              }
-                          },
-                          "next": {
-                              "block": {
-                                  "type": "event_object_trigger",
-                                  "inputs": {
-                                      "OBJECT_NAME": {
-                                          "block": {
-                                              "type": "variables_get",
-                                              "fields": {"VAR": {"id": "coin_var"}}
-                                          }
-                                      },
-                                      "EVENT_NAME": {
-                                          "block": {
-                                              "type": "text",
-                                              "fields": {"TEXT": "collected"}
-                                          }
-                                      }
-                                  }
                               }
                           }
                       }
                   }
               }
-          ],
-          "variables": [
-              {"name": "coin", "id": "coin_var"}
           ]
       }
     };

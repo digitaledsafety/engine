@@ -2416,6 +2416,7 @@ workspace_data: "${base64WorkspaceData}"
                 this.engine = new BABYLON.Engine(this.canvas, true);
                 this.scene = new BABYLON.Scene(this.engine);
                 this.objects = {};
+                this.pendingObjectEvents = {};
                 this.materials = {};
                 this.sounds = [];
                 this.player = null;
@@ -2671,6 +2672,14 @@ workspace_data: "${base64WorkspaceData}"
                     child.metadata = child.metadata || {};
                     child.metadata.logicalRoot = logicalName;
                 });
+
+                if (this.pendingObjectEvents && this.pendingObjectEvents[logicalName]) {
+                    const pendings = this.pendingObjectEvents[logicalName];
+                    pendings.forEach(p => {
+                        this.onObjectEvent(mesh, p.eventName, p.callback);
+                    });
+                    delete this.pendingObjectEvents[logicalName];
+                }
             }
 
             _normalizeAndCenter(wrapper, importedRoots) {
@@ -3227,6 +3236,7 @@ workspace_data: "${base64WorkspaceData}"
                 this._cleanupExisting(name);
                 const groundMesh = BABYLON.MeshBuilder.CreateGround(name, { width: width, height: height }, this.scene);
                 this.objects[name] = groundMesh;
+                this._tagMesh(groundMesh, name);
                 this.setGroundPhysics(name); // Automatically add physics
                 return groundMesh;
             }
@@ -3814,6 +3824,7 @@ workspace_data: "${base64WorkspaceData}"
                 this.uiManager = new UIManager(this.scene); // Re-initialize UIManager for the new scene
                 this.initJoystick(); // Re-initialize joystick for mobile if needed
                 this.objects = {};
+                this.pendingObjectEvents = {};
                 this.materials = {};
 
                 // Dispose all sounds
@@ -3895,6 +3906,22 @@ workspace_data: "${base64WorkspaceData}"
                         targetMesh.customObservables[eventName] = new BABYLON.Observable();
                     }
                     targetMesh.customObservables[eventName].add(callback);
+                } else {
+                    let name;
+                    if (typeof target === 'string') {
+                        name = target;
+                    } else if (target && typeof target === 'object' && target.name) {
+                        name = target.name;
+                    }
+                    if (name) {
+                        if (!this.pendingObjectEvents) {
+                            this.pendingObjectEvents = {};
+                        }
+                        if (!this.pendingObjectEvents[name]) {
+                            this.pendingObjectEvents[name] = [];
+                        }
+                        this.pendingObjectEvents[name].push({ eventName, callback });
+                    }
                 }
             }
 
@@ -4614,6 +4641,7 @@ workspace_data: "${base64WorkspaceData}"
         // Define a custom theme for Digital Education Safety
         Blockly.Themes.DigitalEducationSafety = Blockly.Theme.defineTheme('digital-education-safety', {
             'base': Blockly.Themes.Classic,
+            'startHats': true,
             'categoryStyles': {
                 'logic_category': { 'colour': '#4C97FF' },      // A vibrant blue for logic
                 'loop_category': { 'colour': '#FFBF00' },       // A bright yellow for loops, like Scratch
@@ -4645,7 +4673,7 @@ workspace_data: "${base64WorkspaceData}"
                 'physics_blocks': { 'colourPrimary': '#A55B80', 'colourSecondary': '#B57B90', 'colourTertiary': '#954B70' },
                 'gameplay_blocks': { 'colourPrimary': '#FF6347', 'colourSecondary': '#FF7D66', 'colourTertiary': '#E65A40' },
                 'assets_blocks': { 'colourPrimary': '#FF8C1A', 'colourSecondary': '#FFA347', 'colourTertiary': '#E67E00' },
-                'event_blocks': { 'colourPrimary': '#FF5C5C', 'colourSecondary': '#FF7C7C', 'colourTertiary': '#E05353' }
+                'event_blocks': { 'colourPrimary': '#FF5C5C', 'colourSecondary': '#FF7C7C', 'colourTertiary': '#E05353', 'hat': 'cap' }
             },
             'componentStyles': {
                 'workspaceBackgroundColour': '#F9F9F9',
@@ -5751,7 +5779,6 @@ workspace_data: "${base64WorkspaceData}"
                         "name": "DO_CODE"
                     }
                 ],
-                "previousStatement": null,
                 "nextStatement": null,
                 "style": "event_blocks",
                 "tooltip": "Executes code when the specified object is clicked.",
@@ -5774,7 +5801,6 @@ workspace_data: "${base64WorkspaceData}"
                         "name": "DO_CODE"
                     }
                 ],
-                "previousStatement": null,
                 "nextStatement": null,
                 "style": "event_blocks",
                 "tooltip": "Executes code for the specified object every frame.",
@@ -5833,7 +5859,6 @@ workspace_data: "${base64WorkspaceData}"
                         "name": "DO"
                     }
                 ],
-                "previousStatement": null,
                 "nextStatement": null,
                 "colour": "%{BKY_LOOPS_HUE}",
                 "tooltip": "Executes code when a controller button is pressed.",
@@ -5920,7 +5945,6 @@ workspace_data: "${base64WorkspaceData}"
                         "name": "DO"
                     }
                 ],
-                "previousStatement": null,
                 "nextStatement": null,
                 "colour": "#5BA55B",
                 "tooltip": "Executes code when two objects collide. Can check against a single object or a list of objects.",
@@ -6169,7 +6193,6 @@ workspace_data: "${base64WorkspaceData}"
                     { "type": "input_dummy" },
                     { "type": "input_statement", "name": "DO" }
                 ],
-                "previousStatement": null,
                 "nextStatement": null,
                 "colour": "%{BKY_LOOPS_HUE}",
                 "tooltip": "Executes code when the specified GUI element is clicked.",
@@ -6586,7 +6609,6 @@ workspace_data: "${base64WorkspaceData}"
                         "name": "DO_CODE"
                     }
                 ],
-                "previousStatement": null,
                 "nextStatement": null,
                 "style": "event_blocks",
                 "tooltip": "Executes the code within this block when the scene finishes loading and starts.",
@@ -6625,7 +6647,6 @@ workspace_data: "${base64WorkspaceData}"
                         "name": "DO_CODE"
                     }
                 ],
-                "previousStatement": null,
                 "nextStatement": null,
                 "style": "event_blocks",
                 "tooltip": "Executes the code within this block when the specified global event is broadcast.",
@@ -6674,7 +6695,6 @@ workspace_data: "${base64WorkspaceData}"
                         "name": "DO_CODE"
                     }
                 ],
-                "previousStatement": null,
                 "nextStatement": null,
                 "style": "event_blocks",
                 "tooltip": "Executes the code when the specified object receives the local event.",
