@@ -1367,6 +1367,24 @@ workspace_data: "${base64WorkspaceData}"
                         {
                             kind: 'block',
                             type: 'create_3d_text',
+                            inputs: {
+                                TEXT: {
+                                    shadow: {
+                                        type: 'text',
+                                        fields: {
+                                            TEXT: 'Hello 3D'
+                                        }
+                                    }
+                                },
+                                FONT_URL: {
+                                    shadow: {
+                                        type: 'text',
+                                        fields: {
+                                            TEXT: 'https://assets.babylonjs.com/fonts/Droid Sans_Bold.json'
+                                        }
+                                    }
+                                }
+                            }
                         },
                         {
                             kind: 'block',
@@ -1517,6 +1535,40 @@ workspace_data: "${base64WorkspaceData}"
                         {
                             kind: 'block',
                             type: 'import_3d_file_url',
+                            inputs: {
+                                MODEL_URL: {
+                                    shadow: {
+                                        type: 'text',
+                                        fields: {
+                                            TEXT: 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/main/2.0/Duck/glTF-Binary/Duck.glb'
+                                        }
+                                    }
+                                },
+                                POS_X: {
+                                    shadow: {
+                                        type: 'math_number',
+                                        fields: {
+                                            NUM: 0
+                                        }
+                                    }
+                                },
+                                POS_Y: {
+                                    shadow: {
+                                        type: 'math_number',
+                                        fields: {
+                                            NUM: 0
+                                        }
+                                    }
+                                },
+                                POS_Z: {
+                                    shadow: {
+                                        type: 'math_number',
+                                        fields: {
+                                            NUM: 0
+                                        }
+                                    }
+                                }
+                            }
                         },
                         {
                             kind: 'block',
@@ -1533,6 +1585,32 @@ workspace_data: "${base64WorkspaceData}"
                         {
                             kind: 'block',
                             type: 'create_primitive',
+                            inputs: {
+                                X: {
+                                    shadow: {
+                                        type: 'math_number',
+                                        fields: {
+                                            NUM: 0
+                                        }
+                                    }
+                                },
+                                Y: {
+                                    shadow: {
+                                        type: 'math_number',
+                                        fields: {
+                                            NUM: 0
+                                        }
+                                    }
+                                },
+                                Z: {
+                                    shadow: {
+                                        type: 'math_number',
+                                        fields: {
+                                            NUM: 0
+                                        }
+                                    }
+                                }
+                            }
                         },
                         {
                             kind: 'block',
@@ -1596,7 +1674,17 @@ workspace_data: "${base64WorkspaceData}"
                         },
                         {
                             "kind": "block",
-                            "type": "import_animation"
+                            "type": "import_animation",
+                            "inputs": {
+                                "URL": {
+                                    "shadow": {
+                                        "type": "text",
+                                        "fields": {
+                                            "TEXT": "https://cdn.digitaleducationsafety.org/assets/models/animations/run_forward.fbx"
+                                        }
+                                    }
+                                }
+                            }
                         },
                         {
                             "kind": "block",
@@ -1633,6 +1721,13 @@ workspace_data: "${base64WorkspaceData}"
                         {
                             kind: 'block',
                             type: 'import_model_from_asset',
+                            inputs: {
+                                ASSET: {
+                                    shadow: {
+                                        type: 'asset_model'
+                                    }
+                                }
+                            }
                         },
                         {
                             kind: 'block',
@@ -1701,6 +1796,56 @@ workspace_data: "${base64WorkspaceData}"
                         {
                             kind: 'block',
                             type: 'create_light',
+                            inputs: {
+                                X: {
+                                    shadow: {
+                                        type: 'math_number',
+                                        fields: {
+                                            NUM: 0
+                                        }
+                                    }
+                                },
+                                Y: {
+                                    shadow: {
+                                        type: 'math_number',
+                                        fields: {
+                                            NUM: 10
+                                        }
+                                    }
+                                },
+                                Z: {
+                                    shadow: {
+                                        type: 'math_number',
+                                        fields: {
+                                            NUM: 0
+                                        }
+                                    }
+                                },
+                                DX: {
+                                    shadow: {
+                                        type: 'math_number',
+                                        fields: {
+                                            NUM: 0
+                                        }
+                                    }
+                                },
+                                DY: {
+                                    shadow: {
+                                        type: 'math_number',
+                                        fields: {
+                                            NUM: -1
+                                        }
+                                    }
+                                },
+                                DZ: {
+                                    shadow: {
+                                        type: 'math_number',
+                                        fields: {
+                                            NUM: 0
+                                        }
+                                    }
+                                }
+                            }
                         },
                         {
                             kind: 'block',
@@ -1883,10 +2028,6 @@ workspace_data: "${base64WorkspaceData}"
                             kind: 'block',
                             type: 'parse_number_from',
                         },                        
-                        {
-                            kind: 'block',
-                            type: 'text',
-                        },
                         {
                             kind: 'block',
                             type: 'text_join',
@@ -3880,6 +4021,7 @@ workspace_data: "${base64WorkspaceData}"
 
                 this.globalEventBus = {};
                 this.onSceneStartObservable = new BABYLON.Observable();
+                this.pendingLazyObjectEvents = [];
             }
 
             dispose() {
@@ -3944,6 +4086,13 @@ workspace_data: "${base64WorkspaceData}"
                     }
                     targetMesh.customObservables[eventName].add(callback);
                 } else {
+                    if (typeof target === 'function') {
+                        if (!this.pendingLazyObjectEvents) {
+                            this.pendingLazyObjectEvents = [];
+                        }
+                        this.pendingLazyObjectEvents.push({ target, eventName, callback });
+                        return;
+                    }
                     let name;
                     if (typeof target === 'string') {
                         name = target;
@@ -3967,6 +4116,17 @@ workspace_data: "${base64WorkspaceData}"
                 if (targetMesh && targetMesh.customObservables && targetMesh.customObservables[eventName]) {
                     targetMesh.customObservables[eventName].notifyObservers();
                 }
+                if (this.pendingLazyObjectEvents) {
+                    this.pendingLazyObjectEvents.forEach(p => {
+                        if (p.eventName === eventName) {
+                            const resolved = this._resolveTarget(p.target);
+                            const targetResolved = this._resolveTarget(target);
+                            if (resolved && targetResolved && (resolved === targetResolved || resolved.name === targetResolved.name)) {
+                                p.callback();
+                            }
+                        }
+                    });
+                }
             }
 
             _resolveTarget(target) {
@@ -3981,13 +4141,14 @@ workspace_data: "${base64WorkspaceData}"
             }
 
             _getMesh(target) {
+                const resolved = this._resolveTarget(target);
                 let name;
-                if (typeof target === 'string') {
-                    name = target;
-                } else if (target && typeof target === 'object' && target.name) {
-                    name = target.name;
+                if (typeof resolved === 'string') {
+                    name = resolved;
+                } else if (resolved && typeof resolved === 'object' && resolved.name) {
+                    name = resolved.name;
                 }
-                return this.objects[name];
+                return this.objects[name] || (resolved && resolved.getClassName && resolved.getClassName() === 'Mesh' ? resolved : null);
             }
 
             getProperty(target, property) {
@@ -5019,21 +5180,15 @@ workspace_data: "${base64WorkspaceData}"
             },
             {
                 "type": "import_model_from_asset",
-                "message0": "import model from asset %1 as %2",
+                "message0": "import model from asset %1",
                 "args0": [
                     {
                         "type": "input_value",
                         "name": "ASSET",
                         "check": "String"
-                    },
-                    {
-                        "type": "field_variable",
-                        "name": "VAR",
-                        "variable": "model"
                     }
                 ],
-                "previousStatement": null,
-                "nextStatement": null,
+                "output": "Mesh",
                 "colour": "%{BKY_MATH_HUE}",
                 "tooltip": "Imports a model from the asset manager.",
                 "helpUrl": ""
@@ -5121,39 +5276,37 @@ workspace_data: "${base64WorkspaceData}"
             },
             {
                 type: 'import_3d_file_url',
-                message0: 'Import model URL %1\r\n',
+                message0: 'import model from URL %1',
                 args0: [
                     {
-                        type: 'field_input',
+                        type: 'input_value',
                         name: 'MODEL_URL',
-                        text: 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/main/2.0/Duck/glTF-Binary/Duck.glb',
+                        check: 'String',
                     }
                 ],
-                message1: 'Place at X %1 Y %2 Z %3',
+                message1: 'place at x %2 y %3 z %4',
                 args1: [
                     {
-                        type: 'field_number',
+                        type: 'input_value',
                         name: 'POS_X',
-                        value: 0,
+                        check: 'Number',
                     },
                     {
-                        type: 'field_number',
+                        type: 'input_value',
                         name: 'POS_Y',
-                        value: 0,
+                        check: 'Number',
                     },
                     {
-                        type: 'field_number',
+                        type: 'input_value',
                         name: 'POS_Z',
-                        value: 0,
+                        check: 'Number',
                     },
-                ],                
+                ],
+                "inputsInline": true,
                 colour: 160,
-                tooltip: 'Imports a 3D file from a URL and executes actions on success.',
+                tooltip: 'Imports a 3D file from a URL and returns it.',
                 output: "Mesh",
                 helpUrl: '',
-                extensions: [
-                    'set_max_display_length',
-                ],
             },
             {
                 type: 'set_isometric_camera',
@@ -5182,7 +5335,7 @@ workspace_data: "${base64WorkspaceData}"
             },
             {
                 type: 'create_primitive',
-                message0: 'Create %1 named %2 at x %3 y %4 z %5',
+                message0: 'create %1 at x %2 y %3 z %4',
                 args0: [
                     {
                         type: 'field_dropdown',
@@ -5191,18 +5344,18 @@ workspace_data: "${base64WorkspaceData}"
                             ['box', 'box'],
                             ['sphere', 'sphere'],
                             ['cylinder', 'cylinder'],
+                            ['ground', 'ground'],
                             ['cone', 'cone'],
-                            ['torus', 'torus']
+                            ['torus', 'torus'],
+                            ['capsule', 'capsule']
                         ],
                     },
-                    { "type": "input_value", "name": "NAME", "check": "String" },
                     { type: 'input_value', name: 'X', check: 'Number' },
                     { type: 'input_value', name: 'Y', check: 'Number' },
                     { type: 'input_value', name: 'Z', check: 'Number' },
                 ],
                 "inputsInline": true,
-                previousStatement: null,
-                nextStatement: null,
+                output: "Mesh",
                 colour: 160,
                 tooltip: 'Creates a 3D primitive at the specified position.',
             },
@@ -5235,18 +5388,17 @@ workspace_data: "${base64WorkspaceData}"
             },
             {
                 "type": "create_3d_text",
-                "message0": "create 3D text %1 named %2",
+                "message0": "create 3D text %1",
                 "args0": [
-                    { "type": "input_value", "name": "TEXT", "check": "String" },
-                    { "type": "input_value", "name": "NAME", "check": "String" },
+                    { "type": "input_value", "name": "TEXT", "check": "String" }
                 ],
-                "message1": "font URL %1",
+                "message1": "font URL %2",
                 "args1": [
-                    { "type": "field_input", "name": "FONT_URL", "text": "https://assets.babylonjs.com/fonts/Droid Sans_Bold.json" }
+                    { "type": "input_value", "name": "FONT_URL", "check": "String" }
                 ],
                 "output": "Mesh",
                 "colour": 160,
-                "inputsInline": false,
+                "inputsInline": true,
                 "tooltip": "Creates a 3D text mesh.",
                 "helpUrl": ""
             },
@@ -5339,18 +5491,35 @@ workspace_data: "${base64WorkspaceData}"
             },
             {
                 type: 'create_light',
-                message0: 'Create light named %1 at x %2 y %3 z %4',
+                message0: 'create %1 light',
                 args0: [
-                    { type: 'field_input', name: 'NAME', text: 'light' },
+                    {
+                        type: 'field_dropdown',
+                        name: 'TYPE',
+                        options: [
+                            ['directional', 'directional'],
+                            ['hemispheric', 'hemispheric'],
+                            ['spot', 'spot'],
+                            ['point', 'point']
+                        ],
+                    }
+                ],
+                message1: 'at x %2 y %3 z %4',
+                args1: [
                     { type: 'input_value', name: 'X', check: 'Number' },
                     { type: 'input_value', name: 'Y', check: 'Number' },
                     { type: 'input_value', name: 'Z', check: 'Number' },
                 ],
+                message2: 'with direction x %5 y %6 z %7',
+                args2: [
+                    { type: 'input_value', name: 'DX', check: 'Number' },
+                    { type: 'input_value', name: 'DY', check: 'Number' },
+                    { type: 'input_value', name: 'DZ', check: 'Number' },
+                ],
                 "inputsInline": true,
-                previousStatement: null,
-                nextStatement: null,
+                output: "Light",
                 colour: 65,
-                tooltip: 'Creates a light at the specified position',
+                tooltip: 'Creates a light with specified position and direction.',
             },
             {
                 type: 'change_object_color',
@@ -5470,17 +5639,15 @@ workspace_data: "${base64WorkspaceData}"
             },
             {
                 "type": "import_animation",
-                "message0": "import animation from url %1 as %2",
+                "message0": "import animation from url %1",
                 "args0": [
                     {
-                        type: 'field_input',
-                        name: 'URL',
-                        text: 'https://cdn.digitaleducationsafety.org/assets/models/animations/run_forward.fbx',
-                    },                    
-                    { "type": "field_variable", "name": "VAR", "variable": "animation" }
+                        "type": "input_value",
+                        "name": "URL",
+                        "check": "String"
+                    }
                 ],
-                "previousStatement": null,
-                "nextStatement": null,
+                "output": "Animation",
                 "colour": "%{BKY_MOTION_HUE}",
                 "tooltip": "Imports a skeletal animation from a URL (.fbx)."
             },
@@ -6751,6 +6918,8 @@ workspace_data: "${base64WorkspaceData}"
         ]);
 
         {
+            javascript.javascriptGenerator.ORDER_AWAIT = javascript.javascriptGenerator.ORDER_NONE || 99;
+
             javascript.javascriptGenerator.forBlock['create_particles'] = function (block, generator) {
                 const type = block.getFieldValue('TYPE');
                 const target = generator.valueToCode(block, 'TARGET', generator.ORDER_ATOMIC) || 'null';
@@ -6918,14 +7087,14 @@ workspace_data: "${base64WorkspaceData}"
             javascript.javascriptGenerator.forBlock['event_object_trigger'] = function (block, generator) {
                 const objectName = generator.valueToCode(block, 'OBJECT_NAME', generator.ORDER_ATOMIC) || "''";
                 const eventName = generator.valueToCode(block, 'EVENT_NAME', generator.ORDER_ATOMIC) || "''";
-                return `sceneManager.triggerObjectEvent(${objectName}, ${eventName});\n`;
+                return `sceneManager.triggerObjectEvent(() => ${objectName}, ${eventName});\n`;
             };
 
             javascript.javascriptGenerator.forBlock['event_on_object_receive'] = function (block, generator) {
                 const objectName = generator.valueToCode(block, 'OBJECT_NAME', generator.ORDER_ATOMIC) || "''";
                 const eventName = generator.valueToCode(block, 'EVENT_NAME', generator.ORDER_ATOMIC) || "''";
                 const doCode = generator.statementToCode(block, 'DO_CODE');
-                return `sceneManager.onObjectEvent(${objectName}, ${eventName}, async function() {\n${doCode}\n});\n`;
+                return `sceneManager.onObjectEvent(() => ${objectName}, ${eventName}, async function() {\n${doCode}\n});\n`;
             };
 
             javascript.javascriptGenerator.forBlock['event_on_click'] = function (block, generator) {
@@ -7050,21 +7219,23 @@ if (${name}) {
             };
 
             javascript.javascriptGenerator.forBlock['import_3d_file_url'] = function (block, generator) {
-                const modelUrl = block.getFieldValue('MODEL_URL');
-                const posX = block.getFieldValue('POS_X');
-                const posY = block.getFieldValue('POS_Y');
-                const posZ = block.getFieldValue('POS_Z');                
-                const modelVarName = javascript.javascriptGenerator.nameDB_.getDistinctName(Blockly.utils.idGenerator.genUid(), Blockly.Variables.NameType);
+                const modelUrl = generator.valueToCode(block, 'MODEL_URL', generator.ORDER_ATOMIC) || "''";
+                const posX = generator.valueToCode(block, 'POS_X', generator.ORDER_ATOMIC) || 0;
+                const posY = generator.valueToCode(block, 'POS_Y', generator.ORDER_ATOMIC) || 0;
+                const posZ = generator.valueToCode(block, 'POS_Z', generator.ORDER_ATOMIC) || 0;
+                const uniqueId = Blockly.utils.idGenerator.genUid();
+                const modelVarName = `id_${uniqueId}`;
 
-                let code;
-                const robloxMatch = modelUrl.match(/roblox\.com\/(?:users|users\/profile)\/(\d+)/i);
-                if (robloxMatch) {
-                    const userId = robloxMatch[1];
-                    code = `await sceneManager.importRobloxAvatar('${modelVarName}', ${userId}, ${posX}, ${posY}, ${posZ})`;
-                } else {
-                    code = `await sceneManager.importModel('${modelVarName}', '${modelUrl}', ${posX}, ${posY}, ${posZ})`;
-                }
-                return [code, generator.ORDER_ATOMIC];
+                const code = `await (async () => {
+                    const urlStr = ${modelUrl};
+                    const robloxMatch = typeof urlStr === 'string' ? urlStr.match(/roblox\\.com\\/(?:users|users\\/profile)\\/(\\d+)/i) : null;
+                    if (robloxMatch) {
+                        return await sceneManager.importRobloxAvatar('${modelVarName}', robloxMatch[1], ${posX}, ${posY}, ${posZ});
+                    } else {
+                        return await sceneManager.importModel('${modelVarName}', urlStr, ${posX}, ${posY}, ${posZ});
+                    }
+                })()`;
+                return [code, generator.ORDER_AWAIT];
             };
 
             javascript.javascriptGenerator.forBlock['set_isometric_camera'] = function (block, generator) {
@@ -7096,24 +7267,33 @@ if (${name}) {
 
             javascript.javascriptGenerator.forBlock['create_primitive'] = function (block, generator) {
                 const type = block.getFieldValue('TYPE');
-                const name = generator.valueToCode(block, 'NAME', generator.ORDER_ATOMIC) || "'myObject'";
                 const x = generator.valueToCode(block, 'X', generator.ORDER_ATOMIC) || 0;
                 const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || 0;
                 const z = generator.valueToCode(block, 'Z', generator.ORDER_ATOMIC) || 0;
+                const uniqueId = Blockly.utils.idGenerator.genUid();
+                const idStr = `id_${uniqueId}`;
 
                 let code;
                 if (type === 'sphere') {
-                    code = `sceneManager.createSphere(${name}, ${x}, ${y}, ${z});\n`;
+                    code = `sceneManager.createSphere('${idStr}', ${x}, ${y}, ${z})`;
                 } else if (type === 'cylinder') {
-                    code = `sceneManager.createCylinder(${name}, ${x}, ${y}, ${z});\n`;
+                    code = `sceneManager.createCylinder('${idStr}', ${x}, ${y}, ${z})`;
                 } else if (type === 'cone') {
-                    code = `sceneManager.createCone(${name}, ${x}, ${y}, ${z});\n`;
+                    code = `sceneManager.createCone('${idStr}', ${x}, ${y}, ${z})`;
                 } else if (type === 'torus') {
-                    code = `sceneManager.createTorus(${name}, ${x}, ${y}, ${z});\n`;
+                    code = `sceneManager.createTorus('${idStr}', ${x}, ${y}, ${z})`;
+                } else if (type === 'capsule') {
+                    code = `sceneManager.createCapsule('${idStr}', ${x}, ${y}, ${z})`;
+                } else if (type === 'ground') {
+                    code = `(() => {
+                        const g = sceneManager.createGround('${idStr}', 10, 10);
+                        g.position.set(${x}, ${y}, ${z});
+                        return g;
+                    })()`;
                 } else {
-                    code = `sceneManager.createBox(${name}, ${x}, ${y}, ${z});\n`;
+                    code = `sceneManager.createBox('${idStr}', ${x}, ${y}, ${z})`;
                 }
-                return code;
+                return [code, generator.ORDER_FUNCTION_CALL];
             };
 
             javascript.javascriptGenerator.forBlock['create_box'] = function (block, generator) {
@@ -7136,10 +7316,10 @@ if (${name}) {
 
             javascript.javascriptGenerator.forBlock['create_3d_text'] = function (block, generator) {
                 const text = generator.valueToCode(block, 'TEXT', generator.ORDER_ATOMIC) || "''";
-                const name = generator.valueToCode(block, 'NAME', generator.ORDER_ATOMIC) || "'myText'";
-                const fontUrl = block.getFieldValue('FONT_URL');
-                const code = `await sceneManager.createText(${name}, ${text}, '${fontUrl}')`;
-                return [code, generator.ORDER_ATOMIC];
+                const fontUrl = generator.valueToCode(block, 'FONT_URL', generator.ORDER_ATOMIC) || "'https://assets.babylonjs.com/fonts/Droid Sans_Bold.json'";
+                const uniqueId = Blockly.utils.idGenerator.genUid();
+                const code = `await sceneManager.createText('id_${uniqueId}', ${text}, ${fontUrl})`;
+                return [code, generator.ORDER_AWAIT];
             };
 
             javascript.javascriptGenerator.forBlock['scale_object'] = function (block, generator) {
@@ -7180,11 +7360,16 @@ if (${name}) {
             };
 
             javascript.javascriptGenerator.forBlock['create_light'] = function (block, generator) {
-                const name = block.getFieldValue('NAME');
+                const type = block.getFieldValue('TYPE') || 'point';
                 const x = generator.valueToCode(block, 'X', generator.ORDER_ATOMIC) || 0;
-                const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || 0;
+                const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || 10;
                 const z = generator.valueToCode(block, 'Z', generator.ORDER_ATOMIC) || 0;
-                return `sceneManager.createLight('${name}', ${x}, ${y}, ${z});\n`;
+                const dx = generator.valueToCode(block, 'DX', generator.ORDER_ATOMIC) || 0;
+                const dy = generator.valueToCode(block, 'DY', generator.ORDER_ATOMIC) || -1;
+                const dz = generator.valueToCode(block, 'DZ', generator.ORDER_ATOMIC) || 0;
+                const uniqueId = Blockly.utils.idGenerator.genUid();
+                const code = `sceneManager.createAdvancedLight('${type}', 'id_${uniqueId}', ${x}, ${y}, ${z}, ${dx}, ${dy}, ${dz})`;
+                return [code, generator.ORDER_FUNCTION_CALL];
             };
 
             javascript.javascriptGenerator.forBlock['change_object_color'] = function (block, generator) {
@@ -7248,9 +7433,9 @@ if (${name}) {
             };
 
             javascript.javascriptGenerator.forBlock['import_animation'] = function(block, generator) {
-                const url = block.getFieldValue('URL');
-                const varName = generator.nameDB_.getName(block.getFieldValue('VAR'), Blockly.Variables.NAME_TYPE);
-                return `var ${varName} = await sceneManager.importAnimation('${url}');\n`;
+                const url = generator.valueToCode(block, 'URL', generator.ORDER_ATOMIC) || "''";
+                const code = `await sceneManager.importAnimation(${url})`;
+                return [code, generator.ORDER_AWAIT];
             };
 
             javascript.javascriptGenerator.forBlock['apply_animation'] = function(block, generator) {
@@ -7428,8 +7613,8 @@ if (${name}) {
 
             javascript.javascriptGenerator.forBlock['import_model_from_asset'] = function (block, generator) {
                 const assetName = generator.valueToCode(block, 'ASSET', generator.ORDER_ATOMIC) || 'null';
-                const varName = generator.nameDB_.getName(block.getFieldValue('VAR'), Blockly.Variables.NAME_TYPE);
-                return `var ${varName} = await sceneManager.importModelAsset(${assetName}, assetManager);\n`;
+                const code = `await sceneManager.importModelAsset(${assetName}, assetManager)`;
+                return [code, generator.ORDER_AWAIT];
             };
 
             javascript.javascriptGenerator.forBlock['play_sound_from_asset'] = function (block, generator) {
