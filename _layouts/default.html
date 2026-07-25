@@ -994,7 +994,6 @@ workspace_data: "${base64WorkspaceData}"
                 loadAssetsIntoView();
 
                 // 3. Load Workspace
-                sanitizeWorkspaceJson(projectData.workspace);
                 Blockly.serialization.workspaces.load(projectData.workspace, this.workspace);
 
                 // 4. Run the loaded project
@@ -7959,62 +7958,9 @@ if (${name}) {
             }
         }
 
-        function sanitizeWorkspaceJson(state) {
-            if (!state || typeof state !== 'object') return;
-
-            // If it is a block
-            if (state.type) {
-                const obsoleteTypes = [
-                    'create_primitive',
-                    'create_light',
-                    'create_advanced_light',
-                    'import_3d_file_url',
-                    'import_model_from_asset',
-                    'import_animation',
-                    'create_3d_text'
-                ];
-                if (obsoleteTypes.includes(state.type)) {
-                    // 1. Map create_advanced_light to create_light
-                    if (state.type === 'create_advanced_light') {
-                        state.type = 'create_light';
-                    }
-                    // 2. Remove NAME input connection to avoid MissingConnection errors
-                    if (state.inputs && state.inputs.NAME) {
-                        delete state.inputs.NAME;
-                    }
-                }
-                if (state.type === 'set_background_image') {
-                    if (state.fields && (state.fields.URL || state.fields.IMAGE)) {
-                        const urlValue = state.fields.URL || state.fields.IMAGE;
-                        if (!state.inputs) {
-                            state.inputs = {};
-                        }
-                        state.inputs.URL = {
-                            block: {
-                                type: 'text',
-                                fields: {
-                                    TEXT: urlValue
-                                }
-                            }
-                        };
-                        delete state.fields.URL;
-                        delete state.fields.IMAGE;
-                    }
-                }
-            }
-
-            // Recursively sanitize all properties (works for both objects and arrays)
-            for (const key in state) {
-                if (state[key] && typeof state[key] === 'object') {
-                    sanitizeWorkspaceJson(state[key]);
-                }
-            }
-        }
-
         function loadWorkspaceDefault() {
             let state = {};
             var workspace = Blockly.getMainWorkspace();
-            sanitizeWorkspaceJson(state);
             Blockly.serialization.workspaces.load(state, workspace);
             doRun();
         }
