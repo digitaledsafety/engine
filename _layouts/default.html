@@ -479,6 +479,60 @@
             z-index: 2500;
             display: none;
         }
+
+        .play-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(30, 30, 30, 0.85);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            transition: opacity 0.3s ease;
+        }
+
+        .play-overlay-content {
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .play-thumbnail {
+            width: 120px;
+            height: 120px;
+            object-fit: contain;
+            border-radius: 20px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+            background-color: #222;
+            padding: 10px;
+        }
+
+        .play-btn {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            padding: 12px 28px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            border-radius: 30px;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.15);
+            transition: background-color 0.2s ease, transform 0.1s ease;
+        }
+
+        .play-btn:hover {
+            background-color: #218838;
+            transform: scale(1.05);
+        }
+
+        .play-btn:active {
+            transform: scale(0.98);
+        }
     </style>
     <script>
         // --- Dynamic PWA Manifest Logic ---
@@ -552,6 +606,12 @@
     <div id="workspace-data" style="display: none;">{{ page.workspace_data }}</div>
     <div class="container">
         <div class="canvas-container">
+            <div id="play-overlay" class="play-overlay">
+                <div class="play-overlay-content">
+                    <img src="{{ site.baseurl }}/assets/icons/icon-512.png" alt="Engine Preview" class="play-thumbnail">
+                    <button id="play-overlay-button" class="play-btn">▶ Play Scene</button>
+                </div>
+            </div>
             <div id="joystick-zone"></div>
             <canvas id="gameCanvas"></canvas>
             <div id="jump-button-container" class="interactive-ui">
@@ -997,7 +1057,7 @@ workspace_data: "${base64WorkspaceData}"
                 Blockly.serialization.workspaces.load(projectData.workspace, this.workspace);
 
                 // 4. Run the loaded project
-                doRun();
+                showPlayOverlay();
 
                 console.log('Project data loaded successfully!');
             }
@@ -1116,7 +1176,7 @@ workspace_data: "${base64WorkspaceData}"
                     await this._clearAllAssets();
                     this.workspace.clear();
                     loadAssetsIntoView();
-                    doRun();
+                    showPlayOverlay();
                 }
             }
 
@@ -7773,14 +7833,30 @@ if (${name}) {
             }
         }
 
+        function showPlayOverlay() {
+            const overlay = document.getElementById('play-overlay');
+            if (overlay) {
+                overlay.style.display = 'flex';
+                overlay.style.opacity = '1';
+            }
+        }
+
+        function hidePlayOverlay() {
+            const overlay = document.getElementById('play-overlay');
+            if (overlay) {
+                overlay.style.display = 'none';
+            }
+        }
+
         function loadWorkspaceDefault() {
             let state = {};
             var workspace = Blockly.getMainWorkspace();
             Blockly.serialization.workspaces.load(state, workspace);
-            doRun();
+            showPlayOverlay();
         }
 
         async function doRun(code) {
+            hidePlayOverlay();
             let codeToRun = code || generateCode();
 
             if (sceneManager) {
@@ -7955,6 +8031,10 @@ function ${generator.FUNCTION_NAME_PLACEHOLDER_}(c1, c2, ratio) {
             if (event.target.tagName === 'BUTTON') {
                 document.getElementById('dropdownMenu').classList.remove('show');
             }
+        });
+
+        document.getElementById('play-overlay-button').addEventListener('click', () => {
+            doRun();
         });
 
         document.getElementById('runButton').addEventListener('click', () => {
