@@ -134,8 +134,8 @@ test.describe('Event System and Observables Functionality', () => {
                   "inputs": {
                       "OBJECT_NAME": {
                           "block": {
-                              "type": "variables_get",
-                              "fields": {"VAR": {"id": "coin_var"}}
+                              "type": "select_object",
+                              "fields": {"OBJECT_NAME": "coin"}
                           }
                       },
                       "EVENT_NAME": {
@@ -160,22 +160,20 @@ test.describe('Event System and Observables Functionality', () => {
                   }
               },
               {
-                  "type": "variables_set",
+                  "type": "create_primitive",
                   "x": 10,
                   "y": 200,
-                  "fields": {"VAR": {"id": "coin_var"}},
+                  "fields": {"TYPE": "sphere"},
                   "inputs": {
-                      "VALUE": {
+                      "NAME": {
                           "block": {
-                              "type": "create_primitive",
-                              "fields": {"TYPE": "sphere"},
-                              "inputs": {
-                                  "X": {"block": {"type": "math_number", "fields": {"NUM": 0}}},
-                                  "Y": {"block": {"type": "math_number", "fields": {"NUM": 1}}},
-                                  "Z": {"block": {"type": "math_number", "fields": {"NUM": 0}}}
-                              }
+                              "type": "text",
+                              "fields": {"TEXT": "coin"}
                           }
-                      }
+                      },
+                      "X": {"block": {"type": "math_number", "fields": {"NUM": 0}}},
+                      "Y": {"block": {"type": "math_number", "fields": {"NUM": 1}}},
+                      "Z": {"block": {"type": "math_number", "fields": {"NUM": 0}}}
                   },
                   "next": {
                       "block": {
@@ -183,8 +181,8 @@ test.describe('Event System and Observables Functionality', () => {
                           "inputs": {
                               "OBJECT_NAME": {
                                   "block": {
-                                      "type": "variables_get",
-                                      "fields": {"VAR": {"id": "coin_var"}}
+                                      "type": "select_object",
+                                      "fields": {"OBJECT_NAME": "coin"}
                                   }
                               },
                               "EVENT_NAME": {
