@@ -1400,6 +1400,10 @@ workspace_data: "${base64WorkspaceData}"
                                     }
                                 }
                             }
+                        },
+                        {
+                            kind: 'block',
+                            type: 'event_on_swipe'
                         }
                     ]
                 },
@@ -2500,7 +2504,11 @@ workspace_data: "${base64WorkspaceData}"
                     'a': 'Left',
                     'd': 'Right',
                     'w': 'Up',
-                    's': 'Down'
+                    's': 'Down',
+                    'arrowleft': 'Left',
+                    'arrowright': 'Right',
+                    'arrowup': 'Up',
+                    'arrowdown': 'Down'
                 };
                 this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 this.uiElements = [];
@@ -2514,6 +2522,7 @@ workspace_data: "${base64WorkspaceData}"
 
                 this.globalEventBus = {};
                 this.onSceneStartObservable = new BABYLON.Observable();
+                this.swipeCallbacks = { 'LEFT': [], 'RIGHT': [], 'UP': [], 'DOWN': [] };
 
                 this.initScene();
                 this.initInputListeners();
@@ -3801,6 +3810,66 @@ workspace_data: "${base64WorkspaceData}"
                 };
                 window.addEventListener('keydown', this._onKeyDown);
                 window.addEventListener('keyup', this._onKeyUp);
+
+                // Swipe Gesture Detection
+                let startX = 0;
+                let startY = 0;
+                const threshold = 30; // Minimum pixels to classify as a swipe
+
+                this._onTouchStart = (e) => {
+                    if (e.touches && e.touches.length > 0) {
+                        startX = e.touches[0].clientX;
+                        startY = e.touches[0].clientY;
+                    }
+                };
+
+                this._onTouchEnd = (e) => {
+                    if (!e.changedTouches || e.changedTouches.length === 0) return;
+                    const deltaX = e.changedTouches[0].clientX - startX;
+                    const deltaY = e.changedTouches[0].clientY - startY;
+
+                    if (Math.abs(deltaX) > Math.abs(deltaY)) {
+                        // Horizontal swipe
+                        if (Math.abs(deltaX) > threshold) {
+                            if (deltaX > 0) {
+                                // Swipe Right
+                                if (this.buttonPressActions['Right']) {
+                                    this.buttonPressActions['Right'].forEach(action => action());
+                                }
+                                this.triggerSwipe('RIGHT');
+                            } else {
+                                // Swipe Left
+                                if (this.buttonPressActions['Left']) {
+                                    this.buttonPressActions['Left'].forEach(action => action());
+                                }
+                                this.triggerSwipe('LEFT');
+                            }
+                        }
+                    } else {
+                        // Vertical swipe
+                        if (Math.abs(deltaY) > threshold) {
+                            if (deltaY < 0) {
+                                // Swipe Up
+                                if (this.buttonPressActions['Up']) {
+                                    this.buttonPressActions['Up'].forEach(action => action());
+                                }
+                                if (this.buttonPressActions['A']) {
+                                    this.buttonPressActions['A'].forEach(action => action());
+                                }
+                                this.triggerSwipe('UP');
+                            } else {
+                                // Swipe Down
+                                if (this.buttonPressActions['Down']) {
+                                    this.buttonPressActions['Down'].forEach(action => action());
+                                }
+                                this.triggerSwipe('DOWN');
+                            }
+                        }
+                    }
+                };
+
+                this.canvas.addEventListener('touchstart', this._onTouchStart, { passive: true });
+                this.canvas.addEventListener('touchend', this._onTouchEnd, { passive: true });
             }
 
             initScene() {
@@ -3940,6 +4009,7 @@ workspace_data: "${base64WorkspaceData}"
 
                 this.globalEventBus = {};
                 this.onSceneStartObservable = new BABYLON.Observable();
+                this.swipeCallbacks = { 'LEFT': [], 'RIGHT': [], 'UP': [], 'DOWN': [] };
             }
 
             dispose() {
@@ -3951,6 +4021,11 @@ workspace_data: "${base64WorkspaceData}"
                 // Remove input listeners
                 window.removeEventListener('keydown', this._onKeyDown);
                 window.removeEventListener('keyup', this._onKeyUp);
+
+                if (this.canvas) {
+                    this.canvas.removeEventListener('touchstart', this._onTouchStart);
+                    this.canvas.removeEventListener('touchend', this._onTouchEnd);
+                }
 
                 // Remove auto-hide listeners
                 if (this._canvasContainer && this._resetTimer) {
@@ -3989,6 +4064,27 @@ workspace_data: "${base64WorkspaceData}"
             broadcastGlobalEvent(eventName) {
                 if (this.globalEventBus[eventName]) {
                     this.globalEventBus[eventName].notifyObservers();
+                }
+            }
+
+            // --- Swipe Events ---
+            onSwipe(direction, callback) {
+                const dir = direction.toUpperCase();
+                if (this.swipeCallbacks[dir]) {
+                    this.swipeCallbacks[dir].push(callback);
+                }
+            }
+
+            triggerSwipe(direction) {
+                const dir = direction.toUpperCase();
+                if (this.swipeCallbacks[dir]) {
+                    this.swipeCallbacks[dir].forEach(callback => {
+                        try {
+                            callback();
+                        } catch (e) {
+                            console.error(`Error running onSwipe callback for ${dir}:`, e);
+                        }
+                    });
                 }
             }
 
@@ -6807,6 +6903,33 @@ workspace_data: "${base64WorkspaceData}"
                 "style": "event_blocks",
                 "tooltip": "Executes the code when the specified object receives the local event.",
                 "helpUrl": ""
+            },
+            {
+                "type": "event_on_swipe",
+                "message0": "when screen is swiped %1 %2 do %3",
+                "args0": [
+                    {
+                        "type": "field_dropdown",
+                        "name": "DIRECTION",
+                        "options": [
+                            ["left", "LEFT"],
+                            ["right", "RIGHT"],
+                            ["up", "UP"],
+                            ["down", "DOWN"]
+                        ]
+                    },
+                    {
+                        "type": "input_dummy"
+                    },
+                    {
+                        "type": "input_statement",
+                        "name": "DO_CODE"
+                    }
+                ],
+                "nextStatement": null,
+                "style": "event_blocks",
+                "tooltip": "Executes code when the screen is swiped in the specified direction.",
+                "helpUrl": ""
             }
         ]);
 
@@ -6986,6 +7109,12 @@ workspace_data: "${base64WorkspaceData}"
                 const eventName = generator.valueToCode(block, 'EVENT_NAME', generator.ORDER_ATOMIC) || "''";
                 const doCode = generator.statementToCode(block, 'DO_CODE');
                 return `sceneManager.onObjectEvent(${objectName}, ${eventName}, async function() {\n${doCode}\n});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['event_on_swipe'] = function (block, generator) {
+                const direction = block.getFieldValue('DIRECTION');
+                const doCode = generator.statementToCode(block, 'DO_CODE');
+                return `sceneManager.onSwipe('${direction}', async function() {\n${doCode}\n});\n`;
             };
 
             javascript.javascriptGenerator.forBlock['event_on_click'] = function (block, generator) {
