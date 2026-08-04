@@ -8,7 +8,7 @@ const scopePath = params.get('scope');
 const title = scopeTitle || 'Engine';
 const desc = scopeDesc || 'An open-source, block-based 3D coding environment.';
 const icon = scopeIcon || '/assets/icons/gamepad-2.svg';
-const startUrl = scopePath ? (scopePath + '?mode=app') : '/?mode=app';
+const startUrl = scopePath ? (scopePath + '?mode=app&fullscreen=true') : '/?mode=app&fullscreen=true';
 
 const CACHE_NAME = 'engine-cache-v1';
 const criticalUrls = [
