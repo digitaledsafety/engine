@@ -20,13 +20,7 @@
     <script src="https://cdn.digitaleducationsafety.org/packages/@blockly/field-colour@6.0.6/index.js"></script>
     <script src="https://cdn.digitaleducationsafety.org/packages/cannon@0.6.2/cannon.min.js"></script>
     <script src="https://cdn.digitaleducationsafety.org/packages/nipplejs@0.10.2/nipplejs.js"></script>
-    <script src="https://cdn.babylonjs.com/proceduralTexturesLibrary/babylon.cloudProceduralTexture.min.js"></script>
-    <script src="https://cdn.babylonjs.com/proceduralTexturesLibrary/babylon.grassProceduralTexture.min.js"></script>
-    <script src="https://cdn.babylonjs.com/proceduralTexturesLibrary/babylon.woodProceduralTexture.min.js"></script>
-    <script src="https://cdn.babylonjs.com/proceduralTexturesLibrary/babylon.marbleProceduralTexture.min.js"></script>
-    <script src="https://cdn.babylonjs.com/proceduralTexturesLibrary/babylon.fireProceduralTexture.min.js"></script>
-    <script src="https://cdn.babylonjs.com/proceduralTexturesLibrary/babylon.roadProceduralTexture.min.js"></script>
-    <script src="https://cdn.babylonjs.com/proceduralTexturesLibrary/babylon.brickProceduralTexture.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/babylonjs-procedural-textures@8.36.1/babylonjs.proceduralTextures.min.js"></script>
 
     <style>
         /* Basic Reset */
@@ -2582,6 +2576,9 @@ workspace_data: "${base64WorkspaceData}"
             }
 
             setPopupImage(target, imageUrl) {
+                if (!isValidAssetURL(imageUrl)) {
+                    return;
+                }
                 const info = this._getPopupPanel(target);
                 if (info) {
                     const imageControl = info.panel.getChildByName(`${info.name}_image`);
@@ -4739,11 +4736,13 @@ workspace_data: "${base64WorkspaceData}"
 
                 // Add Image if provided
                 if (options.image) {
-                    const image = new BABYLON.GUI.Image(`${name}_image`, getProxiedUrl(options.image));
-                    image.width = "150px";
-                    image.height = "150px";
-                    image.paddingBottom = "20px";
-                    panel.addControl(image);
+                    if (isValidAssetURL(options.image)) {
+                        const image = new BABYLON.GUI.Image(`${name}_image`, getProxiedUrl(options.image));
+                        image.width = "150px";
+                        image.height = "150px";
+                        image.paddingBottom = "20px";
+                        panel.addControl(image);
+                    }
                 }
 
                 // Add Title
