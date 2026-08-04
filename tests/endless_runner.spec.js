@@ -6,7 +6,7 @@ test.describe('Endless Runner MVP & Swipe Verification', () => {
       console.log(`PAGE_CONSOLE: [${msg.type()}] ${msg.text()}`);
     });
     page.on('pageerror', err => {
-      console.error(`PAGE_ERROR: ${err.message}`);
+      console.error(`PAGE_ERROR: ${err.stack}`);
     });
 
     // 1. Navigate to the endless runner workspace page
