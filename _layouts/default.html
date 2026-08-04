@@ -8408,6 +8408,22 @@ function ${generator.FUNCTION_NAME_PLACEHOLDER_}(c1, c2, ratio) {
         touchJump.addEventListener('touchend', (e) => { e.preventDefault(); handleTouch(' ', false); }, { passive: false });
         touchJump.addEventListener('touchcancel', (e) => { e.preventDefault(); handleTouch(' ', false); }, { passive: false });
 
+        function decodeBase64Safe(str) {
+            if (!str) return '';
+            let cleaned = str.trim().replace(/\s/g, '');
+            cleaned = cleaned
+                .replace(/&amp;/g, '&')
+                .replace(/&lt;/g, '<')
+                .replace(/&gt;/g, '>')
+                .replace(/&quot;/g, '"')
+                .replace(/&#39;/g, "'")
+                .replace(/&#43;/g, '+')
+                .replace(/&#x2F;/g, '/')
+                .replace(/&#x3D;/g, '=')
+                .replace(/&apos;/g, "'");
+            return atob(cleaned);
+        }
+
         async function loadProjectFromUrl() {
             const urlParams = new URLSearchParams(window.location.search);
             const projectParam = urlParams.get('project');
@@ -8433,7 +8449,7 @@ function ${generator.FUNCTION_NAME_PLACEHOLDER_}(c1, c2, ratio) {
             try {
                 if (workspaceDataEl && workspaceDataEl.textContent.trim()) {
                     // Loading from a published Jekyll page
-                    const decodedData = atob(workspaceDataEl.textContent.trim());
+                    const decodedData = decodeBase64Safe(workspaceDataEl.textContent);
                     const projectData = JSON.parse(decodedData);
                     await projectManager.loadProjectData(projectData);
 
