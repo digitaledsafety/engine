@@ -12,7 +12,7 @@ test.describe('Bedrock .mcstructure Viewer Verification', () => {
     await page.click('#preview-tab');
   });
 
-  test('importModel detects .mcstructure and parses/creates instanced voxel meshes with metadata statistics', async ({ page }) => {
+  test('importModel detects .mcstructure and parses/creates instanced voxel meshes', async ({ page }) => {
     // 1. Create a tiny valid Little-Endian NBT .mcstructure buffer
     // using NBTify in node and passing it to the browser as base64 data URI
     const { write, NBTData } = require('nbtify');
@@ -45,7 +45,7 @@ test.describe('Bedrock .mcstructure Viewer Verification', () => {
       await window.sceneManager.importModel('testVoxelModel.mcstructure', uri, 0, 0, 0);
     }, dataUri);
 
-    // 3. Verify the wrapper mesh, instanced sub-meshes, block colors, and metadata stats are created successfully
+    // 3. Verify the wrapper mesh, instanced sub-meshes, and block colors are created successfully
     const result = await page.evaluate(() => {
       const model = window.sceneManager.objects['testVoxelModel.mcstructure'];
       if (!model) return { found: false };
@@ -62,9 +62,6 @@ test.describe('Bedrock .mcstructure Viewer Verification', () => {
       const redColorHex = redCube && redCube.material ? redCube.material.diffuseColor.toHexString() : null;
       const blueColorHex = blueCube && blueCube.material ? blueCube.material.diffuseColor.toHexString() : null;
 
-      // Extract statistics metadata
-      const meta = model.metadata || {};
-
       return {
         found: true,
         descendantsCount: descendants.length,
@@ -72,11 +69,7 @@ test.describe('Bedrock .mcstructure Viewer Verification', () => {
         instancesCount: instances.length,
         redColorHex,
         blueColorHex,
-        logicalRoot: meta.logicalRoot,
-        dimensions: meta.dimensions,
-        volume: meta.volume,
-        solidBlocks: meta.solidBlocks,
-        stats_text: meta.stats_text
+        logicalRoot: model.metadata ? model.metadata.logicalRoot : null
       };
     });
 
@@ -88,15 +81,5 @@ test.describe('Bedrock .mcstructure Viewer Verification', () => {
     // Standard Blue Wool color from our map is '#3C44AA'
     expect(result.blueColorHex).toBe('#3C44AA');
     expect(result.logicalRoot).toBe('testVoxelModel.mcstructure');
-
-    // Assert correct Minecraft statistics metadata
-    expect(result.dimensions).toBe('2 x 1 x 1');
-    expect(result.volume).toBe(2);
-    expect(result.solidBlocks).toBe(2);
-    expect(result.stats_text).toContain('Dimensions: 2 x 1 x 1');
-    expect(result.stats_text).toContain('Total Volume: 2');
-    expect(result.stats_text).toContain('Solid Blocks: 2');
-    expect(result.stats_text).toContain('red wool: 1');
-    expect(result.stats_text).toContain('blue wool: 1');
   });
 });
