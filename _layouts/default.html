@@ -3122,6 +3122,10 @@ workspace_data: "${base64WorkspaceData}"
                     const baseMeshMap = new Map();
                     const importedRoots = [];
 
+                    // Collect structure statistics
+                    const blockDistribution = {};
+                    let solidBlockCount = 0;
+
                     let idx = 0;
                     for (let x = 0; x < sizeX; x++) {
                       for (let y = 0; y < sizeY; y++) {
@@ -3130,6 +3134,9 @@ workspace_data: "${base64WorkspaceData}"
                           if (paletteIdx !== -1 && palette[paletteIdx]) {
                             const blockName = palette[paletteIdx].name;
                             if (blockName === "minecraft:air" || blockName === "minecraft:structure_void") continue;
+
+                            solidBlockCount++;
+                            blockDistribution[blockName] = (blockDistribution[blockName] || 0) + 1;
 
                             if (!baseMeshMap.has(blockName)) {
                               const baseMesh = BABYLON.MeshBuilder.CreateBox(`baseCube_${blockName}`, { size: 1 }, this.scene);
@@ -3159,6 +3166,23 @@ workspace_data: "${base64WorkspaceData}"
                     this._cleanupExisting(name);
                     this.objects[name] = wrapper;
                     this._tagMesh(wrapper, name);
+
+                    // Attach the statistics metadata to the wrapper mesh
+                    const volume = sizeX * sizeY * sizeZ;
+                    const statsText = `Dimensions: ${sizeX} x ${sizeY} x ${sizeZ}\n` +
+                                      `Total Volume: ${volume.toLocaleString()}\n` +
+                                      `Solid Blocks: ${solidBlockCount.toLocaleString()}\n\n` +
+                                      `Block Distribution:\n` +
+                                      Object.entries(blockDistribution)
+                                            .sort((a, b) => b[1] - a[1])
+                                            .map(([k, v]) => ` - ${k.replace('minecraft:', '').replace(/_/g, ' ')}: ${v.toLocaleString()}`)
+                                            .join('\n');
+
+                    wrapper.metadata = wrapper.metadata || {};
+                    wrapper.metadata.dimensions = `${sizeX} x ${sizeY} x ${sizeZ}`;
+                    wrapper.metadata.volume = volume;
+                    wrapper.metadata.solidBlocks = solidBlockCount;
+                    wrapper.metadata.stats_text = statsText;
 
                     console.log(`Parsed and loaded Bedrock .mcstructure model: ${name}`);
                     return wrapper;
