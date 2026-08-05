@@ -704,7 +704,7 @@
         function isValidAssetURL(url) {
             if (typeof url !== 'string') return false;
             const normalized = url.trim().toLowerCase();
-            if (normalized.startsWith('https://') || normalized.startsWith('blob:') || normalized.startsWith('data:')) {
+            if (normalized.startsWith('https://') || normalized.startsWith('blob:') || normalized.startsWith('data:') || normalized.startsWith('/') || normalized.startsWith('./') || normalized.startsWith('assets/')) {
                 return true;
             }
             console.error('Invalid URL:', url, 'Only HTTPS or blob URLs are allowed for assets.');
@@ -714,6 +714,7 @@
         function getProxiedUrl(url) {
             if (!url || typeof url !== 'string') return url;
             if (url.startsWith('blob:') || url.startsWith('data:')) return url;
+            if (url.startsWith('/') || url.startsWith('./') || url.startsWith('assets/')) return url;
             if (url.startsWith('https://proxy.functions.io/?url=')) return url;
             return `https://proxy.functions.io/?url=${encodeURIComponent(url)}`;
         }
@@ -2902,6 +2903,17 @@ workspace_data: "${base64WorkspaceData}"
                 if (!isValidAssetURL(url)) {
                     return null;
                 }
+                const isMcStructure = (url && url.toLowerCase().includes('.mcstructure')) || (name && name.toLowerCase().endsWith('.mcstructure'));
+                if (isMcStructure) {
+                    try {
+                        const response = await fetch(getProxiedUrl(url));
+                        const buffer = await response.arrayBuffer();
+                        return await this.importMcStructureFromBuffer(name, buffer, x, y, z);
+                    } catch (error) {
+                        console.error(`Failed to load .mcstructure from URL: ${url}`, error);
+                        return null;
+                    }
+                }
                 try {
                     // Load model using SceneLoader
                     const result = await BABYLON.SceneLoader.ImportMeshAsync(null, '', getProxiedUrl(url), this.scene);
@@ -2940,6 +2952,244 @@ workspace_data: "${base64WorkspaceData}"
                     console.error(`Failed to load model from URL: ${url}`, error);
                 }
                 return null;
+            }
+
+            async importMcStructureFromBuffer(name, buffer, x = 0, y = 0, z = 0) {
+                try {
+                    // Dynamically import NBTify
+                    const NBT = await import('https://cdn.jsdelivr.net/npm/nbtify@2.2.0/+esm');
+                    const nbtData = await NBT.read(new Uint8Array(buffer), { endianness: "little" });
+                    const nbt = nbtData.data;
+
+                    // Extract dimensions and structure block lists
+                    const [sizeX, sizeY, sizeZ] = nbt.size.map(v => Number(v));
+                    const blockIndices = nbt.structure.block_indices[0]; // Primary block layer
+                    const palette = nbt.structure.palette.default.block_palette;
+
+                    // Create wrapper
+                    const wrapper = new BABYLON.Mesh(name, this.scene);
+                    wrapper.position.set(0, 0, 0);
+
+                    // Standard color map
+                    const MINECRAFT_COLORS = {
+                      "white": "#f0f0f0",
+                      "orange": "#f9801d",
+                      "magenta": "#c900c9",
+                      "light_blue": "#6699d8",
+                      "yellow": "#fed83d",
+                      "lime": "#80c71f",
+                      "pink": "#f38caa",
+                      "gray": "#474f52",
+                      "light_gray": "#9d9d97",
+                      "cyan": "#169c9c",
+                      "purple": "#8932b8",
+                      "blue": "#3c44aa",
+                      "brown": "#835432",
+                      "green": "#5e7c16",
+                      "red": "#b02e26",
+                      "black": "#1d1d21",
+                      "pale_oak": "#bfa27a",
+                      "cherry": "#e5b3b3",
+                      "acacia": "#ba6337",
+                      "oak": "#a88854",
+                      "spruce": "#6b5131",
+                      "birch": "#d7c59a",
+                      "jungle": "#a37653",
+                      "dark_oak": "#46321a",
+                      "mangrove": "#74302c",
+                      "bamboo": "#abb046",
+                      "crimson": "#842746",
+                      "warped": "#2d7f80"
+                    };
+
+                    const getBlockColor = (blockName, states = {}) => {
+                      let hexColor = null;
+                      if (states) {
+                        let colorState = states.color || states.stone_color;
+                        if (colorState) {
+                          let val = "";
+                          if (typeof colorState === 'string') {
+                            val = colorState;
+                          } else if (colorState.value) {
+                            val = colorState.value;
+                          }
+                          if (val && MINECRAFT_COLORS[val.toLowerCase()]) {
+                            hexColor = MINECRAFT_COLORS[val.toLowerCase()];
+                          }
+                        }
+                      }
+                      if (!hexColor) {
+                        const lowerName = blockName.toLowerCase();
+                        for (const [colorName, hex] of Object.entries(MINECRAFT_COLORS)) {
+                          if (lowerName.includes(`${colorName}_`) || lowerName.endsWith(`_${colorName}`) || lowerName.includes(`:${colorName}`)) {
+                            hexColor = hex;
+                            break;
+                          }
+                        }
+                      }
+                      if (hexColor) {
+                        return BABYLON.Color3.FromHexString(hexColor);
+                      }
+                      const lowerName = blockName.toLowerCase();
+                      if (lowerName.includes("glass")) {
+                        if (lowerName.includes("stained")) {
+                          for (const [colorName, hex] of Object.entries(MINECRAFT_COLORS)) {
+                            if (lowerName.includes(colorName)) {
+                              return BABYLON.Color3.FromHexString(hex);
+                            }
+                          }
+                        }
+                        return BABYLON.Color3.FromHexString("#e0f7fa");
+                      }
+                      if (lowerName.includes("water")) return BABYLON.Color3.FromHexString("#295c9a");
+                      if (lowerName.includes("ice")) return BABYLON.Color3.FromHexString("#a5d6a7");
+                      if (lowerName.includes("grass")) return BABYLON.Color3.FromHexString("#5c8e32");
+                      if (lowerName.includes("dirt") || lowerName.includes("podzol") || lowerName.includes("coarse_dirt")) return BABYLON.Color3.FromHexString("#866043");
+                      if (lowerName.includes("mycelium")) return BABYLON.Color3.FromHexString("#6a5a65");
+                      if (lowerName.includes("sand")) {
+                        if (lowerName.includes("red")) return BABYLON.Color3.FromHexString("#b35029");
+                        return BABYLON.Color3.FromHexString("#dbcd99");
+                      }
+                      if (lowerName.includes("gravel")) return BABYLON.Color3.FromHexString("#858181");
+                      if (lowerName.includes("clay")) return BABYLON.Color3.FromHexString("#a3a7b2");
+                      if (lowerName.includes("cobblestone")) return BABYLON.Color3.FromHexString("#6d6d6d");
+                      if (lowerName.includes("mossy_cobblestone") || lowerName.includes("mossy_stone")) return BABYLON.Color3.FromHexString("#57614d");
+                      if (lowerName.includes("stone")) {
+                        if (lowerName.includes("andesite")) return BABYLON.Color3.FromHexString("#8a8a8a");
+                        if (lowerName.includes("diorite")) return BABYLON.Color3.FromHexString("#bcbcbc");
+                        if (lowerName.includes("granite")) return BABYLON.Color3.FromHexString("#9c7161");
+                        if (lowerName.includes("end_stone")) return BABYLON.Color3.FromHexString("#deecae");
+                        if (lowerName.includes("red_sandstone")) return BABYLON.Color3.FromHexString("#b35029");
+                        if (lowerName.includes("sandstone")) return BABYLON.Color3.FromHexString("#d3c39a");
+                        return BABYLON.Color3.FromHexString("#737373");
+                      }
+                      if (lowerName.includes("deepslate")) return BABYLON.Color3.FromHexString("#444446");
+                      if (lowerName.includes("tuff")) return BABYLON.Color3.FromHexString("#64655f");
+                      if (lowerName.includes("calcite")) return BABYLON.Color3.FromHexString("#e1e2dd");
+                      if (lowerName.includes("obsidian")) return BABYLON.Color3.FromHexString("#19132b");
+                      if (lowerName.includes("crying_obsidian")) return BABYLON.Color3.FromHexString("#30174e");
+                      if (lowerName.includes("bedrock")) return BABYLON.Color3.FromHexString("#2e2e2e");
+                      if (lowerName.includes("wood") || lowerName.includes("log") || lowerName.includes("plank") || lowerName.includes("fence") || lowerName.includes("gate") || lowerName.includes("door") || lowerName.includes("slab") || lowerName.includes("stairs") || lowerName.includes("sign")) {
+                        for (const [woodType, hex] of Object.entries(MINECRAFT_COLORS)) {
+                          if (lowerName.includes(woodType)) {
+                            return BABYLON.Color3.FromHexString(hex);
+                          }
+                        }
+                        return BABYLON.Color3.FromHexString("#9c6e3b");
+                      }
+                      if (lowerName.includes("leaves")) return BABYLON.Color3.FromHexString("#2e6617");
+                      if (lowerName.includes("shrub") || lowerName.includes("sapling") || lowerName.includes("bush") || lowerName.includes("fern") || lowerName.includes("vine") || lowerName.includes("crop")) return BABYLON.Color3.FromHexString("#327821");
+                      if (lowerName.includes("hay")) return BABYLON.Color3.FromHexString("#a88a2a");
+                      if (lowerName.includes("netherrack")) return BABYLON.Color3.FromHexString("#6d2626");
+                      if (lowerName.includes("soul_sand") || lowerName.includes("soul_soil")) return BABYLON.Color3.FromHexString("#4d3a2f");
+                      if (lowerName.includes("glowstone")) return BABYLON.Color3.FromHexString("#b38b4d");
+                      if (lowerName.includes("basalt")) return BABYLON.Color3.FromHexString("#4d4d54");
+                      if (lowerName.includes("blackstone")) return BABYLON.Color3.FromHexString("#252229");
+                      if (lowerName.includes("quartz")) return BABYLON.Color3.FromHexString("#e8e3d9");
+                      if (lowerName.includes("purpur")) return BABYLON.Color3.FromHexString("#aa7da8");
+                      if (lowerName.includes("nether_brick")) return BABYLON.Color3.FromHexString("#2b1116");
+                      if (lowerName.includes("brick")) return BABYLON.Color3.FromHexString("#964335");
+                      if (lowerName.includes("copper")) return BABYLON.Color3.FromHexString("#c36b4d");
+                      if (lowerName.includes("iron")) return BABYLON.Color3.FromHexString("#d1c3b7");
+                      if (lowerName.includes("gold")) return BABYLON.Color3.FromHexString("#fce251");
+                      if (lowerName.includes("diamond")) return BABYLON.Color3.FromHexString("#64dbdb");
+                      if (lowerName.includes("emerald")) return BABYLON.Color3.FromHexString("#25ce68");
+                      if (lowerName.includes("lapis")) return BABYLON.Color3.FromHexString("#1b44b8");
+                      if (lowerName.includes("coal")) return BABYLON.Color3.FromHexString("#2a2a2a");
+                      if (lowerName.includes("redstone")) return BABYLON.Color3.FromHexString("#ce1717");
+                      if (lowerName.includes("bookshelf")) return BABYLON.Color3.FromHexString("#8e6a47");
+                      if (lowerName.includes("wool")) return BABYLON.Color3.FromHexString("#dedede");
+                      if (lowerName.includes("concrete")) return BABYLON.Color3.FromHexString("#cfcfcf");
+                      if (lowerName.includes("terracotta") || lowerName.includes("hardened_clay")) return BABYLON.Color3.FromHexString("#9c5a3c");
+                      return BABYLON.Color3.FromHexString("#aaaaaa");
+                    };
+
+                    const configureBlockMaterial = (material, blockName) => {
+                      const lowerName = blockName.toLowerCase();
+                      if (lowerName.includes("glass")) {
+                        material.alpha = 0.45;
+                        material.backFaceCulling = false;
+                      } else if (lowerName.includes("water")) {
+                        material.alpha = 0.65;
+                        material.backFaceCulling = false;
+                      } else if (lowerName.includes("ice")) {
+                        material.alpha = 0.8;
+                        material.backFaceCulling = false;
+                      }
+                    };
+
+                    // Cache base meshes per block state
+                    const baseMeshMap = new Map();
+                    const importedRoots = [];
+
+                    // Collect structure statistics
+                    const blockDistribution = {};
+                    let solidBlockCount = 0;
+
+                    let idx = 0;
+                    for (let x = 0; x < sizeX; x++) {
+                      for (let y = 0; y < sizeY; y++) {
+                        for (let z = 0; z < sizeZ; z++) {
+                          const paletteIdx = Number(blockIndices[idx++]);
+                          if (paletteIdx !== -1 && palette[paletteIdx]) {
+                            const blockName = palette[paletteIdx].name;
+                            if (blockName === "minecraft:air" || blockName === "minecraft:structure_void") continue;
+
+                            solidBlockCount++;
+                            blockDistribution[blockName] = (blockDistribution[blockName] || 0) + 1;
+
+                            if (!baseMeshMap.has(blockName)) {
+                              const baseMesh = BABYLON.MeshBuilder.CreateBox(`baseCube_${blockName}`, { size: 1 }, this.scene);
+                              baseMesh.isVisible = false;
+                              baseMesh.parent = wrapper;
+                              importedRoots.push(baseMesh);
+
+                              const mat = new BABYLON.StandardMaterial(`mat_${blockName}`, this.scene);
+                              mat.diffuseColor = getBlockColor(blockName, palette[paletteIdx].states);
+                              configureBlockMaterial(mat, blockName);
+                              baseMesh.material = mat;
+                              baseMeshMap.set(blockName, baseMesh);
+                            }
+
+                            const baseMesh = baseMeshMap.get(blockName);
+                            const instance = baseMesh.createInstance(`block_${x}_${y}_${z}`);
+                            instance.position = new BABYLON.Vector3(x, y, z);
+                            instance.parent = wrapper;
+                          }
+                        }
+                      }
+                    }
+
+                    this._normalizeAndCenter(wrapper, importedRoots);
+                    wrapper.position.set(x, y, z);
+
+                    this._cleanupExisting(name);
+                    this.objects[name] = wrapper;
+                    this._tagMesh(wrapper, name);
+
+                    // Attach the statistics metadata to the wrapper mesh
+                    const volume = sizeX * sizeY * sizeZ;
+                    const statsText = `Dimensions: ${sizeX} x ${sizeY} x ${sizeZ}\n` +
+                                      `Total Volume: ${volume.toLocaleString()}\n` +
+                                      `Solid Blocks: ${solidBlockCount.toLocaleString()}\n\n` +
+                                      `Block Distribution:\n` +
+                                      Object.entries(blockDistribution)
+                                            .sort((a, b) => b[1] - a[1])
+                                            .map(([k, v]) => ` - ${k.replace('minecraft:', '').replace(/_/g, ' ')}: ${v.toLocaleString()}`)
+                                            .join('\n');
+
+                    wrapper.metadata = wrapper.metadata || {};
+                    wrapper.metadata.dimensions = `${sizeX} x ${sizeY} x ${sizeZ}`;
+                    wrapper.metadata.volume = volume;
+                    wrapper.metadata.solidBlocks = solidBlockCount;
+                    wrapper.metadata.stats_text = statsText;
+
+                    console.log(`Parsed and loaded Bedrock .mcstructure model: ${name}`);
+                    return wrapper;
+                } catch (error) {
+                    console.error("Failed to parse and render Bedrock structure:", error);
+                    return null;
+                }
             }
 
             async importRobloxAvatar(name, userId, x = 0, y = 0, z = 0) {
