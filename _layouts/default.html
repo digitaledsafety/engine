@@ -532,42 +532,15 @@
         // --- Dynamic PWA Manifest Logic ---
         function updateManifest() {
             const isWorkspace = window.location.pathname.includes('/workspaces/');
-            if (!isWorkspace) return;
-
-            // Extract project details from the page
-            const projectName = "{{ page.title | default: 'Engine' }}";
-            const projectDescription = "{{ page.description | default: 'An interactive 3D project.' }}";
-            const projectIcon = "{{ page.icon | default: '/assets/icons/gamepad-2.svg' }}";
-
-            const manifest = {
-                "name": projectName,
-                "short_name": projectName,
-                "description": projectDescription,
-                "start_url": window.location.pathname + "?mode=app",
-                "display": "fullscreen",
-                "background_color": "#ffffff",
-                "theme_color": "#007bff",
-                "icons": [
-                    {
-                        "src": projectIcon,
-                        "sizes": "any",
-                        "type": projectIcon.endsWith('.svg') ? "image/svg+xml" : "image/png"
-                    }
-                ]
-            };
-
-            // Add standard icons if using default or if we want fallbacks
-            if (projectIcon === "/assets/icons/gamepad-2.svg") {
-                manifest.icons.push(
-                    { "src": "/assets/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
-                    { "src": "/assets/icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
-                );
+            const manifestLink = document.querySelector('#manifest-link');
+            if (manifestLink) {
+                if (isWorkspace) {
+                    // Use relative manifest.json so the scoped SW intercepts it
+                    manifestLink.setAttribute('href', 'manifest.json');
+                } else {
+                    manifestLink.setAttribute('href', '{{ site.baseurl }}/manifest.json');
+                }
             }
-
-            const stringManifest = JSON.stringify(manifest);
-            const blob = new Blob([stringManifest], {type: 'application/json'});
-            const manifestUrl = URL.createObjectURL(blob);
-            document.querySelector('#manifest-link').setAttribute('href', manifestUrl);
         }
 
         // Initialize manifest immediately
@@ -575,7 +548,37 @@
 
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('{{ site.baseurl }}/sw.js').then(registration => {
+                const isWorkspace = window.location.pathname.includes('/workspaces/');
+                let swUrl = '{{ site.baseurl }}/sw.js';
+                let registerOptions = {};
+
+                if (isWorkspace) {
+                    // Extract project details from Jekyll template page variables
+                    const projectName = "{{ page.title | default: 'Engine' }}";
+                    const projectDescription = "{{ page.description | default: 'An interactive 3D project.' }}";
+                    const projectIcon = "{{ page.icon | default: '/assets/icons/gamepad-2.svg' }}";
+
+                    const pathParts = window.location.pathname.split('/');
+                    const workspaceIndex = pathParts.indexOf('workspaces');
+                    let scope = '{{ site.baseurl }}/';
+                    if (workspaceIndex !== -1 && pathParts.length > workspaceIndex + 1) {
+                        scope = pathParts.slice(0, workspaceIndex + 2).join('/') + '/';
+                    }
+
+                    const params = new URLSearchParams();
+                    params.set('title', projectName);
+                    params.set('desc', projectDescription);
+                    params.set('icon', projectIcon);
+                    params.set('scope', scope);
+
+                    swUrl += '?' + params.toString();
+                    registerOptions.scope = scope;
+                } else {
+                    registerOptions.scope = '{{ site.baseurl }}/';
+                }
+
+                console.log('REGISTERING SW:', swUrl, 'WITH SCOPE:', registerOptions.scope);
+                navigator.serviceWorker.register(swUrl, registerOptions).then(registration => {
                     console.log('ServiceWorker registration successful with scope: ', registration.scope);
                 }, err => {
                     console.log('ServiceWorker registration failed: ', err);
@@ -8405,6 +8408,22 @@ function ${generator.FUNCTION_NAME_PLACEHOLDER_}(c1, c2, ratio) {
         touchJump.addEventListener('touchend', (e) => { e.preventDefault(); handleTouch(' ', false); }, { passive: false });
         touchJump.addEventListener('touchcancel', (e) => { e.preventDefault(); handleTouch(' ', false); }, { passive: false });
 
+        function decodeBase64Safe(str) {
+            if (!str) return '';
+            let cleaned = str.trim().replace(/\s/g, '');
+            cleaned = cleaned
+                .replace(/&amp;/g, '&')
+                .replace(/&lt;/g, '<')
+                .replace(/&gt;/g, '>')
+                .replace(/&quot;/g, '"')
+                .replace(/&#39;/g, "'")
+                .replace(/&#43;/g, '+')
+                .replace(/&#x2F;/g, '/')
+                .replace(/&#x3D;/g, '=')
+                .replace(/&apos;/g, "'");
+            return atob(cleaned);
+        }
+
         async function loadProjectFromUrl() {
             const urlParams = new URLSearchParams(window.location.search);
             const projectParam = urlParams.get('project');
@@ -8430,7 +8449,7 @@ function ${generator.FUNCTION_NAME_PLACEHOLDER_}(c1, c2, ratio) {
             try {
                 if (workspaceDataEl && workspaceDataEl.textContent.trim()) {
                     // Loading from a published Jekyll page
-                    const decodedData = atob(workspaceDataEl.textContent.trim());
+                    const decodedData = decodeBase64Safe(workspaceDataEl.textContent);
                     const projectData = JSON.parse(decodedData);
                     await projectManager.loadProjectData(projectData);
 

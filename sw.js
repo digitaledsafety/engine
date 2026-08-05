@@ -1,8 +1,19 @@
+const swUrl = new URL(self.location.href);
+const params = swUrl.searchParams;
+const scopeTitle = params.get('title');
+const scopeDesc = params.get('desc');
+const scopeIcon = params.get('icon');
+const scopePath = params.get('scope');
+
+const title = scopeTitle || 'Engine';
+const desc = scopeDesc || 'An open-source, block-based 3D coding environment.';
+const icon = scopeIcon || '/assets/icons/gamepad-2.svg';
+const startUrl = scopePath ? (scopePath + '?mode=app&fullscreen=true') : '/?mode=app&fullscreen=true';
+
 const CACHE_NAME = 'engine-cache-v1';
 const criticalUrls = [
   '/',
   '/manifest.json',
-  '/favicon.ico',
   '/assets/icons/gamepad-2.svg'
 ];
 
@@ -22,6 +33,7 @@ const externalUrls = [
 ];
 
 self.addEventListener('install', event => {
+  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(async cache => {
@@ -38,8 +50,47 @@ self.addEventListener('install', event => {
   );
 });
 
+self.addEventListener('activate', event => {
+  event.waitUntil(self.clients.claim());
+});
+
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
+
+  // Intercept manifest.json requests under the scope
+  if (url.pathname.endsWith('manifest.json')) {
+    const manifest = {
+      "name": title,
+      "short_name": title,
+      "description": desc,
+      "start_url": startUrl,
+      "display": "fullscreen",
+      "background_color": "#ffffff",
+      "theme_color": "#007bff",
+      "icons": [
+        {
+          "src": icon,
+          "sizes": "any",
+          "type": icon.endsWith('.svg') ? "image/svg+xml" : "image/png"
+        }
+      ]
+    };
+
+    // Add standard icons if using default or if we want fallbacks
+    if (icon === "/assets/icons/gamepad-2.svg") {
+      manifest.icons.push(
+        { "src": "/assets/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+        { "src": "/assets/icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+      );
+    }
+
+    event.respondWith(
+      new Response(JSON.stringify(manifest), {
+        headers: { 'Content-Type': 'application/json' }
+      })
+    );
+    return;
+  }
 
   // Strategy for HTML pages (including workspaces)
   if (event.request.mode === 'navigate') {
