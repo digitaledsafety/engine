@@ -2565,6 +2565,21 @@ workspace_data: "${base64WorkspaceData}"
                 return null;
             }
 
+            async setTexture(target, assetName, assetManager) {
+                const mesh = this._getMesh(target);
+                if (mesh) {
+                    const asset = await assetManager.getAsset(assetName);
+                    if (asset && asset.data instanceof Blob) {
+                        const objectUrl = URL.createObjectURL(asset.data);
+                        const texture = new BABYLON.Texture(objectUrl, this.scene);
+                        if (!mesh.material) {
+                            mesh.material = new BABYLON.StandardMaterial(mesh.name + "_material", this.scene);
+                        }
+                        mesh.material.diffuseTexture = texture;
+                    }
+                }
+            }
+
             setPopupTitle(target, title) {
                 const info = this._getPopupPanel(target);
                 if (info) {
@@ -3777,6 +3792,15 @@ workspace_data: "${base64WorkspaceData}"
                 if (asset && asset.data instanceof ArrayBuffer) {
                     this.playSound(URL.createObjectURL(new Blob([asset.data])));
                 }
+            }
+
+            async importModelAsset(name, assetManager) {
+                let asset = await assetManager.getAsset(name);
+                if (asset && asset.data instanceof Blob) {
+                    const objectUrl = URL.createObjectURL(asset.data);
+                    return await this.importModel(name, objectUrl);
+                }
+                return null;
             }
 
             playNote(frequency, duration) {
@@ -7628,7 +7652,7 @@ if (${name}) {
             javascript.javascriptGenerator.forBlock['set_texture_from_asset'] = function (block, generator) {
                 const object = generator.valueToCode(block, 'OBJECT', generator.ORDER_ATOMIC) || 'null';
                 const assetName = generator.valueToCode(block, 'ASSET', generator.ORDER_ATOMIC) || 'null';
-                return `sceneManager.setTexture(${object}, ${assetName}, assetManager);\n`;
+                return `await sceneManager.setTexture(${object}, ${assetName}, assetManager);\n`;
             };
 
             // --- GUI Block Generators ---
