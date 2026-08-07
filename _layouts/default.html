@@ -1742,6 +1742,10 @@ workspace_data: "${base64WorkspaceData}"
                         },
                         {
                             kind: 'block',
+                            type: 'frame_camera_on_mesh',
+                        },
+                        {
+                            kind: 'block',
                             type: 'camera_follow',
                         },
                         {
@@ -3655,6 +3659,40 @@ workspace_data: "${base64WorkspaceData}"
             cameraZoom(value) {
                 if (this.scene.activeCamera && typeof this.scene.activeCamera.radius === 'number') {
                     this.scene.activeCamera.radius = Math.max(1, this.scene.activeCamera.radius - value);
+                }
+            }
+
+            frameCameraOnMesh(target) {
+                let camera = this.scene.activeCamera;
+                if (!camera) return;
+
+                if (camera instanceof BABYLON.UniversalCamera) {
+                    camera.dispose();
+                    camera = new BABYLON.ArcRotateCamera('Camera', Math.PI / 2, Math.PI / 4, 10, BABYLON.Vector3.Zero(), this.scene);
+                    camera.attachControl(this.canvas, true);
+                    this.scene.activeCamera = camera;
+                }
+
+                if (camera instanceof BABYLON.ArcRotateCamera) {
+                    camera.mode = BABYLON.Camera.PERSPECTIVE_CAMERA;
+                    camera.attachControl(this.canvas, true);
+                }
+
+                const mesh = this._getMesh(target);
+                if (mesh && camera instanceof BABYLON.ArcRotateCamera) {
+                    camera.lockedTarget = null;
+
+                    const boundingInfo = mesh.getHierarchyBoundingVectors ? mesh.getHierarchyBoundingVectors(true) : mesh.getBoundingInfo().boundingBox;
+                    const min = boundingInfo.min;
+                    const max = boundingInfo.max;
+                    const center = min.add(max).scale(0.5);
+                    const size = max.subtract(min);
+                    const maxDimension = Math.max(size.x, size.y, size.z);
+
+                    camera.setTarget(center);
+                    const fov = camera.fov || 0.8;
+                    const distance = (maxDimension / 2) / Math.sin(fov / 2);
+                    camera.radius = distance * 1.5;
                 }
             }
 
@@ -6480,6 +6518,21 @@ workspace_data: "${base64WorkspaceData}"
                 "helpUrl": ""
             },
             {
+                "type": "frame_camera_on_mesh",
+                "message0": "frame camera on mesh %1",
+                "args0": [
+                    {
+                        "type": "input_value",
+                        "name": "OBJECT"
+                    }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": "#A55B80",
+                "tooltip": "Centers and fits the camera to show the entire mesh.",
+                "helpUrl": ""
+            },
+            {
                 "type": "camera_zoom",
                 "message0": "zoom camera by %1",
                 "args0": [
@@ -7436,6 +7489,11 @@ if (${name}) {
             javascript.javascriptGenerator.forBlock['camera_follow'] = function (block, generator) {
                 const objectName = generator.valueToCode(block, 'OBJECT', generator.ORDER_ATOMIC) || 'null';
                 return `sceneManager.cameraFollow(${objectName});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['frame_camera_on_mesh'] = function (block, generator) {
+                const objectName = generator.valueToCode(block, 'OBJECT', generator.ORDER_ATOMIC) || 'null';
+                return `sceneManager.frameCameraOnMesh(${objectName});\n`;
             };
 
             javascript.javascriptGenerator.forBlock['camera_zoom'] = function (block, generator) {
