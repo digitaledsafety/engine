@@ -686,7 +686,7 @@
                 loadingDiv.style.justifyContent = "center";
                 loadingDiv.style.alignItems = "center";
                 loadingDiv.style.zIndex = "1001"; 
-                loadingDiv.innerHTML = this.loadingUIText;
+                loadingDiv.textContent = this.loadingUIText;
                 canvasContainer.appendChild(loadingDiv);
                 this._loadingDiv = loadingDiv;
             } else {
@@ -704,6 +704,10 @@
         function isValidAssetURL(url) {
             if (typeof url !== 'string') return false;
             const normalized = url.trim().toLowerCase();
+            if (normalized.startsWith('//')) {
+                console.error('Invalid URL:', url, 'Protocol-relative URLs are not allowed.');
+                return false;
+            }
             if (normalized.startsWith('https://') || normalized.startsWith('blob:') || normalized.startsWith('data:') || normalized.startsWith('/') || normalized.startsWith('./') || normalized.startsWith('assets/')) {
                 return true;
             }
