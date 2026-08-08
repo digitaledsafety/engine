@@ -12,6 +12,7 @@ test.describe('Engine Popup Security Validation', () => {
 
         const securePopupVar = workspace.createVariable('securePopup');
         const insecurePopupVar = workspace.createVariable('insecurePopup');
+        const protocolRelativePopupVar = workspace.createVariable('protocolRelativePopup');
 
         // Case 1: Create a popup with an INSECURE image URL
         const createInsecureBlock = workspace.newBlock('create_popup');
@@ -27,6 +28,21 @@ test.describe('Engine Popup Security Validation', () => {
         setInsecureVarBlock.setFieldValue(insecurePopupVar.getId(), 'VAR');
         setInsecureVarBlock.getInput('VALUE').connection.connect(createInsecureBlock.outputConnection);
 
+        // Case 1b: Create a popup with a PROTOCOL-RELATIVE image URL
+        const createProtoBlock = workspace.newBlock('create_popup');
+        const protoTitleText = workspace.newBlock('text');
+        protoTitleText.setFieldValue('Proto-relative Popup', 'TEXT');
+        createProtoBlock.getInput('TITLE').connection.connect(protoTitleText.outputConnection);
+
+        const protoUrlText = workspace.newBlock('text');
+        protoUrlText.setFieldValue('//tracking-pixel.com/image.png', 'TEXT');
+        createProtoBlock.getInput('IMAGE').connection.connect(protoUrlText.outputConnection);
+
+        const setProtoVarBlock = workspace.newBlock('variables_set');
+        setProtoVarBlock.setFieldValue(protocolRelativePopupVar.getId(), 'VAR');
+        setProtoVarBlock.getInput('VALUE').connection.connect(createProtoBlock.outputConnection);
+        setInsecureVarBlock.nextConnection.connect(setProtoVarBlock.previousConnection);
+
         // Case 2: Create a popup with a SECURE image URL
         const createSecureBlock = workspace.newBlock('create_popup');
         const secureTitleText = workspace.newBlock('text');
@@ -40,7 +56,7 @@ test.describe('Engine Popup Security Validation', () => {
         const setSecureVarBlock = workspace.newBlock('variables_set');
         setSecureVarBlock.setFieldValue(securePopupVar.getId(), 'VAR');
         setSecureVarBlock.getInput('VALUE').connection.connect(createSecureBlock.outputConnection);
-        setInsecureVarBlock.nextConnection.connect(setSecureVarBlock.previousConnection);
+        setProtoVarBlock.nextConnection.connect(setSecureVarBlock.previousConnection);
 
         // Case 3: Update secure popup with an INSECURE url dynamically
         const setPopupImageBlock = workspace.newBlock('gui_set_popup_image');
@@ -73,6 +89,11 @@ test.describe('Engine Popup Security Validation', () => {
         const insecurePanel = insecurePopup.children[0];
         const hasInsecureImage = insecurePanel.children.some(c => c.name === 'insecurePopup_image');
 
+        // Verify Protocol-relative Popup (should NOT have any image child because URL was rejected)
+        const protoPopup = window.sceneManager.uiManager.getControlByName('protocolRelativePopup');
+        const protoPanel = protoPopup.children[0];
+        const hasProtoImage = protoPanel.children.some(c => c.name === 'protocolRelativePopup_image');
+
         // Verify Secure Popup
         const securePopup = window.sceneManager.uiManager.getControlByName('securePopup');
         const securePanel = securePopup.children[0];
@@ -81,6 +102,7 @@ test.describe('Engine Popup Security Validation', () => {
 
         return {
             hasInsecureImage,
+            hasProtoImage,
             hasSecureImage: !!secureImageControl,
             secureImageSrc
         };
@@ -88,6 +110,7 @@ test.describe('Engine Popup Security Validation', () => {
 
     // Asset sanitization assertions
     expect(result.hasInsecureImage).toBe(false);
+    expect(result.hasProtoImage).toBe(false);
     expect(result.hasSecureImage).toBe(true);
     // The final state of secureImageSrc should be the secure dynamic update, and not blocked or bypassed
     expect(result.secureImageSrc).toBe("https://proxy.functions.io/?url=https%3A%2F%2Fwww.babylonjs-playground.com%2Ftextures%2Fbabylon5.png");
