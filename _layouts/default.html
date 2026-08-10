@@ -1405,7 +1405,14 @@ workspace_data: "${base64WorkspaceData}"
                         },
                         {
                             kind: 'block',
-                            type: 'event_on_swipe'
+                            type: 'event_on_swipe',
+                            inputs: {
+                                OBJECT_SELECTOR: {
+                                    shadow: {
+                                        type: 'select_object',
+                                    }
+                                }
+                            }
                         }
                     ]
                 },
@@ -4384,19 +4391,23 @@ workspace_data: "${base64WorkspaceData}"
             }
 
             // --- Swipe Events ---
-            onSwipe(direction, callback) {
+            onSwipe(target, direction, callback) {
                 const dir = direction.toUpperCase();
                 if (this.swipeCallbacks[dir]) {
-                    this.swipeCallbacks[dir].push(callback);
+                    this.swipeCallbacks[dir].push({ target, callback });
                 }
             }
 
             triggerSwipe(direction) {
                 const dir = direction.toUpperCase();
                 if (this.swipeCallbacks[dir]) {
-                    this.swipeCallbacks[dir].forEach(callback => {
+                    this.swipeCallbacks[dir].forEach(item => {
                         try {
-                            callback();
+                            const resolved = this._resolveTarget(item.target);
+                            const mesh = this._getMesh(resolved);
+                            if (mesh) {
+                                item.callback(mesh);
+                            }
                         } catch (e) {
                             console.error(`Error running onSwipe callback for ${dir}:`, e);
                         }
@@ -7239,8 +7250,13 @@ workspace_data: "${base64WorkspaceData}"
             },
             {
                 "type": "event_on_swipe",
-                "message0": "when screen is swiped %1 %2 do %3",
+                "message0": "when %1 is swiped %2 %3 do %4",
                 "args0": [
+                    {
+                        "type": "input_value",
+                        "name": "OBJECT_SELECTOR",
+                        "check": "String"
+                    },
                     {
                         "type": "field_dropdown",
                         "name": "DIRECTION",
@@ -7261,7 +7277,7 @@ workspace_data: "${base64WorkspaceData}"
                 ],
                 "nextStatement": null,
                 "style": "event_blocks",
-                "tooltip": "Executes code when the screen is swiped in the specified direction.",
+                "tooltip": "Executes code when the specified object receives a swipe in the given direction.",
                 "helpUrl": ""
             }
         ]);
@@ -7445,9 +7461,11 @@ workspace_data: "${base64WorkspaceData}"
             };
 
             javascript.javascriptGenerator.forBlock['event_on_swipe'] = function (block, generator) {
+                const objectName = generator.valueToCode(block, 'OBJECT_SELECTOR', generator.ORDER_ATOMIC) || 'null';
                 const direction = block.getFieldValue('DIRECTION');
                 const doCode = generator.statementToCode(block, 'DO_CODE');
-                return `sceneManager.onSwipe('${direction}', async function() {\n${doCode}\n});\n`;
+                const callback = `async function(thisMesh) {\n${doCode}\n}`;
+                return `sceneManager.onSwipe(() => ${objectName}, '${direction}', ${callback});\n`;
             };
 
             javascript.javascriptGenerator.forBlock['event_on_click'] = function (block, generator) {
