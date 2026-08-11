@@ -708,6 +708,42 @@
                 console.error('Invalid URL:', url, 'Protocol-relative URLs are not allowed.');
                 return false;
             }
+
+            // Prevent proxy/wrapper bypasses recursively
+            if (normalized.startsWith('https://proxy.functions.io')) {
+                try {
+                    const parsed = new URL(url);
+                    const inner = parsed.searchParams.get('url');
+                    if (inner) {
+                        return isValidAssetURL(inner);
+                    }
+                } catch (e) {}
+            }
+
+            if (normalized.startsWith('https://digitaleducationsafety.org/cdn-cgi/image/')) {
+                const rest = url.substring('https://digitaleducationsafety.org/cdn-cgi/image/'.length);
+                const httpIndex = rest.indexOf('http://');
+                const httpsIndex = rest.indexOf('https://');
+                const doubleSlashIndex = rest.indexOf('//');
+                let innerUrl = rest;
+                if (httpsIndex !== -1) {
+                    innerUrl = rest.substring(httpsIndex);
+                } else if (httpIndex !== -1) {
+                    innerUrl = rest.substring(httpIndex);
+                } else if (doubleSlashIndex !== -1) {
+                    innerUrl = rest.substring(doubleSlashIndex);
+                } else {
+                    const firstSlash = rest.indexOf('/');
+                    if (firstSlash !== -1) {
+                        const firstSegment = rest.substring(0, firstSlash);
+                        if (firstSegment.includes('=') || firstSegment.includes(',')) {
+                            innerUrl = rest.substring(firstSlash + 1);
+                        }
+                    }
+                }
+                return isValidAssetURL(innerUrl);
+            }
+
             if (normalized.startsWith('https://') || normalized.startsWith('blob:') || normalized.startsWith('data:') || normalized.startsWith('/') || normalized.startsWith('./') || normalized.startsWith('assets/')) {
                 return true;
             }

@@ -115,4 +115,93 @@ test.describe('Engine Popup Security Validation', () => {
     // The final state of secureImageSrc should be the secure dynamic update, and not blocked or bypassed
     expect(result.secureImageSrc).toBe("https://proxy.functions.io/?url=https%3A%2F%2Fwww.babylonjs-playground.com%2Ftextures%2Fbabylon5.png");
   });
+
+  test('Proxy-wrapped and optimized insecure URLs are blocked', async ({ page }) => {
+    await page.goto('/');
+    await page.click("#start-button");
+
+    const result = await page.evaluate(async () => {
+        const workspace = window.workspace;
+        workspace.clear();
+        workspace.clearUndo();
+
+        // Variables for different cases
+        const cfBypassPopupVar = workspace.createVariable('cfBypassPopup');
+        const proxyBypassPopupVar = workspace.createVariable('proxyBypassPopup');
+        const validProxyPopupVar = workspace.createVariable('validProxyPopup');
+
+        // Case 1: Cloudflare image optimization bypass with HTTP target
+        const createCfBypassBlock = workspace.newBlock('create_popup');
+        const titleCfText = workspace.newBlock('text');
+        titleCfText.setFieldValue('CF Bypass', 'TEXT');
+        createCfBypassBlock.getInput('TITLE').connection.connect(titleCfText.outputConnection);
+
+        const urlCfText = workspace.newBlock('text');
+        urlCfText.setFieldValue('https://digitaleducationsafety.org/cdn-cgi/image/width=100/http://tracking-pixel.com/image.png', 'TEXT');
+        createCfBypassBlock.getInput('IMAGE').connection.connect(urlCfText.outputConnection);
+
+        const setCfVarBlock = workspace.newBlock('variables_set');
+        setCfVarBlock.setFieldValue(cfBypassPopupVar.getId(), 'VAR');
+        setCfVarBlock.getInput('VALUE').connection.connect(createCfBypassBlock.outputConnection);
+
+        // Case 2: functions.io proxy bypass with HTTP target
+        const createProxyBypassBlock = workspace.newBlock('create_popup');
+        const titleProxyText = workspace.newBlock('text');
+        titleProxyText.setFieldValue('Proxy Bypass', 'TEXT');
+        createProxyBypassBlock.getInput('TITLE').connection.connect(titleProxyText.outputConnection);
+
+        const urlProxyText = workspace.newBlock('text');
+        urlProxyText.setFieldValue('https://proxy.functions.io/?url=http%3A%2F%2Ftracking-pixel.com%2Fimage.png', 'TEXT');
+        createProxyBypassBlock.getInput('IMAGE').connection.connect(urlProxyText.outputConnection);
+
+        const setProxyVarBlock = workspace.newBlock('variables_set');
+        setProxyVarBlock.setFieldValue(proxyBypassPopupVar.getId(), 'VAR');
+        setProxyVarBlock.getInput('VALUE').connection.connect(createProxyBypassBlock.outputConnection);
+        setCfVarBlock.nextConnection.connect(setProxyVarBlock.previousConnection);
+
+        // Case 3: Legitimate functions.io proxy with HTTPS target
+        const createValidProxyBlock = workspace.newBlock('create_popup');
+        const titleValidText = workspace.newBlock('text');
+        titleValidText.setFieldValue('Valid Proxy', 'TEXT');
+        createValidProxyBlock.getInput('TITLE').connection.connect(titleValidText.outputConnection);
+
+        const urlValidText = workspace.newBlock('text');
+        urlValidText.setFieldValue('https://proxy.functions.io/?url=https%3A%2F%2Fwww.babylonjs.com%2Fassets%2Flogo.png', 'TEXT');
+        createValidProxyBlock.getInput('IMAGE').connection.connect(urlValidText.outputConnection);
+
+        const setValidVarBlock = workspace.newBlock('variables_set');
+        setValidVarBlock.setFieldValue(validProxyPopupVar.getId(), 'VAR');
+        setValidVarBlock.getInput('VALUE').connection.connect(createValidProxyBlock.outputConnection);
+        setProxyVarBlock.nextConnection.connect(setValidVarBlock.previousConnection);
+
+        // Execute Workspace Code
+        const code = Blockly.JavaScript.workspaceToCode(workspace);
+        await window.doRun(code);
+
+        // Verify CF Bypass Popup (should NOT have any image child because URL was rejected)
+        const cfPopup = window.sceneManager.uiManager.getControlByName('cfBypassPopup');
+        const cfPanel = cfPopup.children[0];
+        const hasCfImage = cfPanel.children.some(c => c.name === 'cfBypassPopup_image');
+
+        // Verify Proxy Bypass Popup (should NOT have any image child because URL was rejected)
+        const proxyPopup = window.sceneManager.uiManager.getControlByName('proxyBypassPopup');
+        const proxyPanel = proxyPopup.children[0];
+        const hasProxyImage = proxyPanel.children.some(c => c.name === 'proxyBypassPopup_image');
+
+        // Verify Valid Proxy Popup (SHOULD have an image child)
+        const validPopup = window.sceneManager.uiManager.getControlByName('validProxyPopup');
+        const validPanel = validPopup.children[0];
+        const hasValidImage = validPanel.children.some(c => c.name === 'validProxyPopup_image');
+
+        return {
+            hasCfImage,
+            hasProxyImage,
+            hasValidImage
+        };
+    });
+
+    expect(result.hasCfImage).toBe(false);
+    expect(result.hasProxyImage).toBe(false);
+    expect(result.hasValidImage).toBe(true);
+  });
 });
