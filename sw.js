@@ -7,8 +7,32 @@ const scopePath = params.get('scope');
 
 const title = scopeTitle || 'Engine';
 const desc = scopeDesc || 'An open-source, block-based 3D coding environment.';
-const icon = scopeIcon || '/assets/icons/gamepad-2.svg';
-const startUrl = scopePath ? (scopePath + '?mode=app&fullscreen=true') : '/?mode=app&fullscreen=true';
+
+// Security Validation: Ensure icon is a secure relative path, HTTPS, or data URL
+let safeIcon = scopeIcon || '/assets/icons/gamepad-2.svg';
+if (scopeIcon) {
+  const trimmedIcon = scopeIcon.trim();
+  const lowerIcon = trimmedIcon.toLowerCase();
+  const isValid = lowerIcon.startsWith('https://') ||
+                  lowerIcon.startsWith('data:') ||
+                  lowerIcon.startsWith('/') ||
+                  lowerIcon.startsWith('./') ||
+                  lowerIcon.startsWith('assets/');
+  if (!isValid || (lowerIcon.includes('//') && !lowerIcon.startsWith('https://')) || lowerIcon.startsWith('javascript:')) {
+    safeIcon = '/assets/icons/gamepad-2.svg';
+  }
+}
+const icon = safeIcon;
+
+// Security Validation: Ensure scopePath / startUrl are relative within the same origin (no open redirects)
+let safeScopePath = scopePath;
+if (scopePath) {
+  const isInvalid = scopePath.includes('://') || scopePath.startsWith('//') || scopePath.toLowerCase().startsWith('javascript:');
+  if (isInvalid) {
+    safeScopePath = '/';
+  }
+}
+const startUrl = safeScopePath ? (safeScopePath + '?mode=app&fullscreen=true') : '/?mode=app&fullscreen=true';
 
 const CACHE_NAME = 'engine-cache-v1';
 const criticalUrls = [
