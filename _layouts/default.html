@@ -1645,6 +1645,10 @@ workspace_data: "${base64WorkspaceData}"
                         },
                         {
                             kind: 'block',
+                            type: 'get_scene_object',
+                        },
+                        {
+                            kind: 'block',
                             type: 'move_object',
                         },
                         {
@@ -3650,9 +3654,26 @@ workspace_data: "${base64WorkspaceData}"
                 }
             }
 
-            createGround(name, width, height) {
+            getSceneObject(entity) {
+                if (entity === 'player') return this.player || 'player';
+                if (entity === 'camera') return (this.scene ? this.scene.activeCamera : null) || 'camera';
+                if (entity === 'scene') return this.scene;
+                return null;
+            }
+
+            createGround(name, arg2, arg3, arg4) {
                 this._cleanupExisting(name);
+                let width = 10, height = 10, x = 0, y = 0, z = 0;
+                if (arguments.length >= 4) {
+                    x = arg2 || 0;
+                    y = arg3 || 0;
+                    z = arg4 || 0;
+                } else {
+                    width = arg2 || 10;
+                    height = arg3 || 10;
+                }
                 const groundMesh = BABYLON.MeshBuilder.CreateGround(name, { width: width, height: height }, this.scene);
+                groundMesh.position.set(x, y, z);
                 this.objects[name] = groundMesh;
                 this._tagMesh(groundMesh, name);
                 this.setGroundPhysics(name); // Automatically add physics
@@ -3674,7 +3695,10 @@ workspace_data: "${base64WorkspaceData}"
 
             createLight(name, x, y, z) {
                 const light = new BABYLON.PointLight(name, new BABYLON.Vector3(x, y, z), this.scene);
-                return light;
+                if (name) {
+                    this.objects[name] = light;
+                }
+                return name || light;
             }
 
             setAsPlayer(target) {
@@ -3880,7 +3904,10 @@ workspace_data: "${base64WorkspaceData}"
                 } else {
                     light = new BABYLON.PointLight(name, pos, this.scene);
                 }
-                return light;
+                if (name) {
+                    this.objects[name] = light;
+                }
+                return name || light;
             }
 
             enableShadows(light, meshes) {
@@ -4048,6 +4075,29 @@ workspace_data: "${base64WorkspaceData}"
 
                 // Set the active camera
                 this.scene.activeCamera = camera;
+            }
+
+            createCamera(type, name, x, y, z) {
+                let camera;
+                const pos = new BABYLON.Vector3(x, y, z);
+                if (type === 'fps' || type === 'first-person') {
+                    camera = new BABYLON.UniversalCamera(name, pos, this.scene);
+                    camera.attachControl(this.canvas, true);
+                } else if (type === 'isometric') {
+                    camera = new BABYLON.FreeCamera(name, pos, this.scene);
+                    camera.mode = BABYLON.Camera.ORTHOGRAPHIC_CAMERA;
+                } else if (type === 'orbit' || type === 'arc_rotate') {
+                    camera = new BABYLON.ArcRotateCamera(name, Math.PI / 4, Math.PI / 3, 10, pos, this.scene);
+                    camera.attachControl(this.canvas, true);
+                } else {
+                    camera = new BABYLON.UniversalCamera(name, pos, this.scene);
+                    camera.attachControl(this.canvas, true);
+                }
+                this.scene.activeCamera = camera;
+                if (name) {
+                    this.objects[name] = camera;
+                }
+                return name || camera;
             }
 
             setIsometricCamera() {
@@ -4347,6 +4397,7 @@ workspace_data: "${base64WorkspaceData}"
                 this.initJoystick(); // Re-initialize joystick for mobile if needed
                 this.objects = {};
                 this.pendingObjectEvents = {};
+                this.pendingLazyObjectEvents = [];
                 this.materials = {};
                 this.registeredCollisionPairs.clear();
                 this.pendingCollisions = [];
@@ -4477,11 +4528,29 @@ workspace_data: "${base64WorkspaceData}"
                             this.pendingObjectEvents[name] = [];
                         }
                         this.pendingObjectEvents[name].push({ eventName, callback });
+                    } else if (typeof target === 'function') {
+                        if (!this.pendingLazyObjectEvents) {
+                            this.pendingLazyObjectEvents = [];
+                        }
+                        this.pendingLazyObjectEvents.push({ targetGetter: target, eventName, callback });
                     }
                 }
             }
 
             triggerObjectEvent(target, eventName) {
+                if (this.pendingLazyObjectEvents && this.pendingLazyObjectEvents.length > 0) {
+                    const remaining = [];
+                    for (const item of this.pendingLazyObjectEvents) {
+                        const m = this._getMesh(item.targetGetter);
+                        if (m) {
+                            this.onObjectEvent(m, item.eventName, item.callback);
+                        } else {
+                            remaining.push(item);
+                        }
+                    }
+                    this.pendingLazyObjectEvents = remaining;
+                }
+
                 let targetMesh = this._getMesh(target);
                 if (targetMesh && targetMesh.customObservables && targetMesh.customObservables[eventName]) {
                     targetMesh.customObservables[eventName].notifyObservers();
@@ -4500,6 +4569,7 @@ workspace_data: "${base64WorkspaceData}"
             }
 
             _getMesh(target) {
+                target = this._resolveTarget(target);
                 let name;
                 if (typeof target === 'string') {
                     name = target;
@@ -5703,7 +5773,7 @@ workspace_data: "${base64WorkspaceData}"
             },
             {
                 type: 'create_primitive',
-                message0: 'Create %1 named %2 at x %3 y %4 z %5',
+                message0: 'create %1 at x %2 y %3 z %4',
                 args0: [
                     {
                         type: 'field_dropdown',
@@ -5712,20 +5782,40 @@ workspace_data: "${base64WorkspaceData}"
                             ['box', 'box'],
                             ['sphere', 'sphere'],
                             ['cylinder', 'cylinder'],
+                            ['ground', 'ground'],
                             ['cone', 'cone'],
-                            ['torus', 'torus']
+                            ['torus', 'torus'],
+                            ['capsule', 'capsule']
                         ],
                     },
-                    { "type": "input_value", "name": "NAME", "check": "String" },
                     { type: 'input_value', name: 'X', check: 'Number' },
                     { type: 'input_value', name: 'Y', check: 'Number' },
                     { type: 'input_value', name: 'Z', check: 'Number' },
                 ],
                 "inputsInline": true,
-                previousStatement: null,
-                nextStatement: null,
+                output: 'Mesh',
                 colour: 160,
-                tooltip: 'Creates a 3D primitive at the specified position.',
+                tooltip: 'Creates a 3D primitive shape and returns its object reference.',
+                helpUrl: '',
+            },
+            {
+                type: 'get_scene_object',
+                message0: 'get %1',
+                args0: [
+                    {
+                        type: 'field_dropdown',
+                        name: 'OBJECT',
+                        options: [
+                            ['player', 'player'],
+                            ['camera', 'camera'],
+                            ['scene', 'scene']
+                        ]
+                    }
+                ],
+                output: null,
+                colour: 230,
+                tooltip: 'Returns a system-managed scene entity (player, camera, or scene).',
+                helpUrl: '',
             },
             {
                 type: 'create_box',
@@ -5860,18 +5950,27 @@ workspace_data: "${base64WorkspaceData}"
             },
             {
                 type: 'create_light',
-                message0: 'Create light named %1 at x %2 y %3 z %4',
+                message0: 'create %1 light at x %2 y %3 z %4',
                 args0: [
-                    { type: 'field_input', name: 'NAME', text: 'light' },
+                    {
+                        type: 'field_dropdown',
+                        name: 'TYPE',
+                        options: [
+                            ['directional', 'directional'],
+                            ['hemispheric', 'hemispheric'],
+                            ['spot', 'spot'],
+                            ['point', 'point']
+                        ],
+                    },
                     { type: 'input_value', name: 'X', check: 'Number' },
                     { type: 'input_value', name: 'Y', check: 'Number' },
                     { type: 'input_value', name: 'Z', check: 'Number' },
                 ],
                 "inputsInline": true,
-                previousStatement: null,
-                nextStatement: null,
+                output: 'Light',
                 colour: 65,
-                tooltip: 'Creates a light at the specified position',
+                tooltip: 'Creates a light source and returns its reference.',
+                helpUrl: '',
             },
             {
                 type: 'change_object_color',
@@ -6254,20 +6353,27 @@ workspace_data: "${base64WorkspaceData}"
             },
             {
                 type: 'create_camera',
-                message0: 'Create camera named %1 and save as %2',
+                message0: 'create %1 camera at x %2 y %3 z %4',
                 args0: [
-                    { type: 'field_input', name: 'NAME', text: 'camera' },
                     {
-                        type: 'field_variable',
-                        name: 'MODEL_VAR',
-                        variable: 'camera',
+                        type: 'field_dropdown',
+                        name: 'TYPE',
+                        options: [
+                            ['perspective', 'perspective'],
+                            ['isometric', 'isometric'],
+                            ['first-person', 'first-person'],
+                            ['orbit', 'orbit']
+                        ]
                     },
+                    { type: 'input_value', name: 'X', check: 'Number' },
+                    { type: 'input_value', name: 'Y', check: 'Number' },
+                    { type: 'input_value', name: 'Z', check: 'Number' }
                 ],
                 "inputsInline": true,
-                previousStatement: null,
-                nextStatement: null,
+                output: 'Camera',
                 colour: 180,
-                tooltip: 'Creates a scene camera',
+                tooltip: 'Creates a camera of the specified type at position (x, y, z) and sets it active.',
+                helpUrl: ''
             },
             {
                 type: 'create_ground',
@@ -7486,14 +7592,14 @@ workspace_data: "${base64WorkspaceData}"
             javascript.javascriptGenerator.forBlock['event_object_trigger'] = function (block, generator) {
                 const objectName = generator.valueToCode(block, 'OBJECT_NAME', generator.ORDER_ATOMIC) || "''";
                 const eventName = generator.valueToCode(block, 'EVENT_NAME', generator.ORDER_ATOMIC) || "''";
-                return `sceneManager.triggerObjectEvent(${objectName}, ${eventName});\n`;
+                return `sceneManager.triggerObjectEvent(() => ${objectName}, ${eventName});\n`;
             };
 
             javascript.javascriptGenerator.forBlock['event_on_object_receive'] = function (block, generator) {
                 const objectName = generator.valueToCode(block, 'OBJECT_NAME', generator.ORDER_ATOMIC) || "''";
                 const eventName = generator.valueToCode(block, 'EVENT_NAME', generator.ORDER_ATOMIC) || "''";
                 const doCode = generator.statementToCode(block, 'DO_CODE');
-                return `sceneManager.onObjectEvent(${objectName}, ${eventName}, async function() {\n${doCode}\n});\n`;
+                return `sceneManager.onObjectEvent(() => ${objectName}, ${eventName}, async function() {\n${doCode}\n});\n`;
             };
 
             javascript.javascriptGenerator.forBlock['event_on_swipe'] = function (block, generator) {
@@ -7535,7 +7641,11 @@ if (${name}) {
 
             javascript.javascriptGenerator.forBlock['select_object'] = function (block, generator) {
                 const objectName = block.getFieldValue('OBJECT_NAME');
-                return [`'${objectName}'`, generator.ORDER_ATOMIC];
+                const isIdentifier = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(objectName);
+                const code = isIdentifier
+                    ? `(typeof ${objectName} !== 'undefined' ? ${objectName} : '${objectName}')`
+                    : `'${objectName}'`;
+                return [code, generator.ORDER_ATOMIC];
             };
 
             // --- Player and Camera Block Generators ---
@@ -7619,10 +7729,14 @@ if (${name}) {
             };
 
             javascript.javascriptGenerator.forBlock['create_camera'] = function (block, generator) {
-                const name = block.getFieldValue('NAME');
-                // This block is now mostly for semantic purpose, as camera is initialized.
-                // We can consider removing it or making it switch between camera types.
-                return `// Camera is managed by the sceneManager\n`;
+                const type = block.getFieldValue('TYPE') || 'perspective';
+                const x = generator.valueToCode(block, 'X', generator.ORDER_ATOMIC) || 0;
+                const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || 5;
+                const z = generator.valueToCode(block, 'Z', generator.ORDER_ATOMIC) || -10;
+                const uniqueId = Blockly.utils.idGenerator.genUid();
+                const idStr = `'id_${uniqueId}'`;
+                const code = `sceneManager.createCamera('${type}', ${idStr}, ${x}, ${y}, ${z})`;
+                return [code, generator.ORDER_FUNCTION_CALL];
             };
 
             javascript.javascriptGenerator.forBlock['point_camera_at_mesh'] = function (block, generator) {
@@ -7676,25 +7790,29 @@ if (${name}) {
             };
 
             javascript.javascriptGenerator.forBlock['create_primitive'] = function (block, generator) {
-                const type = block.getFieldValue('TYPE');
-                const name = generator.valueToCode(block, 'NAME', generator.ORDER_ATOMIC) || "'myObject'";
+                const type = block.getFieldValue('TYPE') || 'box';
                 const x = generator.valueToCode(block, 'X', generator.ORDER_ATOMIC) || 0;
                 const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || 0;
                 const z = generator.valueToCode(block, 'Z', generator.ORDER_ATOMIC) || 0;
+                const uniqueId = Blockly.utils.idGenerator.genUid();
+                const idStr = `'id_${uniqueId}'`;
 
-                let code;
-                if (type === 'sphere') {
-                    code = `sceneManager.createSphere(${name}, ${x}, ${y}, ${z});\n`;
-                } else if (type === 'cylinder') {
-                    code = `sceneManager.createCylinder(${name}, ${x}, ${y}, ${z});\n`;
-                } else if (type === 'cone') {
-                    code = `sceneManager.createCone(${name}, ${x}, ${y}, ${z});\n`;
-                } else if (type === 'torus') {
-                    code = `sceneManager.createTorus(${name}, ${x}, ${y}, ${z});\n`;
-                } else {
-                    code = `sceneManager.createBox(${name}, ${x}, ${y}, ${z});\n`;
-                }
-                return code;
+                let method = 'createBox';
+                if (type === 'sphere') method = 'createSphere';
+                else if (type === 'cylinder') method = 'createCylinder';
+                else if (type === 'ground') method = 'createGround';
+                else if (type === 'cone') method = 'createCone';
+                else if (type === 'torus') method = 'createTorus';
+                else if (type === 'capsule') method = 'createCapsule';
+
+                const code = `sceneManager.${method}(${idStr}, ${x}, ${y}, ${z})`;
+                return [code, generator.ORDER_FUNCTION_CALL];
+            };
+
+            javascript.javascriptGenerator.forBlock['get_scene_object'] = function (block, generator) {
+                const object = block.getFieldValue('OBJECT') || 'player';
+                const code = `sceneManager.getSceneObject('${object}')`;
+                return [code, generator.ORDER_FUNCTION_CALL];
             };
 
             javascript.javascriptGenerator.forBlock['create_box'] = function (block, generator) {
@@ -7761,11 +7879,14 @@ if (${name}) {
             };
 
             javascript.javascriptGenerator.forBlock['create_light'] = function (block, generator) {
-                const name = block.getFieldValue('NAME');
+                const type = block.getFieldValue('TYPE') || 'point';
                 const x = generator.valueToCode(block, 'X', generator.ORDER_ATOMIC) || 0;
                 const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || 0;
                 const z = generator.valueToCode(block, 'Z', generator.ORDER_ATOMIC) || 0;
-                return `sceneManager.createLight('${name}', ${x}, ${y}, ${z});\n`;
+                const uniqueId = Blockly.utils.idGenerator.genUid();
+                const idStr = `'id_${uniqueId}'`;
+                const code = `sceneManager.createAdvancedLight('${type}', ${idStr}, ${x}, ${y}, ${z}, 0, -1, 0)`;
+                return [code, generator.ORDER_FUNCTION_CALL];
             };
 
             javascript.javascriptGenerator.forBlock['change_object_color'] = function (block, generator) {
