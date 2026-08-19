@@ -124,6 +124,9 @@ test.describe('Event System and Observables Functionality', () => {
 
     // 3. Test Local Object Custom Event Trigger & Receive
     const workspace_json_local_event = {
+      "variables": [
+          {"name": "coin", "id": "coin_var"}
+      ],
       "blocks": {
           "languageVersion": 0,
           "blocks": [
@@ -134,8 +137,8 @@ test.describe('Event System and Observables Functionality', () => {
                   "inputs": {
                       "OBJECT_NAME": {
                           "block": {
-                              "type": "select_object",
-                              "fields": {"OBJECT_NAME": "coin"}
+                              "type": "variables_get",
+                              "fields": {"VAR": {"id": "coin_var"}}
                           }
                       },
                       "EVENT_NAME": {
@@ -160,20 +163,22 @@ test.describe('Event System and Observables Functionality', () => {
                   }
               },
               {
-                  "type": "create_primitive",
+                  "type": "variables_set",
                   "x": 10,
                   "y": 200,
-                  "fields": {"TYPE": "sphere"},
+                  "fields": {"VAR": {"id": "coin_var"}},
                   "inputs": {
-                      "NAME": {
+                      "VALUE": {
                           "block": {
-                              "type": "text",
-                              "fields": {"TEXT": "coin"}
+                              "type": "create_primitive",
+                              "fields": {"TYPE": "sphere"},
+                              "inputs": {
+                                  "X": {"block": {"type": "math_number", "fields": {"NUM": 0}}},
+                                  "Y": {"block": {"type": "math_number", "fields": {"NUM": 1}}},
+                                  "Z": {"block": {"type": "math_number", "fields": {"NUM": 0}}}
+                              }
                           }
-                      },
-                      "X": {"block": {"type": "math_number", "fields": {"NUM": 0}}},
-                      "Y": {"block": {"type": "math_number", "fields": {"NUM": 1}}},
-                      "Z": {"block": {"type": "math_number", "fields": {"NUM": 0}}}
+                      }
                   },
                   "next": {
                       "block": {
@@ -181,8 +186,8 @@ test.describe('Event System and Observables Functionality', () => {
                           "inputs": {
                               "OBJECT_NAME": {
                                   "block": {
-                                      "type": "select_object",
-                                      "fields": {"OBJECT_NAME": "coin"}
+                                      "type": "variables_get",
+                                      "fields": {"VAR": {"id": "coin_var"}}
                                   }
                               },
                               "EVENT_NAME": {
