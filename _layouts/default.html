@@ -1449,6 +1449,10 @@ workspace_data: "${base64WorkspaceData}"
                                     }
                                 }
                             }
+                        },
+                        {
+                            kind: 'block',
+                            type: 'event_on_action',
                         }
                     ]
                 },
@@ -1607,6 +1611,10 @@ workspace_data: "${base64WorkspaceData}"
                         {
                             kind: 'block',
                             type: 'on_button_press',
+                        },
+                        {
+                            kind: 'block',
+                            type: 'is_action_active',
                         },
                         {
                             kind: 'block',
@@ -2576,6 +2584,11 @@ workspace_data: "${base64WorkspaceData}"
                 this.globalEventBus = {};
                 this.onSceneStartObservable = new BABYLON.Observable();
                 this.swipeCallbacks = { 'LEFT': [], 'RIGHT': [], 'UP': [], 'DOWN': [] };
+
+                // Unified Action Input System
+                this.actionCallbacks = { select: [], context: [], zoom: [], navigate: [], menu: [], double_select: [] };
+                this.activeActions = { select: false, context: false, zoom: false, navigate: false, menu: false, double_select: false };
+                this.gamepadPrevButtons = {};
 
                 this.initScene();
                 this.initInputListeners();
@@ -4210,9 +4223,45 @@ workspace_data: "${base64WorkspaceData}"
                 oscillator.stop(this.audioContext.currentTime + duration);
             }
 
+            onAction(actionName, callback) {
+                const action = actionName ? actionName.toLowerCase() : '';
+                if (this.actionCallbacks[action]) {
+                    this.actionCallbacks[action].push(callback);
+                }
+            }
+
+            isActionActive(actionName) {
+                const action = actionName ? actionName.toLowerCase() : '';
+                return !!this.activeActions[action];
+            }
+
+            triggerAction(actionName, data = {}) {
+                const action = actionName ? actionName.toLowerCase() : '';
+                this.activeActions[action] = true;
+                if (this.actionCallbacks[action]) {
+                    this.actionCallbacks[action].forEach(cb => {
+                        try {
+                            cb(data);
+                        } catch (err) {
+                            console.error(`Error executing action callback for ${action}:`, err);
+                        }
+                    });
+                }
+                setTimeout(() => {
+                    this.activeActions[action] = false;
+                }, 100);
+            }
+
             initInputListeners() {
                 this._onKeyDown = (event) => {
-                    this.inputState.keys[event.key.toLowerCase()] = true;
+                    const key = event.key.toLowerCase();
+                    this.inputState.keys[key] = true;
+
+                    if (key === 'escape') {
+                        this.triggerAction('menu');
+                    } else if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
+                        this.triggerAction('navigate', { key });
+                    }
                 };
                 this._onKeyUp = (event) => {
                     this.inputState.keys[event.key.toLowerCase()] = false;
@@ -4220,34 +4269,116 @@ workspace_data: "${base64WorkspaceData}"
                 window.addEventListener('keydown', this._onKeyDown);
                 window.addEventListener('keyup', this._onKeyUp);
 
-                // Swipe Gesture Detection
+                // Mouse & Touch Pointer / Gesture Handling
                 let startX = 0;
                 let startY = 0;
-                const threshold = 30; // Minimum pixels to classify as a swipe
+                let lastTapTime = 0;
+                let longPressTimer = null;
+                let isDragging = false;
+                let initialPinchDist = null;
+                const threshold = 30; // Minimum pixels for a swipe/drag
+
+                this._onMouseDown = (e) => {
+                    if (e.button === 0) {
+                        this.triggerAction('select', { pointer: 'mouse' });
+                        isDragging = true;
+                    } else if (e.button === 2) {
+                        this.triggerAction('context', { pointer: 'mouse' });
+                    }
+                };
+
+                this._onMouseUp = (e) => {
+                    if (e.button === 0) {
+                        isDragging = false;
+                    }
+                };
+
+                this._onMouseMove = (e) => {
+                    if (isDragging && (Math.abs(e.movementX) > 2 || Math.abs(e.movementY) > 2)) {
+                        this.triggerAction('navigate', { deltaX: e.movementX, deltaY: e.movementY });
+                    }
+                };
+
+                this._onWheel = (e) => {
+                    this.triggerAction('zoom', { deltaY: e.deltaY });
+                };
+
+                this._onDblClick = (e) => {
+                    if (e.button === 0) {
+                        this.triggerAction('double_select', { pointer: 'mouse' });
+                    }
+                };
 
                 this._onTouchStart = (e) => {
-                    if (e.touches && e.touches.length > 0) {
+                    if (!e.touches) return;
+
+                    if (e.touches.length === 1) {
                         startX = e.touches[0].clientX;
                         startY = e.touches[0].clientY;
+
+                        // Long press detection (500ms)
+                        clearTimeout(longPressTimer);
+                        longPressTimer = setTimeout(() => {
+                            this.triggerAction('context', { pointer: 'touch' });
+                        }, 500);
+
+                        // Double tap detection (< 300ms between taps)
+                        const now = Date.now();
+                        if (now - lastTapTime < 300) {
+                            clearTimeout(longPressTimer);
+                            this.triggerAction('double_select', { pointer: 'touch' });
+                        }
+                        lastTapTime = now;
+                    } else if (e.touches.length === 2) {
+                        clearTimeout(longPressTimer);
+                        const dx = e.touches[0].clientX - e.touches[1].clientX;
+                        const dy = e.touches[0].clientY - e.touches[1].clientY;
+                        initialPinchDist = Math.hypot(dx, dy);
+                    }
+                };
+
+                this._onTouchMove = (e) => {
+                    if (!e.touches) return;
+
+                    if (e.touches.length === 1) {
+                        const deltaX = e.touches[0].clientX - startX;
+                        const deltaY = e.touches[0].clientY - startY;
+                        if (Math.abs(deltaX) > 10 || Math.abs(deltaY) > 10) {
+                            clearTimeout(longPressTimer); // Cancel long press if user moves finger
+                            this.triggerAction('navigate', { deltaX, deltaY });
+                        }
+                    } else if (e.touches.length === 2 && initialPinchDist) {
+                        const dx = e.touches[0].clientX - e.touches[1].clientX;
+                        const dy = e.touches[0].clientY - e.touches[1].clientY;
+                        const dist = Math.hypot(dx, dy);
+                        const diff = dist - initialPinchDist;
+
+                        if (Math.abs(diff) > 15) {
+                            this.triggerAction('zoom', { scale: dist / initialPinchDist });
+                            initialPinchDist = dist;
+                        }
                     }
                 };
 
                 this._onTouchEnd = (e) => {
+                    clearTimeout(longPressTimer);
+                    initialPinchDist = null;
+
                     if (!e.changedTouches || e.changedTouches.length === 0) return;
                     const deltaX = e.changedTouches[0].clientX - startX;
                     const deltaY = e.changedTouches[0].clientY - startY;
 
-                    if (Math.abs(deltaX) > Math.abs(deltaY)) {
+                    if (Math.abs(deltaX) <= 10 && Math.abs(deltaY) <= 10) {
+                        this.triggerAction('select', { pointer: 'touch' });
+                    } else if (Math.abs(deltaX) > Math.abs(deltaY)) {
                         // Horizontal swipe
                         if (Math.abs(deltaX) > threshold) {
                             if (deltaX > 0) {
-                                // Swipe Right
                                 if (this.buttonPressActions['Right']) {
                                     this.buttonPressActions['Right'].forEach(action => action());
                                 }
                                 this.triggerSwipe('RIGHT');
                             } else {
-                                // Swipe Left
                                 if (this.buttonPressActions['Left']) {
                                     this.buttonPressActions['Left'].forEach(action => action());
                                 }
@@ -4258,7 +4389,6 @@ workspace_data: "${base64WorkspaceData}"
                         // Vertical swipe
                         if (Math.abs(deltaY) > threshold) {
                             if (deltaY < 0) {
-                                // Swipe Up
                                 if (this.buttonPressActions['Up']) {
                                     this.buttonPressActions['Up'].forEach(action => action());
                                 }
@@ -4267,7 +4397,6 @@ workspace_data: "${base64WorkspaceData}"
                                 }
                                 this.triggerSwipe('UP');
                             } else {
-                                // Swipe Down
                                 if (this.buttonPressActions['Down']) {
                                     this.buttonPressActions['Down'].forEach(action => action());
                                 }
@@ -4277,8 +4406,60 @@ workspace_data: "${base64WorkspaceData}"
                     }
                 };
 
+                this.canvas.addEventListener('mousedown', this._onMouseDown);
+                this.canvas.addEventListener('mouseup', this._onMouseUp);
+                this.canvas.addEventListener('mousemove', this._onMouseMove);
+                this.canvas.addEventListener('wheel', this._onWheel, { passive: true });
+                this.canvas.addEventListener('dblclick', this._onDblClick);
+
                 this.canvas.addEventListener('touchstart', this._onTouchStart, { passive: true });
+                this.canvas.addEventListener('touchmove', this._onTouchMove, { passive: true });
                 this.canvas.addEventListener('touchend', this._onTouchEnd, { passive: true });
+            }
+
+            pollGamepads() {
+                if (!navigator.getGamepads) return;
+                const gamepads = navigator.getGamepads();
+                for (let i = 0; i < gamepads.length; i++) {
+                    const gp = gamepads[i];
+                    if (!gp) continue;
+
+                    // Standard Gamepad Buttons:
+                    // 0: A/Cross (Select)
+                    // 1: B/Circle (Double Select)
+                    // 6 / 7: LT / RT (Context / Zoom)
+                    // 9: Start/Options (Menu)
+                    // 11: R3 (Zoom)
+                    const buttons = gp.buttons;
+                    const prev = this.gamepadPrevButtons[gp.index] || [];
+
+                    if (buttons[0] && buttons[0].pressed && !prev[0]) {
+                        this.triggerAction('select', { source: 'gamepad' });
+                    }
+                    if (buttons[1] && buttons[1].pressed && !prev[1]) {
+                        this.triggerAction('double_select', { source: 'gamepad' });
+                    }
+                    if (buttons[6] && buttons[6].pressed && !prev[6]) {
+                        this.triggerAction('context', { source: 'gamepad' });
+                    }
+                    if ((buttons[7] && buttons[7].pressed && !prev[7]) || (buttons[11] && buttons[11].pressed && !prev[11])) {
+                        this.triggerAction('zoom', { source: 'gamepad' });
+                    }
+                    if (buttons[9] && buttons[9].pressed && !prev[9]) {
+                        this.triggerAction('menu', { source: 'gamepad' });
+                    }
+
+                    // Analog sticks for navigate (axes 0, 1 for left stick, 2, 3 for right stick)
+                    if (gp.axes) {
+                        const lx = gp.axes[0] || 0;
+                        const ly = gp.axes[1] || 0;
+                        if (Math.abs(lx) > 0.2 || Math.abs(ly) > 0.2) {
+                            this.triggerAction('navigate', { lx, ly, source: 'gamepad' });
+                        }
+                    }
+
+                    this.gamepadPrevButtons[gp.index] = buttons.map(b => b.pressed);
+                }
             }
 
             initScene() {
@@ -4306,6 +4487,9 @@ workspace_data: "${base64WorkspaceData}"
 
                     // Reset movement direction at the start of the frame
                     this.moveDirection.set(0, 0, 0);
+
+                    // Poll gamepads on every frame
+                    this.pollGamepads();
 
                     // Handle continuous button presses via input map
                     for (const key in this.inputState.keys) {
@@ -4420,6 +4604,9 @@ workspace_data: "${base64WorkspaceData}"
                 this.globalEventBus = {};
                 this.onSceneStartObservable = new BABYLON.Observable();
                 this.swipeCallbacks = { 'LEFT': [], 'RIGHT': [], 'UP': [], 'DOWN': [] };
+                this.actionCallbacks = { select: [], context: [], zoom: [], navigate: [], menu: [], double_select: [] };
+                this.activeActions = { select: false, context: false, zoom: false, navigate: false, menu: false, double_select: false };
+                this.gamepadPrevButtons = {};
             }
 
             dispose() {
@@ -4433,7 +4620,14 @@ workspace_data: "${base64WorkspaceData}"
                 window.removeEventListener('keyup', this._onKeyUp);
 
                 if (this.canvas) {
+                    this.canvas.removeEventListener('mousedown', this._onMouseDown);
+                    this.canvas.removeEventListener('mouseup', this._onMouseUp);
+                    this.canvas.removeEventListener('mousemove', this._onMouseMove);
+                    this.canvas.removeEventListener('wheel', this._onWheel);
+                    this.canvas.removeEventListener('dblclick', this._onDblClick);
+
                     this.canvas.removeEventListener('touchstart', this._onTouchStart);
+                    this.canvas.removeEventListener('touchmove', this._onTouchMove);
                     this.canvas.removeEventListener('touchend', this._onTouchEnd);
                 }
 
@@ -7421,6 +7615,57 @@ workspace_data: "${base64WorkspaceData}"
                 "style": "event_blocks",
                 "tooltip": "Executes code when the specified object receives a swipe in the given direction.",
                 "helpUrl": ""
+            },
+            {
+                "type": "event_on_action",
+                "message0": "when action %1 is triggered %2 do %3",
+                "args0": [
+                    {
+                        "type": "field_dropdown",
+                        "name": "ACTION",
+                        "options": [
+                            ["select / tap / left-click", "select"],
+                            ["context / long-press / right-click", "context"],
+                            ["zoom / pinch / scroll", "zoom"],
+                            ["navigate / drag / WASD", "navigate"],
+                            ["menu / pause / escape", "menu"],
+                            ["double select / double-tap", "double_select"]
+                        ]
+                    },
+                    {
+                        "type": "input_dummy"
+                    },
+                    {
+                        "type": "input_statement",
+                        "name": "DO_CODE"
+                    }
+                ],
+                "nextStatement": null,
+                "style": "event_blocks",
+                "tooltip": "Executes code when a device-agnostic user action (tap, click, key, gesture, gamepad button) is triggered.",
+                "helpUrl": ""
+            },
+            {
+                "type": "is_action_active",
+                "message0": "action %1 is active",
+                "args0": [
+                    {
+                        "type": "field_dropdown",
+                        "name": "ACTION",
+                        "options": [
+                            ["select / tap / left-click", "select"],
+                            ["context / long-press / right-click", "context"],
+                            ["zoom / pinch / scroll", "zoom"],
+                            ["navigate / drag / WASD", "navigate"],
+                            ["menu / pause / escape", "menu"],
+                            ["double select / double-tap", "double_select"]
+                        ]
+                    }
+                ],
+                "output": "Boolean",
+                "colour": "%{BKY_LOGIC_HUE}",
+                "tooltip": "Returns true if the specified unified action is currently active.",
+                "helpUrl": ""
             }
         ]);
 
@@ -7608,6 +7853,18 @@ workspace_data: "${base64WorkspaceData}"
                 const doCode = generator.statementToCode(block, 'DO_CODE');
                 const callback = `async function(thisMesh) {\n${doCode}\n}`;
                 return `sceneManager.onSwipe(() => ${objectName}, '${direction}', ${callback});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['event_on_action'] = function (block, generator) {
+                const action = block.getFieldValue('ACTION');
+                const doCode = generator.statementToCode(block, 'DO_CODE');
+                const callback = `async function(data) {\n${doCode}\n}`;
+                return `sceneManager.onAction('${action}', ${callback});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['is_action_active'] = function (block, generator) {
+                const action = block.getFieldValue('ACTION');
+                return [`sceneManager.isActionActive('${action}')`, generator.ORDER_ATOMIC];
             };
 
             javascript.javascriptGenerator.forBlock['event_on_click'] = function (block, generator) {
