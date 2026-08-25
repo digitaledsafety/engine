@@ -104,7 +104,7 @@ test.describe('Engine Popup with Variables', () => {
     const isHidden = await page.evaluate(async () => {
         const workspace = window.workspace;
         // Do NOT clear workspace here as it might lose the variable ID mapping if we recreate it wrongly
-        const myPopupVar = workspace.getVariable('myPopup');
+        const myPopupVar = workspace.getVariableMap().getVariable('myPopup');
 
         const hidePopupBlock = workspace.newBlock('hide_popup');
         const getVarBlockHide = workspace.newBlock('variables_get');
