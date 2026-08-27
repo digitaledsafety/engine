@@ -44,6 +44,42 @@ test.describe('Engine Features V2', () => {
         expect(physicsValid).toBe(true);
     });
 
+    test('should play note across full C3-C5 frequency range without missing option warnings', async ({ page }) => {
+        const consoleWarnings = [];
+        page.on('console', msg => {
+            if (msg.type() === 'warning') {
+                consoleWarnings.push(msg.text());
+            }
+        });
+
+        await page.evaluate(async () => {
+            const sm = window.sceneManager;
+            sm.playNote(130.81, 0.1); // C3
+            sm.playNote(523.25, 0.1); // C5
+        });
+
+        const hasUnavailableOptionWarning = consoleWarnings.some(w => w.includes('Cannot set the dropdown\'s value to an unavailable option'));
+        expect(hasUnavailableOptionWarning).toBe(false);
+    });
+
+    test('should configure physics impostor for objects and ground via setPhysicsImpostor and setGroundPhysics', async ({ page }) => {
+        await page.evaluate(async () => {
+            const sm = window.sceneManager;
+            sm.createBox('boxObj', 0, 2, 0);
+            sm.setPhysicsImpostor('boxObj', 'BoxImpostor');
+
+            sm.createGround('groundObj', 10, 10);
+            sm.setGroundPhysics('groundObj', 'BoxImpostor');
+        });
+
+        const impostorsValid = await page.evaluate(() => {
+            const box = window.sceneManager.objects['boxObj'];
+            const ground = window.sceneManager.objects['groundObj'];
+            return !!box.physicsImpostor && !!ground.physicsImpostor;
+        });
+        expect(impostorsValid).toBe(true);
+    });
+
     test('should use refactored popup methods', async ({ page }) => {
         const popupText = await page.evaluate(async () => {
             const sm = window.sceneManager;
