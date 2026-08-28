@@ -1453,6 +1453,18 @@ workspace_data: "${base64WorkspaceData}"
                         {
                             kind: 'block',
                             type: 'event_on_action',
+                        },
+                        {
+                            kind: 'block',
+                            type: 'multiplayer_on_peer_join',
+                        },
+                        {
+                            kind: 'block',
+                            type: 'multiplayer_on_peer_leave',
+                        },
+                        {
+                            kind: 'block',
+                            type: 'multiplayer_on_receive_data',
                         }
                     ]
                 },
@@ -1623,7 +1635,27 @@ workspace_data: "${base64WorkspaceData}"
                         {
                             kind: 'block',
                             type: 'get_joystick_force',
-                        }                        
+                        },
+                        {
+                            kind: 'block',
+                            type: 'multiplayer_host_room',
+                        },
+                        {
+                            kind: 'block',
+                            type: 'multiplayer_join_room',
+                        },
+                        {
+                            kind: 'block',
+                            type: 'multiplayer_get_my_peer_id',
+                        },
+                        {
+                            kind: 'block',
+                            type: 'multiplayer_send_data',
+                        },
+                        {
+                            kind: 'block',
+                            type: 'multiplayer_sync_object',
+                        }
                     ]
                 },
                 {
@@ -2580,6 +2612,15 @@ workspace_data: "${base64WorkspaceData}"
                 this.pendingCollisions = [];
                 this.background = null;
                 this.backgroundLayer = null;
+
+                // PeerJS Multiplayer system state
+                this.peer = null;
+                this.peerId = null;
+                this.peerConnections = {}; // peerId -> DataConnection
+                this.peerJoinCallbacks = [];
+                this.peerLeaveCallbacks = [];
+                this.peerDataCallbacks = [];
+                this.syncedObjects = {}; // name -> { objectRef, interval }
 
                 this.globalEventBus = {};
                 this.onSceneStartObservable = new BABYLON.Observable();
@@ -4638,9 +4679,206 @@ workspace_data: "${base64WorkspaceData}"
                     this._canvasContainer.removeEventListener('click', this._resetTimer);
                 }
 
+                // Clean up PeerJS multiplayer connections
+                this.disconnectPeer();
+
                 this.uiManager.dispose();
                 this.scene.dispose();
                 this.engine.dispose();
+            }
+
+            // --- PeerJS Multiplayer System Methods ---
+            async loadPeerJS() {
+                if (window.Peer) return window.Peer;
+                if (this._peerLoadingPromise) return this._peerLoadingPromise;
+
+                this._peerLoadingPromise = (async () => {
+                    try {
+                        // Dynamic ESM import with fallback to dynamic script tag injection
+                        const module = await import('https://cdn.jsdelivr.net/npm/peerjs@1.5.4/+esm');
+                        if (module && module.Peer) {
+                            window.Peer = module.Peer;
+                            return module.Peer;
+                        }
+                    } catch (err) {
+                        console.warn('ESM dynamic import for PeerJS failed, falling back to script injection:', err);
+                    }
+
+                    return new Promise((resolve, reject) => {
+                        if (window.Peer) return resolve(window.Peer);
+                        const script = document.createElement('script');
+                        script.src = 'https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js';
+                        script.onload = () => {
+                            if (window.Peer) resolve(window.Peer);
+                            else reject(new Error('PeerJS failed to load.'));
+                        };
+                        script.onerror = (e) => reject(e);
+                        document.head.appendChild(script);
+                    });
+                })();
+
+                return this._peerLoadingPromise;
+            }
+
+            async initPeer(customId = null, options = {}) {
+                if (this.peer && !this.peer.destroyed) return this.peer;
+                const PeerClass = await this.loadPeerJS();
+
+                return new Promise((resolve, reject) => {
+                    const peerInstance = customId ? new PeerClass(customId, options) : new PeerClass(options);
+                    this.peer = peerInstance;
+
+                    peerInstance.on('open', (id) => {
+                        this.peerId = id;
+                        console.log('PeerJS initialized with ID:', id);
+                        resolve(id);
+                    });
+
+                    peerInstance.on('connection', (conn) => {
+                        this._setupConnection(conn);
+                    });
+
+                    peerInstance.on('error', (err) => {
+                        console.error('PeerJS error:', err);
+                        reject(err);
+                    });
+                });
+            }
+
+            _setupConnection(conn) {
+                this.peerConnections[conn.peer] = conn;
+
+                conn.on('open', () => {
+                    console.log('Peer connected:', conn.peer);
+                    this.peerJoinCallbacks.forEach(cb => cb(conn.peer));
+                });
+
+                conn.on('data', (data) => {
+                    this._handleIncomingData(conn.peer, data);
+                });
+
+                conn.on('close', () => {
+                    console.log('Peer disconnected:', conn.peer);
+                    delete this.peerConnections[conn.peer];
+                    this.peerLeaveCallbacks.forEach(cb => cb(conn.peer));
+                });
+
+                conn.on('error', (err) => {
+                    console.error('Peer connection error:', err);
+                });
+            }
+
+            _handleIncomingData(senderPeerId, data) {
+                // Internal multiplayer engine protocol handling
+                if (data && typeof data === 'object' && data.__mp_type) {
+                    if (data.__mp_type === 'sync_transform') {
+                        const targetMesh = this._getMesh(data.objectName);
+                        if (targetMesh) {
+                            if (data.position) {
+                                targetMesh.position.set(data.position.x, data.position.y, data.position.z);
+                            }
+                            if (data.rotation) {
+                                targetMesh.rotation.set(data.rotation.x, data.rotation.y, data.rotation.z);
+                            }
+                        }
+                    }
+                    return;
+                }
+
+                // Trigger blockly user callbacks for custom data
+                this.peerDataCallbacks.forEach(cb => cb(data, senderPeerId));
+            }
+
+            async hostRoom(desiredRoomId = null) {
+                return await this.initPeer(desiredRoomId);
+            }
+
+            async joinRoom(targetPeerId) {
+                if (!this.peer) {
+                    await this.initPeer();
+                }
+                const conn = this.peer.connect(targetPeerId);
+                this._setupConnection(conn);
+                return conn;
+            }
+
+            getPeerId() {
+                return this.peerId || '';
+            }
+
+            sendData(data, targetPeerId = null) {
+                if (targetPeerId && this.peerConnections[targetPeerId]) {
+                    this.peerConnections[targetPeerId].send(data);
+                } else {
+                    // Broadcast to all connected peers
+                    Object.values(this.peerConnections).forEach(conn => {
+                        if (conn && conn.open) {
+                            conn.send(data);
+                        }
+                    });
+                }
+            }
+
+            onPeerJoin(callback) {
+                if (typeof callback === 'function') {
+                    this.peerJoinCallbacks.push(callback);
+                }
+            }
+
+            onPeerLeave(callback) {
+                if (typeof callback === 'function') {
+                    this.peerLeaveCallbacks.push(callback);
+                }
+            }
+
+            onReceiveData(callback) {
+                if (typeof callback === 'function') {
+                    this.peerDataCallbacks.push(callback);
+                }
+            }
+
+            syncObject(target, intervalMs = 100) {
+                const mesh = this._getMesh(target);
+                if (!mesh) return;
+
+                const meshName = mesh.name;
+                if (this.syncedObjects[meshName]) {
+                    clearInterval(this.syncedObjects[meshName].interval);
+                }
+
+                const interval = setInterval(() => {
+                    if (!this.peer || Object.keys(this.peerConnections).length === 0) return;
+                    const transformData = {
+                        __mp_type: 'sync_transform',
+                        objectName: meshName,
+                        position: { x: mesh.position.x, y: mesh.position.y, z: mesh.position.z },
+                        rotation: { x: mesh.rotation.x, y: mesh.rotation.y, z: mesh.rotation.z }
+                    };
+                    this.sendData(transformData);
+                }, intervalMs);
+
+                this.syncedObjects[meshName] = { mesh, interval };
+            }
+
+            disconnectPeer() {
+                Object.keys(this.syncedObjects).forEach(name => {
+                    clearInterval(this.syncedObjects[name].interval);
+                });
+                this.syncedObjects = {};
+
+                Object.values(this.peerConnections).forEach(conn => {
+                    try { conn.close(); } catch(e) {}
+                });
+                this.peerConnections = {};
+
+                if (this.peer && !this.peer.destroyed) {
+                    try { this.peer.destroy(); } catch(e) {}
+                }
+                this.peer = null;
+                this.peerId = null;
+                this.peerJoinCallbacks = [];
+                this.peerLeaveCallbacks = [];
+                this.peerDataCallbacks = [];
             }
 
             getMeshNames() {
@@ -7666,6 +7904,146 @@ workspace_data: "${base64WorkspaceData}"
                 "colour": "%{BKY_LOGIC_HUE}",
                 "tooltip": "Returns true if the specified unified action is currently active.",
                 "helpUrl": ""
+            },
+            // Multiplayer Blocks
+            {
+                "type": "multiplayer_host_room",
+                "message0": "host room with room ID %1",
+                "args0": [
+                    {
+                        "type": "input_value",
+                        "name": "ROOM_ID",
+                        "check": "String"
+                    }
+                ],
+                "output": "String",
+                "colour": "#FF6B6B",
+                "tooltip": "Hosts a multiplayer room using PeerJS and returns the host Peer ID.",
+                "helpUrl": ""
+            },
+            {
+                "type": "multiplayer_join_room",
+                "message0": "join room with ID %1",
+                "args0": [
+                    {
+                        "type": "input_value",
+                        "name": "ROOM_ID",
+                        "check": "String"
+                    }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": "#FF6B6B",
+                "tooltip": "Joins a multiplayer room hosted by another peer using their Room ID.",
+                "helpUrl": ""
+            },
+            {
+                "type": "multiplayer_get_my_peer_id",
+                "message0": "my peer ID",
+                "output": "String",
+                "colour": "#FF6B6B",
+                "tooltip": "Returns the local Peer ID string.",
+                "helpUrl": ""
+            },
+            {
+                "type": "multiplayer_send_data",
+                "message0": "send multiplayer data %1 to peer %2",
+                "args0": [
+                    {
+                        "type": "input_value",
+                        "name": "DATA"
+                    },
+                    {
+                        "type": "input_value",
+                        "name": "PEER_ID",
+                        "check": "String"
+                    }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": "#FF6B6B",
+                "tooltip": "Sends data to a specific peer or broadcast to all peers if peer ID is empty/null.",
+                "helpUrl": ""
+            },
+            {
+                "type": "multiplayer_sync_object",
+                "message0": "sync object %1 position every %2 ms",
+                "args0": [
+                    {
+                        "type": "input_value",
+                        "name": "OBJECT"
+                    },
+                    {
+                        "type": "input_value",
+                        "name": "INTERVAL",
+                        "check": "Number"
+                    }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": "#FF6B6B",
+                "tooltip": "Automatically synchronizes an object transform across connected peers.",
+                "helpUrl": ""
+            },
+            {
+                "type": "multiplayer_on_peer_join",
+                "message0": "when peer joins %1 do %2",
+                "args0": [
+                    {
+                        "type": "input_dummy"
+                    },
+                    {
+                        "type": "input_statement",
+                        "name": "DO"
+                    }
+                ],
+                "nextStatement": null,
+                "style": "event_blocks",
+                "tooltip": "Executes code when a remote peer connects.",
+                "helpUrl": "",
+                "extraState": {
+                    "hasPeerIdVar": true
+                }
+            },
+            {
+                "type": "multiplayer_on_peer_leave",
+                "message0": "when peer leaves %1 do %2",
+                "args0": [
+                    {
+                        "type": "input_dummy"
+                    },
+                    {
+                        "type": "input_statement",
+                        "name": "DO"
+                    }
+                ],
+                "nextStatement": null,
+                "style": "event_blocks",
+                "tooltip": "Executes code when a remote peer disconnects.",
+                "helpUrl": "",
+                "extraState": {
+                    "hasPeerIdVar": true
+                }
+            },
+            {
+                "type": "multiplayer_on_receive_data",
+                "message0": "when data received %1 do %2",
+                "args0": [
+                    {
+                        "type": "input_dummy"
+                    },
+                    {
+                        "type": "input_statement",
+                        "name": "DO"
+                    }
+                ],
+                "nextStatement": null,
+                "style": "event_blocks",
+                "tooltip": "Executes code when custom multiplayer data is received from a peer.",
+                "helpUrl": "",
+                "extraState": {
+                    "hasDataVar": true
+                }
             }
         ]);
 
@@ -7865,6 +8243,56 @@ workspace_data: "${base64WorkspaceData}"
             javascript.javascriptGenerator.forBlock['is_action_active'] = function (block, generator) {
                 const action = block.getFieldValue('ACTION');
                 return [`sceneManager.isActionActive('${action}')`, generator.ORDER_ATOMIC];
+            };
+
+            javascript.javascriptGenerator.forBlock['multiplayer_host_room'] = function (block, generator) {
+                const roomId = generator.valueToCode(block, 'ROOM_ID', generator.ORDER_ATOMIC) || 'null';
+                const code = `await sceneManager.hostRoom(${roomId})`;
+                return [code, generator.ORDER_AWAIT];
+            };
+
+            javascript.javascriptGenerator.forBlock['multiplayer_join_room'] = function (block, generator) {
+                const roomId = generator.valueToCode(block, 'ROOM_ID', generator.ORDER_ATOMIC) || "''";
+                return `await sceneManager.joinRoom(${roomId});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['multiplayer_get_my_peer_id'] = function (block, generator) {
+                const code = `sceneManager.getPeerId()`;
+                return [code, generator.ORDER_FUNCTION_CALL];
+            };
+
+            javascript.javascriptGenerator.forBlock['multiplayer_send_data'] = function (block, generator) {
+                const data = generator.valueToCode(block, 'DATA', generator.ORDER_ATOMIC) || 'null';
+                const peerId = generator.valueToCode(block, 'PEER_ID', generator.ORDER_ATOMIC) || 'null';
+                return `sceneManager.sendData(${data}, ${peerId});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['multiplayer_sync_object'] = function (block, generator) {
+                const object = generator.valueToCode(block, 'OBJECT', generator.ORDER_ATOMIC) || 'null';
+                const interval = generator.valueToCode(block, 'INTERVAL', generator.ORDER_ATOMIC) || '100';
+                return `sceneManager.syncObject(${object}, ${interval});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['multiplayer_on_peer_join'] = function (block, generator) {
+                const doCode = generator.statementToCode(block, 'DO');
+                const peerIdVar = generator.nameDB_.getName('peer_id', Blockly.VARIABLE_CATEGORY_NAME);
+                const callback = `async function(${peerIdVar}) {\n${doCode}\n}`;
+                return `sceneManager.onPeerJoin(${callback});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['multiplayer_on_peer_leave'] = function (block, generator) {
+                const doCode = generator.statementToCode(block, 'DO');
+                const peerIdVar = generator.nameDB_.getName('peer_id', Blockly.VARIABLE_CATEGORY_NAME);
+                const callback = `async function(${peerIdVar}) {\n${doCode}\n}`;
+                return `sceneManager.onPeerLeave(${callback});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['multiplayer_on_receive_data'] = function (block, generator) {
+                const doCode = generator.statementToCode(block, 'DO');
+                const dataVar = generator.nameDB_.getName('received_data', Blockly.VARIABLE_CATEGORY_NAME);
+                const senderPeerIdVar = generator.nameDB_.getName('sender_peer_id', Blockly.VARIABLE_CATEGORY_NAME);
+                const callback = `async function(${dataVar}, ${senderPeerIdVar}) {\n${doCode}\n}`;
+                return `sceneManager.onReceiveData(${callback});\n`;
             };
 
             javascript.javascriptGenerator.forBlock['event_on_click'] = function (block, generator) {
