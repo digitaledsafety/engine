@@ -3303,11 +3303,18 @@ workspace_data: "${base64WorkspaceData}"
 
             async importRobloxAvatar(name, userId, x = 0, y = 0, z = 0) {
                 try {
+                    // Security Validation: Ensure userId is a clean positive integer
+                    const sanitizedUserId = parseInt(userId, 10);
+                    if (isNaN(sanitizedUserId) || sanitizedUserId <= 0 || !/^\d+$/.test(String(userId).trim())) {
+                        console.error("Invalid Roblox User ID:", userId);
+                        return null;
+                    }
+
                     let thumbData = null;
                     const tryEndpoints = [
-                        `https://apis.roblox.com/thumbnails/v1/users/avatar-3d?userId=${userId}`,
-                        `https://thumbnails.roblox.com/v1/users/avatar-3d?userId=${userId}`,
-                        `https://www.roblox.com/avatar-thumbnail-3d/json?userId=${userId}`
+                        `https://apis.roblox.com/thumbnails/v1/users/avatar-3d?userId=${sanitizedUserId}`,
+                        `https://thumbnails.roblox.com/v1/users/avatar-3d?userId=${sanitizedUserId}`,
+                        `https://www.roblox.com/avatar-thumbnail-3d/json?userId=${sanitizedUserId}`
                     ];
 
                     for (const url of tryEndpoints) {
