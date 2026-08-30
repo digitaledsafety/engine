@@ -3734,9 +3734,31 @@ workspace_data: "${base64WorkspaceData}"
                 return groundMesh;
             }
 
-            setGroundPhysics(name) {
-                if (this.objects[name]) {
-                    this.objects[name].physicsImpostor = new BABYLON.PhysicsImpostor(this.objects[name], BABYLON.PhysicsImpostor.PlaneImpostor, { mass: 0, restitution: 0.9 }, this.scene);
+            _resolveImpostorType(impostorType = 'BoxImpostor') {
+                if (typeof impostorType === 'string') {
+                    const cleanType = impostorType.split('.').pop();
+                    if (BABYLON.PhysicsImpostor && BABYLON.PhysicsImpostor[cleanType] !== undefined) {
+                        return cleanType;
+                    }
+                }
+                return 'BoxImpostor';
+            }
+
+            setPhysicsImpostor(name, impostorType = 'BoxImpostor') {
+                const mesh = this._getMesh(name);
+                if (!mesh) return;
+                const typeStr = this._resolveImpostorType(impostorType);
+                if (!mesh.physicsImpostor && (!mesh.parent || !mesh.parent.physicsImpostor)) {
+                    this.enablePhysics(mesh, 1, 0.2, 0.9, typeStr);
+                }
+            }
+
+            setGroundPhysics(name, impostorType = 'PlaneImpostor') {
+                const mesh = this._getMesh(name);
+                if (mesh) {
+                    const typeStr = this._resolveImpostorType(impostorType);
+                    const impostor = BABYLON.PhysicsImpostor[typeStr] || BABYLON.PhysicsImpostor.PlaneImpostor;
+                    mesh.physicsImpostor = new BABYLON.PhysicsImpostor(mesh, impostor, { mass: 0, restitution: 0.9 }, this.scene);
                 }
             }
 
@@ -6770,10 +6792,11 @@ workspace_data: "${base64WorkspaceData}"
                         type: 'field_dropdown',
                         name: 'IMPOSTOR',
                         options: [
-                            ['Box', 'BABYLON.PhysicsImpostor.BoxImpostor'],
-                            ['Sphere', 'BABYLON.PhysicsImpostor.SphereImpostor'],
-                            ['Plane', 'BABYLON.PhysicsImpostor.PlaneImpostor'],
-                            ['Mesh', 'BABYLON.PhysicsImpostor.MeshImpostor']
+                            ['Box', 'BoxImpostor'],
+                            ['Sphere', 'SphereImpostor'],
+                            ['Cylinder', 'CylinderImpostor'],
+                            ['Plane', 'PlaneImpostor'],
+                            ['Mesh', 'MeshImpostor']
                         ],
                     },
                 ],
@@ -6841,8 +6864,8 @@ workspace_data: "${base64WorkspaceData}"
                         type: 'field_dropdown',
                         name: 'IMPOSTOR',
                         options: [
-                            ['Plane', 'BABYLON.PhysicsImpostor.PlaneImpostor'],
-                            ['Box', 'BABYLON.PhysicsImpostor.BoxImpostor'],
+                            ['Plane', 'PlaneImpostor'],
+                            ['Box', 'BoxImpostor'],
                         ],
                     },
                 ],
@@ -7161,13 +7184,21 @@ workspace_data: "${base64WorkspaceData}"
                         "type": "field_dropdown",
                         "name": "NOTE",
                         "options": [
+                            ["C3", "130.81"],
+                            ["D3", "146.83"],
+                            ["E3", "164.81"],
+                            ["F3", "174.61"],
+                            ["G3", "196.00"],
+                            ["A3", "220.00"],
+                            ["B3", "246.94"],
                             ["C4", "261.63"],
                             ["D4", "293.66"],
                             ["E4", "329.63"],
                             ["F4", "349.23"],
                             ["G4", "392.00"],
                             ["A4", "440.00"],
-                            ["B4", "493.88"]
+                            ["B4", "493.88"],
+                            ["C5", "523.25"]
                         ]
                     },
                     {
@@ -8471,7 +8502,8 @@ if (${name}) {
 
             javascript.javascriptGenerator.forBlock['set_ground_physics'] = function (block, generator) {
                 const name = block.getFieldValue('NAME');
-                return `sceneManager.setGroundPhysics('${name}');\n`;
+                const impostorType = block.getFieldValue('IMPOSTOR') || 'PlaneImpostor';
+                return `sceneManager.setGroundPhysics('${name}', '${impostorType}');\n`;
             };
 
             javascript.javascriptGenerator.forBlock['create_primitive'] = function (block, generator) {
@@ -8778,10 +8810,9 @@ if (${name}) {
 
             javascript.javascriptGenerator.forBlock['set_physics_impostor'] = function (block, generator) {
                 const name = block.getFieldValue('NAME');
-                const impostorField = block.getFieldValue('IMPOSTOR');
-                // Extract the type from the full BABYLON path
+                const impostorField = block.getFieldValue('IMPOSTOR') || 'BoxImpostor';
                 const impostorType = impostorField.split('.').pop();
-                return `// Physics impostor is now set via enablePhysics. For '${name}', you can specify type.\n`;
+                return `sceneManager.setPhysicsImpostor('${name}', '${impostorType}');\n`;
             };
 
             // --- Audio Block Generators ---
