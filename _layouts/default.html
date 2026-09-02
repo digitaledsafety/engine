@@ -1073,6 +1073,85 @@ workspace_data: "${base64WorkspaceData}"
                 });
             }
 
+            _migrateLegacyWorkspaceState(state) {
+                if (!state || typeof state !== 'object') return state;
+
+                if (Array.isArray(state)) {
+                    return state.map(item => this._migrateLegacyWorkspaceState(item));
+                }
+
+                let block = Object.assign({}, state);
+
+                for (let key in block) {
+                    if (block.hasOwnProperty(key) && key !== 'next') {
+                        block[key] = this._migrateLegacyWorkspaceState(block[key]);
+                    }
+                }
+
+                const creationTypes = [
+                    'gui_create_text_block', 'gui_create_input_text', 'gui_create_button',
+                    'gui_create_image_from_url', 'gui_create_image_from_asset',
+                    'import_model_from_asset', 'import_animation'
+                ];
+
+                if (block.type && creationTypes.includes(block.type)) {
+                    const varName = (block.fields && (block.fields.NAME || (block.fields.VAR && (block.fields.VAR.name || block.fields.VAR)))) || null;
+                    if (varName) {
+                        const nextBlock = block.next ? this._migrateLegacyWorkspaceState(block.next) : null;
+                        delete block.next;
+                        if (block.fields) {
+                            delete block.fields.NAME;
+                            delete block.fields.VAR;
+                            if (Object.keys(block.fields).length === 0) delete block.fields;
+                        }
+
+                        const varStr = typeof varName === 'object' ? (varName.name || varName.id) : varName;
+                        const varId = typeof varName === 'object' ? varName.id : varStr;
+
+                        const variablesSetBlock = {
+                            type: 'variables_set',
+                            id: (block.id || 'block') + '_var',
+                            fields: {
+                                VAR: { id: varId, name: varStr }
+                            },
+                            inputs: {
+                                VALUE: {
+                                    block: block
+                                }
+                            }
+                        };
+                        if (nextBlock) {
+                            variablesSetBlock.next = nextBlock;
+                        }
+                        return variablesSetBlock;
+                    }
+                }
+
+                const actionTypes = ['gui_set_text', 'gui_get_input_text', 'event_on_gui_click'];
+                if (block.type && actionTypes.includes(block.type)) {
+                    if (block.fields && block.fields.NAME && (!block.inputs || !block.inputs.ELEMENT)) {
+                        const elemName = block.fields.NAME;
+                        delete block.fields.NAME;
+                        if (Object.keys(block.fields).length === 0) delete block.fields;
+                        if (!block.inputs) block.inputs = {};
+                        block.inputs.ELEMENT = {
+                            block: {
+                                type: 'text',
+                                fields: {
+                                    TEXT: elemName
+                                }
+                            }
+                        };
+                    }
+                }
+
+                if (block.next) {
+                    block.next = this._migrateLegacyWorkspaceState(block.next);
+                }
+
+                return block;
+            }
+
             async loadProjectData(projectData) {
                 if (!projectData.workspace || !projectData.assets) {
                     throw new Error('Invalid project data format.');
@@ -1097,6 +1176,7 @@ workspace_data: "${base64WorkspaceData}"
                     let jsonStr = JSON.stringify(workspaceState);
                     jsonStr = jsonStr.replace(/BABYLON\.PhysicsImpostor\.(BoxImpostor|SphereImpostor|CylinderImpostor|PlaneImpostor|MeshImpostor)/g, '$1');
                     workspaceState = JSON.parse(jsonStr);
+                    workspaceState = this._migrateLegacyWorkspaceState(workspaceState);
                 }
                 Blockly.serialization.workspaces.load(workspaceState, this.workspace);
 
@@ -5504,9 +5584,18 @@ workspace_data: "${base64WorkspaceData}"
                 return textBlock;
             }
 
-            setText(name, text) {
-                if (this.controls[name] && this.controls[name].text !== undefined) {
-                    this.controls[name].text = text;
+            _getControl(target) {
+                if (!target) return null;
+                if (typeof target === 'string') {
+                    return this.controls[target] || null;
+                }
+                return target;
+            }
+
+            setText(target, text) {
+                const control = this._getControl(target);
+                if (control && control.text !== undefined) {
+                    control.text = text;
                 }
             }
 
@@ -5525,9 +5614,10 @@ workspace_data: "${base64WorkspaceData}"
                 return inputText;
             }
 
-            getInputText(name) {
-                if (this.controls[name] && this.controls[name].text !== undefined) {
-                    return this.controls[name].text;
+            getInputText(target) {
+                const control = this._getControl(target);
+                if (control && control.text !== undefined) {
+                    return control.text;
                 }
                 return "";
             }
@@ -5564,7 +5654,12 @@ workspace_data: "${base64WorkspaceData}"
                 return image;
             }
 
-            createImageFromAsset(name, asset, options = {}) {
+            async createImageFromAsset(name, assetOrName, options = {}) {
+                let asset = assetOrName;
+                if (typeof assetOrName === 'string') {
+                    asset = await window.assetManager.getAsset(assetOrName);
+                }
+                if (!asset) return null;
                 if (this.controls[name]) {
                     this.controls[name].dispose();
                 }
@@ -5590,14 +5685,15 @@ workspace_data: "${base64WorkspaceData}"
                 return image;
             }
 
-            onControlClick(name, callback) {
-                if (this.controls[name]) {
-                    this.controls[name].onPointerClickObservable.add(callback);
+            onControlClick(target, callback) {
+                const control = this._getControl(target);
+                if (control) {
+                    control.onPointerClickObservable.add(callback);
                 }
             }
 
             getControlByName(name) {
-                return this.controls[name];
+                return this._getControl(name);
             }
 
             createPopup(name, title, options = {}) {
@@ -6062,21 +6158,15 @@ workspace_data: "${base64WorkspaceData}"
             },
             {
                 "type": "import_model_from_asset",
-                "message0": "import model from asset %1 as %2",
+                "message0": "import model from asset %1",
                 "args0": [
                     {
                         "type": "input_value",
                         "name": "ASSET",
                         "check": "String"
-                    },
-                    {
-                        "type": "field_variable",
-                        "name": "VAR",
-                        "variable": "model"
                     }
                 ],
-                "previousStatement": null,
-                "nextStatement": null,
+                "output": "Mesh",
                 "colour": "%{BKY_MATH_HUE}",
                 "tooltip": "Imports a model from the asset manager.",
                 "helpUrl": ""
@@ -6542,17 +6632,15 @@ workspace_data: "${base64WorkspaceData}"
             },
             {
                 "type": "import_animation",
-                "message0": "import animation from url %1 as %2",
+                "message0": "import animation from url %1",
                 "args0": [
                     {
-                        type: 'field_input',
-                        name: 'URL',
-                        text: 'https://cdn.digitaleducationsafety.org/assets/models/animations/run_forward.fbx',
-                    },                    
-                    { "type": "field_variable", "name": "VAR", "variable": "animation" }
+                        "type": "input_value",
+                        "name": "URL",
+                        "check": "String"
+                    }
                 ],
-                "previousStatement": null,
-                "nextStatement": null,
+                "output": "Animation",
                 "colour": "%{BKY_MOTION_HUE}",
                 "tooltip": "Imports a skeletal animation from a URL (.fbx)."
             },
@@ -7213,9 +7301,8 @@ workspace_data: "${base64WorkspaceData}"
             // GUI Blocks
             {
                 "type": "gui_create_text_block",
-                "message0": "create text block named %1 with text %2",
+                "message0": "create text block with text %1",
                 "args0": [
-                    { "type": "field_input", "name": "NAME", "text": "myText" },
                     { "type": "input_value", "name": "TEXT", "check": "String" }
                 ],
                 "message1": "align horizontal %1 vertical %2",
@@ -7235,8 +7322,7 @@ workspace_data: "${base64WorkspaceData}"
                     { "type": "input_value", "name": "LEFT", "check": "String" }
                 ],
                 "inputsInline": false,
-                "previousStatement": null,
-                "nextStatement": null,
+                "output": "GUIElement",
                 "colour": "#5B80A5",
                 "tooltip": "Creates a new text block in the GUI with positioning.",
                 "helpUrl": ""
@@ -7245,7 +7331,7 @@ workspace_data: "${base64WorkspaceData}"
                 "type": "gui_set_text",
                 "message0": "set text of GUI element %1 to %2",
                 "args0": [
-                    { "type": "field_input", "name": "NAME", "text": "myText" },
+                    { "type": "input_value", "name": "ELEMENT" },
                     { "type": "input_value", "name": "TEXT", "check": "String" }
                 ],
                 "previousStatement": null,
@@ -7256,10 +7342,8 @@ workspace_data: "${base64WorkspaceData}"
             },
             {
                 "type": "gui_create_input_text",
-                "message0": "create input field named %1",
-                "args0": [
-                    { "type": "field_input", "name": "NAME", "text": "myInput" }
-                ],
+                "message0": "create input field",
+                "args0": [],
                 "message1": "align horizontal %1 vertical %2",
                 "args1": [
                     {
@@ -7277,8 +7361,7 @@ workspace_data: "${base64WorkspaceData}"
                     { "type": "input_value", "name": "LEFT", "check": "String" }
                 ],
                 "inputsInline": false,
-                "previousStatement": null,
-                "nextStatement": null,
+                "output": "GUIElement",
                 "colour": "#5B80A5",
                 "tooltip": "Creates a new input text field in the GUI with positioning.",
                 "helpUrl": ""
@@ -7287,7 +7370,7 @@ workspace_data: "${base64WorkspaceData}"
                 "type": "gui_get_input_text",
                 "message0": "get text from input field %1",
                 "args0": [
-                    { "type": "field_input", "name": "NAME", "text": "myInput" }
+                    { "type": "input_value", "name": "ELEMENT" }
                 ],
                 "output": "String",
                 "colour": "#5B80A5",
@@ -7296,41 +7379,35 @@ workspace_data: "${base64WorkspaceData}"
             },
             {
                 "type": "gui_create_button",
-                "message0": "create button named %1 with text %2",
+                "message0": "create button with text %1",
                 "args0": [
-                    { "type": "field_input", "name": "NAME", "text": "myButton" },
                     { "type": "input_value", "name": "TEXT", "check": "String" }
                 ],
                 "inputsInline": true,
-                "previousStatement": null,
-                "nextStatement": null,
+                "output": "GUIElement",
                 "colour": "#5B80A5",
                 "tooltip": "Creates a new button in the GUI.",
                 "helpUrl": ""
             },
             {
                 "type": "gui_create_image_from_url",
-                "message0": "create image named %1 from URL %2",
+                "message0": "create image from URL %1",
                 "args0": [
-                    { "type": "field_input", "name": "NAME", "text": "myImage" },
                     { "type": "input_value", "name": "URL", "check": "String" }
                 ],
                 "inputsInline": true,
-                "previousStatement": null,
-                "nextStatement": null,
+                "output": "GUIElement",
                 "colour": "#5B80A5",
                 "tooltip": "Creates a new image in the GUI from a URL.",
                 "helpUrl": ""
             },
             {
                 "type": "gui_create_image_from_asset",
-                "message0": "create image named %1 from asset %2",
+                "message0": "create image from asset %1",
                 "args0": [
-                    { "type": "field_input", "name": "NAME", "text": "myImage" },
                     { "type": "input_value", "name": "ASSET", "check": "String" }
                 ],
-                "previousStatement": null,
-                "nextStatement": null,
+                "output": "GUIElement",
                 "colour": "#5B80A5",
                 "tooltip": "Creates a new image in the GUI from an asset.",
                 "helpUrl": ""
@@ -7339,7 +7416,7 @@ workspace_data: "${base64WorkspaceData}"
                 "type": "event_on_gui_click",
                 "message0": "when GUI element %1 is clicked %2 do %3",
                 "args0": [
-                    { "type": "field_input", "name": "NAME", "text": "myButton" },
+                    { "type": "input_value", "name": "ELEMENT" },
                     { "type": "input_dummy" },
                     { "type": "input_statement", "name": "DO" }
                 ],
@@ -8663,9 +8740,17 @@ if (${name}) {
             };
 
             javascript.javascriptGenerator.forBlock['import_animation'] = function(block, generator) {
-                const url = block.getFieldValue('URL');
-                const varName = generator.nameDB_.getName(block.getFieldValue('VAR'), Blockly.Variables.NAME_TYPE);
-                return `var ${varName} = await sceneManager.importAnimation('${url}');\n`;
+                let url;
+                const urlBlock = block.getInputTargetBlock('URL');
+                if (urlBlock && urlBlock.type === 'text') {
+                    url = `'${urlBlock.getFieldValue('TEXT')}'`;
+                } else if (block.getField('URL')) {
+                    url = `'${block.getFieldValue('URL')}'`;
+                } else {
+                    url = generator.valueToCode(block, 'URL', generator.ORDER_ATOMIC) || "''";
+                }
+                const code = `await sceneManager.importAnimation(${url})`;
+                return [code, generator.ORDER_AWAIT];
             };
 
             javascript.javascriptGenerator.forBlock['apply_animation'] = function(block, generator) {
@@ -8843,8 +8928,8 @@ if (${name}) {
 
             javascript.javascriptGenerator.forBlock['import_model_from_asset'] = function (block, generator) {
                 const assetName = generator.valueToCode(block, 'ASSET', generator.ORDER_ATOMIC) || 'null';
-                const varName = generator.nameDB_.getName(block.getFieldValue('VAR'), Blockly.Variables.NAME_TYPE);
-                return `var ${varName} = await sceneManager.importModelAsset(${assetName}, assetManager);\n`;
+                const code = `await sceneManager.importModelAsset(${assetName}, assetManager)`;
+                return [code, generator.ORDER_AWAIT];
             };
 
             javascript.javascriptGenerator.forBlock['play_sound_from_asset'] = function (block, generator) {
@@ -8860,7 +8945,6 @@ if (${name}) {
 
             // --- GUI Block Generators ---
             javascript.javascriptGenerator.forBlock['gui_create_text_block'] = function (block, generator) {
-                const name = block.getFieldValue('NAME');
                 const text = generator.valueToCode(block, 'TEXT', generator.ORDER_ATOMIC) || "''";
                 const hAlign = parseInt(block.getFieldValue('H_ALIGN'));
                 const vAlign = parseInt(block.getFieldValue('V_ALIGN'));
@@ -8880,24 +8964,21 @@ if (${name}) {
                     left = generator.valueToCode(block, 'LEFT', generator.ORDER_ATOMIC) || "'0px'";
                 }
 
-                const options = `{
-                    horizontalAlignment: ${hAlign},
-                    verticalAlignment: ${vAlign},
-                    top: ${top},
-                    left: ${left}
-                }`;
+                const uniqueId = Blockly.utils.idGenerator.genUid();
+                const name = `'gui_${uniqueId}'`;
+                const options = `{ horizontalAlignment: ${hAlign}, verticalAlignment: ${vAlign}, top: ${top}, left: ${left} }`;
 
-                return `sceneManager.uiManager.createText('${name}', ${text}, ${options});\n`;
+                const code = `sceneManager.uiManager.createText(${name}, ${text}, ${options})`;
+                return [code, generator.ORDER_FUNCTION_CALL];
             };
 
             javascript.javascriptGenerator.forBlock['gui_set_text'] = function (block, generator) {
-                const name = block.getFieldValue('NAME');
+                const element = generator.valueToCode(block, 'ELEMENT', generator.ORDER_ATOMIC) || generator.valueToCode(block, 'NAME', generator.ORDER_ATOMIC) || 'null';
                 const text = generator.valueToCode(block, 'TEXT', generator.ORDER_ATOMIC) || "''";
-                return `sceneManager.uiManager.setText('${name}', ${text});\n`;
+                return `sceneManager.uiManager.setText(${element}, ${text});\n`;
             };
 
             javascript.javascriptGenerator.forBlock['gui_create_input_text'] = function (block, generator) {
-                const name = block.getFieldValue('NAME');
                 const hAlign = parseInt(block.getFieldValue('H_ALIGN'));
                 const vAlign = parseInt(block.getFieldValue('V_ALIGN'));
 
@@ -8916,52 +8997,49 @@ if (${name}) {
                     left = generator.valueToCode(block, 'LEFT', generator.ORDER_ATOMIC) || "'0px'";
                 }
 
-                const options = `{
-                    horizontalAlignment: ${hAlign},
-                    verticalAlignment: ${vAlign},
-                    top: ${top},
-                    left: ${left}
-                }`;
+                const uniqueId = Blockly.utils.idGenerator.genUid();
+                const name = `'gui_${uniqueId}'`;
+                const options = `{ horizontalAlignment: ${hAlign}, verticalAlignment: ${vAlign}, top: ${top}, left: ${left} }`;
 
-                return `sceneManager.uiManager.createInput('${name}', ${options});\n`;
+                const code = `sceneManager.uiManager.createInput(${name}, ${options})`;
+                return [code, generator.ORDER_FUNCTION_CALL];
             };
 
             javascript.javascriptGenerator.forBlock['gui_get_input_text'] = function (block, generator) {
-                const name = block.getFieldValue('NAME');
-                const code = `sceneManager.uiManager.getInputText('${name}')`;
+                const element = generator.valueToCode(block, 'ELEMENT', generator.ORDER_ATOMIC) || generator.valueToCode(block, 'NAME', generator.ORDER_ATOMIC) || 'null';
+                const code = `sceneManager.uiManager.getInputText(${element})`;
                 return [code, generator.ORDER_ATOMIC];
             };
 
             javascript.javascriptGenerator.forBlock['gui_create_button'] = function (block, generator) {
-                const name = block.getFieldValue('NAME');
                 const text = generator.valueToCode(block, 'TEXT', generator.ORDER_ATOMIC) || "''";
-                return `sceneManager.uiManager.createButton('${name}', ${text});\n`;
+                const uniqueId = Blockly.utils.idGenerator.genUid();
+                const name = `'gui_${uniqueId}'`;
+                const code = `sceneManager.uiManager.createButton(${name}, ${text})`;
+                return [code, generator.ORDER_FUNCTION_CALL];
             };
 
             javascript.javascriptGenerator.forBlock['gui_create_image_from_url'] = function (block, generator) {
-                const name = block.getFieldValue('NAME');
                 const url = generator.valueToCode(block, 'URL', generator.ORDER_ATOMIC) || "''";
-                return `sceneManager.uiManager.createImage('${name}', ${url});\n`;
+                const uniqueId = Blockly.utils.idGenerator.genUid();
+                const name = `'gui_${uniqueId}'`;
+                const code = `sceneManager.uiManager.createImage(${name}, ${url})`;
+                return [code, generator.ORDER_FUNCTION_CALL];
             };
 
             javascript.javascriptGenerator.forBlock['gui_create_image_from_asset'] = function (block, generator) {
-                const name = block.getFieldValue('NAME');
                 const assetName = generator.valueToCode(block, 'ASSET', generator.ORDER_ATOMIC) || "''";
-                return `
-                    (async () => {
-                        const asset = await assetManager.getAsset(${assetName});
-                        if (asset) {
-                            sceneManager.uiManager.createImageFromAsset('${name}', asset);
-                        }
-                    })();
-                `;
+                const uniqueId = Blockly.utils.idGenerator.genUid();
+                const name = `'gui_${uniqueId}'`;
+                const code = `await sceneManager.uiManager.createImageFromAsset(${name}, ${assetName})`;
+                return [code, generator.ORDER_AWAIT];
             };
 
             javascript.javascriptGenerator.forBlock['event_on_gui_click'] = function (block, generator) {
-                const name = block.getFieldValue('NAME');
+                const element = generator.valueToCode(block, 'ELEMENT', generator.ORDER_ATOMIC) || generator.valueToCode(block, 'NAME', generator.ORDER_ATOMIC) || 'null';
                 const doCode = generator.statementToCode(block, 'DO');
                 const callback = `function() {\n${doCode}\n}`;
-                return `sceneManager.uiManager.onControlClick('${name}', ${callback});\n`;
+                return `sceneManager.uiManager.onControlClick(${element}, ${callback});\n`;
             };
 
             // --- Console Block Generators ---
