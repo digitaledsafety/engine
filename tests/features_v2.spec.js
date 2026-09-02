@@ -58,13 +58,42 @@ test.describe('Engine Features V2', () => {
                     }
                 }]
             };
-            // Manually inject into uiManager mock or similar if needed,
-            // but let's try to use the real one if possible or just check if the methods exist and don't crash.
 
-            // Testing that _getPopupPanel exists and works if called with correct structure
             const panelInfo = sm._getPopupPanel(mockPopup);
             return panelInfo && panelInfo.name === 'testPopup';
         });
         expect(popupText).toBe(true);
+    });
+
+    test('should resolve impostor types via _resolveImpostorType and support full & short names', async ({ page }) => {
+        const result = await page.evaluate(() => {
+            const sm = window.sceneManager;
+            const resShort = sm._resolveImpostorType('SphereImpostor');
+            const resFull = sm._resolveImpostorType('BABYLON.PhysicsImpostor.SphereImpostor');
+            const resPlane = sm._resolveImpostorType('PlaneImpostor');
+            return {
+                resShort,
+                resFull,
+                resPlane,
+                isSphere: resShort === BABYLON.PhysicsImpostor.SphereImpostor && resFull === BABYLON.PhysicsImpostor.SphereImpostor,
+                isPlane: resPlane === BABYLON.PhysicsImpostor.PlaneImpostor
+            };
+        });
+        expect(result.isSphere).toBe(true);
+        expect(result.isPlane).toBe(true);
+    });
+
+    test('should play note across expanded C3-C5 frequency range in play_note block', async ({ page }) => {
+        const hasNotes = await page.evaluate(() => {
+            const block = window.Blockly.Blocks['play_note'];
+            if (!block) return false;
+            // Get dropdown options from the block definition dummy or init
+            const dummyBlock = window.Blockly.getMainWorkspace().newBlock('play_note');
+            const field = dummyBlock.getField('NOTE');
+            const options = field.getOptions().map(opt => opt[1]);
+            dummyBlock.dispose();
+            return options.includes('130.81') && options.includes('523.25') && options.includes('261.63');
+        });
+        expect(hasNotes).toBe(true);
     });
 });

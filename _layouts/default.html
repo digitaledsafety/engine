@@ -1092,7 +1092,13 @@ workspace_data: "${base64WorkspaceData}"
                 loadAssetsIntoView();
 
                 // 3. Load Workspace
-                Blockly.serialization.workspaces.load(projectData.workspace, this.workspace);
+                let workspaceState = projectData.workspace;
+                if (workspaceState) {
+                    let jsonStr = JSON.stringify(workspaceState);
+                    jsonStr = jsonStr.replace(/BABYLON\.PhysicsImpostor\.(BoxImpostor|SphereImpostor|CylinderImpostor|PlaneImpostor|MeshImpostor)/g, '$1');
+                    workspaceState = JSON.parse(jsonStr);
+                }
+                Blockly.serialization.workspaces.load(workspaceState, this.workspace);
 
                 // 4. Run the loaded project
                 showPlayOverlay();
@@ -3458,6 +3464,20 @@ workspace_data: "${base64WorkspaceData}"
                 return null;
             }
 
+            _resolveImpostorType(impostorType) {
+                if (typeof impostorType === 'number') return impostorType;
+                if (typeof impostorType === 'string') {
+                    const cleanType = impostorType.replace(/^BABYLON\.PhysicsImpostor\./, '');
+                    if (BABYLON.PhysicsImpostor[cleanType] !== undefined) {
+                        return BABYLON.PhysicsImpostor[cleanType];
+                    }
+                    if (BABYLON.PhysicsImpostor[cleanType + 'Impostor'] !== undefined) {
+                        return BABYLON.PhysicsImpostor[cleanType + 'Impostor'];
+                    }
+                }
+                return BABYLON.PhysicsImpostor.BoxImpostor;
+            }
+
             enablePhysics(target, mass, friction = 0.2, restitution = 0.9, impostorType = 'BoxImpostor') {
                 let originalMesh;
                 if (typeof target === 'string') {
@@ -3512,7 +3532,7 @@ workspace_data: "${base64WorkspaceData}"
                     impostorBox.visibility = 0; // Make it invisible for rendering.
 
                     // 4. Apply the physics impostor to this new box.
-                    const impostor = BABYLON.PhysicsImpostor[impostorType];
+                    const impostor = this._resolveImpostorType(impostorType);
                     impostorBox.physicsImpostor = new BABYLON.PhysicsImpostor(impostorBox, impostor, { mass: mass, friction: friction, restitution: restitution }, this.scene);
 
                     // 5. Parent the original visual mesh to the new physics box.
@@ -3529,7 +3549,7 @@ workspace_data: "${base64WorkspaceData}"
 
                 } else {
                     // It's a simple mesh (like a primitive), apply physics directly to it.
-                    const impostor = BABYLON.PhysicsImpostor[impostorType];
+                    const impostor = this._resolveImpostorType(impostorType);
                     originalMesh.physicsImpostor = new BABYLON.PhysicsImpostor(originalMesh, impostor, { mass: mass, friction: friction, restitution: restitution }, this.scene);
                 }
                 this.processPendingCollisions();
@@ -6770,10 +6790,10 @@ workspace_data: "${base64WorkspaceData}"
                         type: 'field_dropdown',
                         name: 'IMPOSTOR',
                         options: [
-                            ['Box', 'BABYLON.PhysicsImpostor.BoxImpostor'],
-                            ['Sphere', 'BABYLON.PhysicsImpostor.SphereImpostor'],
-                            ['Plane', 'BABYLON.PhysicsImpostor.PlaneImpostor'],
-                            ['Mesh', 'BABYLON.PhysicsImpostor.MeshImpostor']
+                            ['Box', 'BoxImpostor'],
+                            ['Sphere', 'SphereImpostor'],
+                            ['Plane', 'PlaneImpostor'],
+                            ['Mesh', 'MeshImpostor']
                         ],
                     },
                 ],
@@ -6841,8 +6861,8 @@ workspace_data: "${base64WorkspaceData}"
                         type: 'field_dropdown',
                         name: 'IMPOSTOR',
                         options: [
-                            ['Plane', 'BABYLON.PhysicsImpostor.PlaneImpostor'],
-                            ['Box', 'BABYLON.PhysicsImpostor.BoxImpostor'],
+                            ['Plane', 'PlaneImpostor'],
+                            ['Box', 'BoxImpostor'],
                         ],
                     },
                 ],
@@ -7161,13 +7181,21 @@ workspace_data: "${base64WorkspaceData}"
                         "type": "field_dropdown",
                         "name": "NOTE",
                         "options": [
+                            ["C3", "130.81"],
+                            ["D3", "146.83"],
+                            ["E3", "164.81"],
+                            ["F3", "174.61"],
+                            ["G3", "196.00"],
+                            ["A3", "220.00"],
+                            ["B3", "246.94"],
                             ["C4", "261.63"],
                             ["D4", "293.66"],
                             ["E4", "329.63"],
                             ["F4", "349.23"],
                             ["G4", "392.00"],
                             ["A4", "440.00"],
-                            ["B4", "493.88"]
+                            ["B4", "493.88"],
+                            ["C5", "523.25"]
                         ]
                     },
                     {
