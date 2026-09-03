@@ -7,7 +7,7 @@ test.describe('Workspace PWA Verification', () => {
         page.on('requestfailed', request => {
             console.log('REQUEST FAILED:', request.url(), request.failure()?.errorText);
         });
-        await page.goto('/workspaces/maze/');
+        await page.goto('/workspaces/maze/', { waitUntil: 'domcontentloaded' });
 
         // 1. Verify title
         const title = await page.title();
@@ -54,7 +54,7 @@ test.describe('Workspace PWA Verification', () => {
 
     test('App mode should switch to preview tab', async ({ page }) => {
         // We use a workspace page for this
-        await page.goto('/workspaces/maze/?mode=app');
+        await page.goto('/workspaces/maze/?mode=app', { waitUntil: 'domcontentloaded' });
 
         const container = page.locator('.container');
         await expect(container).toHaveClass(/preview-active/);
