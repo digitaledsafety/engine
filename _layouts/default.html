@@ -3051,6 +3051,7 @@ workspace_data: "${base64WorkspaceData}"
                 if (!isValidAssetURL(fontUrl)) {
                     return null;
                 }
+                this._cleanupExisting(name);
                 try {
                     const response = await fetch(getProxiedUrl(fontUrl));
                     if (!response.ok) {
@@ -3065,7 +3066,6 @@ workspace_data: "${base64WorkspaceData}"
                     }, this.scene);
 
                     if (textMesh) {
-                        this._cleanupExisting(name);
                         this.objects[name] = textMesh;
                         // Center the mesh pivot
                         const boundingInfo = textMesh.getHierarchyBoundingVectors();
@@ -3098,6 +3098,7 @@ workspace_data: "${base64WorkspaceData}"
                 if (!isValidAssetURL(url)) {
                     return null;
                 }
+                this._cleanupExisting(name);
                 const isMcStructure = (url && url.toLowerCase().includes('.mcstructure')) || (name && name.toLowerCase().endsWith('.mcstructure'));
                 if (isMcStructure) {
                     try {
@@ -3138,7 +3139,6 @@ workspace_data: "${base64WorkspaceData}"
                             }
                         });
 
-                        this._cleanupExisting(name);
                         this.objects[name] = wrapper;
                         this._tagMesh(wrapper, name);
                         return wrapper;
@@ -3150,6 +3150,7 @@ workspace_data: "${base64WorkspaceData}"
             }
 
             async importMcStructureFromBuffer(name, buffer, x = 0, y = 0, z = 0) {
+                this._cleanupExisting(name);
                 try {
                     // Dynamically import NBTify
                     const NBT = await import('https://cdn.jsdelivr.net/npm/nbtify@2.2.0/+esm');
@@ -3358,7 +3359,6 @@ workspace_data: "${base64WorkspaceData}"
                     this._normalizeAndCenter(wrapper, importedRoots);
                     wrapper.position.set(x, y, z);
 
-                    this._cleanupExisting(name);
                     this.objects[name] = wrapper;
                     this._tagMesh(wrapper, name);
 
@@ -3388,6 +3388,7 @@ workspace_data: "${base64WorkspaceData}"
             }
 
             async importRobloxAvatar(name, userId, x = 0, y = 0, z = 0) {
+                this._cleanupExisting(name);
                 try {
                     let thumbData = null;
                     const tryEndpoints = [
@@ -3533,7 +3534,6 @@ workspace_data: "${base64WorkspaceData}"
 
                         wrapper.position.set(x, y, z);
 
-                        this._cleanupExisting(name);
                         this.objects[name] = wrapper;
                         this._tagMesh(wrapper, name);
                         return wrapper;
