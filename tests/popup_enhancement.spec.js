@@ -2,7 +2,7 @@ const { test, expect } = require('@playwright/test');
 
 test.describe('Engine Popup Text Enhancement', () => {
   test('Popup creation with text and setPopupText works', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
     await page.click("#start-button");
 
     const result = await page.evaluate(async () => {

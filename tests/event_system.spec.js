@@ -2,7 +2,7 @@ const { test, expect } = require('@playwright/test');
 
 test.describe('Event System and Observables Functionality', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
     await page.click("#start-button");
     await page.click("#preview-tab");
   });

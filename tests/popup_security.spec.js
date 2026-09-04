@@ -2,7 +2,7 @@ const { test, expect } = require('@playwright/test');
 
 test.describe('Engine Popup Security Validation', () => {
   test('Popup creation and dynamic update sanitize image URLs', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
     await page.click("#start-button");
 
     const result = await page.evaluate(async () => {
@@ -117,7 +117,7 @@ test.describe('Engine Popup Security Validation', () => {
   });
 
   test('Proxy-wrapped and optimized insecure URLs are blocked', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
     await page.click("#start-button");
 
     const result = await page.evaluate(async () => {
