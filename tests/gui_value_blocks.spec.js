@@ -2,7 +2,7 @@ const { test, expect } = require('@playwright/test');
 
 test.describe('GUI Value Blocks & Creation Blocks Conversion', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
     const startButton = page.locator('#start-button');
     if (await startButton.isVisible()) {
       await startButton.click();

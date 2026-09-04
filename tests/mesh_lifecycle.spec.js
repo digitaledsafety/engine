@@ -2,7 +2,7 @@ const { test, expect } = require('@playwright/test');
 
 test.describe('Mesh Lifecycle and Resource Cleanup', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
     // Handle the hero overlay
     const startButton = page.locator('#start-button');
     if (await startButton.isVisible()) {

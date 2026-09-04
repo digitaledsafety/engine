@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 test('verify all changes', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
   await page.click('#start-button');
   await page.waitForFunction(() => typeof window.workspace !== 'undefined');
 

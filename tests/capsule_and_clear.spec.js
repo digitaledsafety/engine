@@ -1,7 +1,7 @@
 const { test, expect, devices } = require('@playwright/test');
 
 test('Capsule primitive creation works', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
   const startButton = page.locator('#start-button');
   if (await startButton.isVisible()) {
     await startButton.click();

@@ -1,7 +1,7 @@
 const { test, expect } = require('@playwright/test');
 
 test('Verify Order Independent Transparency can be enabled via block', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
 
     // Click 'Start Coding' to initialize the scene
     const startButton = page.locator('#start-button');

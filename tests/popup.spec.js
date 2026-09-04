@@ -2,7 +2,7 @@ const { test, expect } = require('@playwright/test');
 
 test.describe('Engine Popup with Variables', () => {
   test('Popup creation and variable manipulation works', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
     await page.click("#start-button");
 
     const result = await page.evaluate(async () => {
@@ -104,7 +104,7 @@ test.describe('Engine Popup with Variables', () => {
     const isHidden = await page.evaluate(async () => {
         const workspace = window.workspace;
         // Do NOT clear workspace here as it might lose the variable ID mapping if we recreate it wrongly
-        const myPopupVar = workspace.getVariable('myPopup');
+        const myPopupVar = workspace.getVariableMap ? workspace.getVariableMap().getVariable('myPopup') : workspace.getVariable('myPopup');
 
         const hidePopupBlock = workspace.newBlock('hide_popup');
         const getVarBlockHide = workspace.newBlock('variables_get');

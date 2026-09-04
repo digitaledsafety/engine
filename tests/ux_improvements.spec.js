@@ -3,7 +3,7 @@ const { test, expect } = require('@playwright/test');
 test.describe('UX Improvements', () => {
   test.beforeEach(async ({ page }) => {
     test.slow();
-    await page.goto('/');
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
     // Handle the hero overlay
     const startButton = page.locator('#start-button');
     if (await startButton.isVisible()) {
