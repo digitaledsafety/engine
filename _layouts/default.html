@@ -670,6 +670,7 @@
             this.loadingUITextColor = loadingUITextColor || "white";
         }
         CustomLoadingScreen.prototype.displayLoadingUI = function () {
+            this.hideLoadingUI();
             var loadingDiv = document.createElement("div");
             loadingDiv.id = "customLoadingScreen";
             const canvasContainer = document.querySelector('.canvas-container');
@@ -694,9 +695,13 @@
             }                
         };
         CustomLoadingScreen.prototype.hideLoadingUI = function () {
-            if (this._loadingDiv) {
+            if (this._loadingDiv && this._loadingDiv.parentNode) {
                 this._loadingDiv.parentNode.removeChild(this._loadingDiv);
-                this._loadingDiv = null;
+            }
+            this._loadingDiv = null;
+            const existingDiv = document.getElementById("customLoadingScreen");
+            if (existingDiv && existingDiv.parentNode) {
+                existingDiv.parentNode.removeChild(existingDiv);
             }
         };
 
@@ -8277,27 +8282,18 @@ workspace_data: "${base64WorkspaceData}"
 
 
             javascript.javascriptGenerator.forBlock['show_loading_screen'] = function (block, generator) {
-                return `
-                    if (sceneManager.engine.loadingScreen) {
-                        sceneManager.engine.displayLoadingUI();
-                    } else {
-                         console.warn("Show loading screen block used, but no loading screen was created. Please use the create loading screen block first.");
-                    };
-                `;
+                return "if (sceneManager.engine.loadingScreen) {\n  sceneManager.engine.displayLoadingUI();\n} else {\n  console.warn('Show loading screen block used, but no loading screen was created. Please use the create loading screen block first.');\n}\n";
             };
 
             javascript.javascriptGenerator.forBlock['hide_loading_screen'] = function (block, generator) {
-                return 'sceneManager.engine.hideLoadingUI();\n';
+                return "sceneManager.engine.hideLoadingUI();\n";
             };
 
             javascript.javascriptGenerator.forBlock['create_loading_screen'] = function (block, generator) {
                 const text = generator.valueToCode(block, 'TEXT', generator.ORDER_ATOMIC) || "'Loading...'";
                 const bgColor = block.getFieldValue('BG_COLOR');
                 const textColor = block.getFieldValue('TEXT_COLOR');
-                return `
-                    var loadingScreen = new CustomLoadingScreen(${text}, '${bgColor}', '${textColor}');
-                    sceneManager.engine.loadingScreen = loadingScreen;
-                `;
+                return `var loadingScreen = new CustomLoadingScreen(${text}, '${bgColor}', '${textColor}');\nsceneManager.engine.loadingScreen = loadingScreen;\n`;
             };
 
             // --- Scripting Block Generators ---
