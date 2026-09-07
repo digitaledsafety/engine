@@ -149,4 +149,32 @@ test.describe('Mesh Lifecycle and Resource Cleanup', () => {
 
     expect(textTaggingInfo).toBe('testText');
   });
+
+  test('async creation methods cleanup existing mesh before async resolution', async ({ page }) => {
+    // 1. Create initial box 'asyncObject'
+    await page.evaluate(() => {
+      window.sceneManager.createBox('asyncObject', 0, 0, 0);
+    });
+
+    const boxUniqueId = await page.evaluate(() => {
+      return window.sceneManager.objects['asyncObject'].uniqueId;
+    });
+
+    // 2. Start calling importModel with an invalid asset URL or pending fetch, or createText
+    // At the immediate moment importModel is called, the old box should be cleaned up / disposed
+    const isCleanedUpImmediately = await page.evaluate(async (oldId) => {
+      // Initiate importModel (which will fail URL validation or fetch, but cleanup happens first)
+      const promise = window.sceneManager.importModel('asyncObject', 'http://invalid-url.com/model.glb');
+
+      const oldMesh = window.sceneManager.scene.getMeshByUniqueId(oldId);
+      const isDisposed = !oldMesh || oldMesh.isDisposed();
+      const isRemovedFromObjects = !window.sceneManager.objects['asyncObject'];
+
+      await promise; // await result
+
+      return isDisposed && isRemovedFromObjects;
+    }, boxUniqueId);
+
+    expect(isCleanedUpImmediately).toBe(true);
+  });
 });
