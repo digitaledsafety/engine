@@ -117,4 +117,21 @@ test.describe('Engine Features V2', () => {
         expect(result.countAfterSecond).toBe(1);
         expect(result.countAfterHide).toBe(0);
     });
+
+    test('should tag all created primitive meshes with logicalRoot metadata', async ({ page }) => {
+        const taggedCorrectly = await page.evaluate(() => {
+            const sm = window.sceneManager;
+            const primitives = [
+                sm.createBox('testBox', 0, 0, 0),
+                sm.createSphere('testSphere', 0, 0, 0),
+                sm.createCylinder('testCylinder', 0, 0, 0),
+                sm.createCone('testCone', 0, 0, 0),
+                sm.createTorus('testTorus', 0, 0, 0),
+                sm.createCapsule('testCapsule', 0, 0, 0)
+            ];
+
+            return primitives.every(mesh => mesh && mesh.metadata && mesh.metadata.logicalRoot === mesh.name);
+        });
+        expect(taggedCorrectly).toBe(true);
+    });
 });
