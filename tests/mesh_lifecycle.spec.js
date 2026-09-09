@@ -149,4 +149,49 @@ test.describe('Mesh Lifecycle and Resource Cleanup', () => {
 
     expect(textTaggingInfo).toBe('testText');
   });
+
+  test('Polymorphic target resolution and destroyObject with direct object references', async ({ page }) => {
+    const res = await page.evaluate(() => {
+      const sm = window.sceneManager;
+      sm.createBox('polyBox', 1, 2, 3);
+      const boxMesh = sm.objects['polyBox'];
+
+      // Test _getMesh with string name and direct Mesh instance
+      const meshByName = sm._getMesh('polyBox');
+      const meshByRef = sm._getMesh(boxMesh);
+
+      // Test getProperty and setProperty with direct object reference & string
+      sm.setProperty('polyBox', 'position.x', 10);
+      const pxByName = sm.getProperty('polyBox', 'position.x');
+
+      sm.setProperty(boxMesh, 'position.y', 20);
+      const pyByRef = sm.getProperty(boxMesh, 'position.y');
+
+      // Create a UI control to test getProperty/setProperty on UI controls
+      sm.uiManager.createButton('polyButton', 'Click Me');
+      sm.setProperty('polyButton', 'width', '200px');
+      const btnWidth = sm.getProperty('polyButton', 'width');
+
+      // Test destroyObject with direct Mesh instance
+      sm.destroyObject(boxMesh);
+      const boxRemaining = sm.objects['polyBox'];
+      const boxDisposed = boxMesh.isDisposed();
+
+      return {
+        sameMeshByNameAndRef: meshByName === boxMesh && meshByRef === boxMesh,
+        pxByName,
+        pyByRef,
+        btnWidth,
+        boxRemaining: !!boxRemaining,
+        boxDisposed
+      };
+    });
+
+    expect(res.sameMeshByNameAndRef).toBe(true);
+    expect(res.pxByName).toBe(10);
+    expect(res.pyByRef).toBe(20);
+    expect(res.btnWidth).toBe('200px');
+    expect(res.boxRemaining).toBe(false);
+    expect(res.boxDisposed).toBe(true);
+  });
 });
