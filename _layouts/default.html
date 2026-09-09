@@ -4290,8 +4290,10 @@ workspace_data: "${base64WorkspaceData}"
             destroyObject(target) {
                 const mesh = this._getMesh(target);
                 if (mesh) {
-                    const meshesToFilter = [mesh, ...mesh.getDescendants(false)];
-                    mesh.dispose();
+                    const meshesToFilter = [mesh, ...(typeof mesh.getDescendants === 'function' ? mesh.getDescendants(false) : [])];
+                    if (typeof mesh.dispose === 'function') {
+                        mesh.dispose();
+                    }
                     let name;
                     if (typeof target === 'string') {
                         name = target;
@@ -4300,6 +4302,11 @@ workspace_data: "${base64WorkspaceData}"
                     }
                     if (name && this.objects[name]) {
                         delete this.objects[name];
+                    }
+                    for (const key of Object.keys(this.objects)) {
+                        if (this.objects[key] === mesh) {
+                            delete this.objects[key];
+                        }
                     }
                     this.perFrameFunctions = this.perFrameFunctions.filter(
                         task => !meshesToFilter.includes(task.targetMesh)
@@ -5107,22 +5114,26 @@ workspace_data: "${base64WorkspaceData}"
 
             _getMesh(target) {
                 target = this._resolveTarget(target);
+                if (!target) return null;
                 let name;
                 if (typeof target === 'string') {
                     name = target;
-                } else if (target && typeof target === 'object' && target.name) {
+                } else if (typeof target === 'object' && target.name) {
                     name = target.name;
                 }
-                return this.objects[name];
+                return (name && this.objects[name]) ? this.objects[name] : (typeof target === 'object' ? target : null);
             }
 
             getProperty(target, property) {
                 if (!target || !property) {
                     return null;
                 }
-                // Special handling for UI controls, which are not in the main 'objects' list
-                if (typeof target === 'string' && this.uiManager.controls[target]) {
+                target = this._resolveTarget(target);
+                // Special handling for UI controls and scene meshes by name string
+                if (typeof target === 'string' && this.uiManager && this.uiManager.controls[target]) {
                     target = this.uiManager.controls[target];
+                } else if (typeof target === 'string' && this.objects[target]) {
+                    target = this.objects[target];
                 }
 
                 const propertyPath = property.split('.');
@@ -5528,10 +5539,15 @@ workspace_data: "${base64WorkspaceData}"
             }
 
             setProperty(target, property, value) {
-                let mesh = this._getMesh(target);
-                if (mesh && property) {
+                let obj = this._getMesh(target);
+                if (!obj && typeof target === 'string' && this.uiManager && this.uiManager.controls[target]) {
+                    obj = this.uiManager.controls[target];
+                } else if (!obj && target && typeof target === 'object') {
+                    obj = target;
+                }
+                if (obj && property) {
                     const props = property.split('.');
-                    let curr = mesh;
+                    let curr = obj;
                     for (let i = 0; i < props.length - 1; i++) {
                         if (curr[props[i]]) curr = curr[props[i]];
                         else return;
