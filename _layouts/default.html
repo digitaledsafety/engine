@@ -1933,7 +1933,31 @@ workspace_data: "${base64WorkspaceData}"
                         {
                             kind: 'block',
                             type: 'camera_zoom',
-                        },                        
+                        },
+                        {
+                            kind: 'block',
+                            type: 'set_camera_inertia',
+                            inputs: {
+                                INERTIA: {
+                                    block: {
+                                        type: 'math_number',
+                                        fields: { NUM: 0.2 }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            kind: 'block',
+                            type: 'set_camera_wheel_precision',
+                            inputs: {
+                                PRECISION: {
+                                    block: {
+                                        type: 'math_number',
+                                        fields: { NUM: 10 }
+                                    }
+                                }
+                            }
+                        },
                         {
                             kind: 'block',
                             type: 'create_ground',
@@ -3889,6 +3913,20 @@ workspace_data: "${base64WorkspaceData}"
             cameraZoom(value) {
                 if (this.scene.activeCamera && typeof this.scene.activeCamera.radius === 'number') {
                     this.scene.activeCamera.radius = Math.max(1, this.scene.activeCamera.radius - value);
+                }
+            }
+
+            setCameraInertia(inertia) {
+                const num = Number(inertia);
+                if (this.scene && this.scene.activeCamera && !isNaN(num)) {
+                    this.scene.activeCamera.inertia = num;
+                }
+            }
+
+            setCameraWheelPrecision(precision) {
+                const num = Number(precision);
+                if (this.scene && this.scene.activeCamera && !isNaN(num)) {
+                    this.scene.activeCamera.wheelPrecision = num;
                 }
             }
 
@@ -7251,6 +7289,38 @@ workspace_data: "${base64WorkspaceData}"
                 "helpUrl": ""
             },
             {
+                "type": "set_camera_inertia",
+                "message0": "set camera inertia %1",
+                "args0": [
+                    {
+                        "type": "input_value",
+                        "name": "INERTIA",
+                        "check": "Number"
+                    }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": "#A55B80",
+                "tooltip": "Sets the inertia of the active camera (e.g. 0.2 for smooth camera deceleration).",
+                "helpUrl": ""
+            },
+            {
+                "type": "set_camera_wheel_precision",
+                "message0": "set camera wheel precision %1",
+                "args0": [
+                    {
+                        "type": "input_value",
+                        "name": "PRECISION",
+                        "check": "Number"
+                    }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": "#A55B80",
+                "tooltip": "Sets the mouse wheel zoom precision of the active camera (higher values slow down zoom speed).",
+                "helpUrl": ""
+            },
+            {
                 "type": "play_sound_url",
                 "message0": "play sound from URL %1",
                 "args0": [
@@ -8462,6 +8532,16 @@ if (${name}) {
             javascript.javascriptGenerator.forBlock['camera_zoom'] = function (block, generator) {
                 const zoomValue = generator.valueToCode(block, 'ZOOM', generator.ORDER_ATOMIC) || 0;
                 return `sceneManager.cameraZoom(${zoomValue});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['set_camera_inertia'] = function (block, generator) {
+                const inertia = generator.valueToCode(block, 'INERTIA', generator.ORDER_ATOMIC) || '0.2';
+                return `sceneManager.setCameraInertia(${inertia});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['set_camera_wheel_precision'] = function (block, generator) {
+                const precision = generator.valueToCode(block, 'PRECISION', generator.ORDER_ATOMIC) || '10';
+                return `sceneManager.setCameraWheelPrecision(${precision});\n`;
             };
 
             // --- Gameplay Block Generators ---

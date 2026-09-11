@@ -117,4 +117,55 @@ test.describe('Engine Features V2', () => {
         expect(result.countAfterSecond).toBe(1);
         expect(result.countAfterHide).toBe(0);
     });
+
+    test('should support setting camera inertia and wheel precision via methods and blocks', async ({ page }) => {
+        const result = await page.evaluate(async () => {
+            const sm = window.sceneManager;
+            sm.setCameraInertia(0.8);
+            sm.setCameraWheelPrecision(25);
+
+            const directInertia = sm.scene.activeCamera.inertia;
+            const directPrecision = sm.scene.activeCamera.wheelPrecision;
+
+            // Test via generated code from blocks
+            const ws = window.Blockly.getMainWorkspace();
+            const inertiaBlock = ws.newBlock('set_camera_inertia');
+            const numBlock1 = ws.newBlock('math_number');
+            numBlock1.setFieldValue(0.4, 'NUM');
+            inertiaBlock.getInput('INERTIA').connection.connect(numBlock1.outputConnection);
+
+            const precisionBlock = ws.newBlock('set_camera_wheel_precision');
+            const numBlock2 = ws.newBlock('math_number');
+            numBlock2.setFieldValue(12, 'NUM');
+            precisionBlock.getInput('PRECISION').connection.connect(numBlock2.outputConnection);
+
+            const codeInertia = window.javascript.javascriptGenerator.blockToCode(inertiaBlock);
+            const codePrecision = window.javascript.javascriptGenerator.blockToCode(precisionBlock);
+
+            eval(codeInertia);
+            eval(codePrecision);
+
+            const blockInertia = sm.scene.activeCamera.inertia;
+            const blockPrecision = sm.scene.activeCamera.wheelPrecision;
+
+            inertiaBlock.dispose();
+            precisionBlock.dispose();
+
+            return {
+                directInertia,
+                directPrecision,
+                blockInertia,
+                blockPrecision,
+                codeInertia: codeInertia.trim(),
+                codePrecision: codePrecision.trim()
+            };
+        });
+
+        expect(result.directInertia).toBe(0.8);
+        expect(result.directPrecision).toBe(25);
+        expect(result.blockInertia).toBe(0.4);
+        expect(result.blockPrecision).toBe(12);
+        expect(result.codeInertia).toBe('sceneManager.setCameraInertia(0.4);');
+        expect(result.codePrecision).toBe('sceneManager.setCameraWheelPrecision(12);');
+    });
 });
