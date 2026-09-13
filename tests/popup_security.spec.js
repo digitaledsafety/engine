@@ -13,6 +13,9 @@ test.describe('Engine Popup Security Validation', () => {
         const securePopupVar = workspace.createVariable('securePopup');
         const insecurePopupVar = workspace.createVariable('insecurePopup');
         const protocolRelativePopupVar = workspace.createVariable('protocolRelativePopup');
+        const backslashProtoPopupVar = workspace.createVariable('backslashProtoPopup');
+        const unsafeDataPopupVar = workspace.createVariable('unsafeDataPopup');
+        const safeDataPopupVar = workspace.createVariable('safeDataPopup');
 
         // Case 1: Create a popup with an INSECURE image URL
         const createInsecureBlock = workspace.newBlock('create_popup');
@@ -43,6 +46,51 @@ test.describe('Engine Popup Security Validation', () => {
         setProtoVarBlock.getInput('VALUE').connection.connect(createProtoBlock.outputConnection);
         setInsecureVarBlock.nextConnection.connect(setProtoVarBlock.previousConnection);
 
+        // Case 1c: Create a popup with a BACKSLASH PROTOCOL-RELATIVE image URL
+        const createBackslashProtoBlock = workspace.newBlock('create_popup');
+        const backslashTitleText = workspace.newBlock('text');
+        backslashTitleText.setFieldValue('Backslash Proto Popup', 'TEXT');
+        createBackslashProtoBlock.getInput('TITLE').connection.connect(backslashTitleText.outputConnection);
+
+        const backslashUrlText = workspace.newBlock('text');
+        backslashUrlText.setFieldValue('\\\\tracking-pixel.com/image.png', 'TEXT');
+        createBackslashProtoBlock.getInput('IMAGE').connection.connect(backslashUrlText.outputConnection);
+
+        const setBackslashVarBlock = workspace.newBlock('variables_set');
+        setBackslashVarBlock.setFieldValue(backslashProtoPopupVar.getId(), 'VAR');
+        setBackslashVarBlock.getInput('VALUE').connection.connect(createBackslashProtoBlock.outputConnection);
+        setProtoVarBlock.nextConnection.connect(setBackslashVarBlock.previousConnection);
+
+        // Case 1d: Create a popup with an UNSAFE data: URI
+        const createUnsafeDataBlock = workspace.newBlock('create_popup');
+        const unsafeDataTitleText = workspace.newBlock('text');
+        unsafeDataTitleText.setFieldValue('Unsafe Data Popup', 'TEXT');
+        createUnsafeDataBlock.getInput('TITLE').connection.connect(unsafeDataTitleText.outputConnection);
+
+        const unsafeDataUrlText = workspace.newBlock('text');
+        unsafeDataUrlText.setFieldValue('data:text/html,<script>alert(1)</script>', 'TEXT');
+        createUnsafeDataBlock.getInput('IMAGE').connection.connect(unsafeDataUrlText.outputConnection);
+
+        const setUnsafeDataVarBlock = workspace.newBlock('variables_set');
+        setUnsafeDataVarBlock.setFieldValue(unsafeDataPopupVar.getId(), 'VAR');
+        setUnsafeDataVarBlock.getInput('VALUE').connection.connect(createUnsafeDataBlock.outputConnection);
+        setBackslashVarBlock.nextConnection.connect(setUnsafeDataVarBlock.previousConnection);
+
+        // Case 1e: Create a popup with a SAFE data: URI
+        const createSafeDataBlock = workspace.newBlock('create_popup');
+        const safeDataTitleText = workspace.newBlock('text');
+        safeDataTitleText.setFieldValue('Safe Data Popup', 'TEXT');
+        createSafeDataBlock.getInput('TITLE').connection.connect(safeDataTitleText.outputConnection);
+
+        const safeDataUrlText = workspace.newBlock('text');
+        safeDataUrlText.setFieldValue('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'TEXT');
+        createSafeDataBlock.getInput('IMAGE').connection.connect(safeDataUrlText.outputConnection);
+
+        const setSafeDataVarBlock = workspace.newBlock('variables_set');
+        setSafeDataVarBlock.setFieldValue(safeDataPopupVar.getId(), 'VAR');
+        setSafeDataVarBlock.getInput('VALUE').connection.connect(createSafeDataBlock.outputConnection);
+        setUnsafeDataVarBlock.nextConnection.connect(setSafeDataVarBlock.previousConnection);
+
         // Case 2: Create a popup with a SECURE image URL
         const createSecureBlock = workspace.newBlock('create_popup');
         const secureTitleText = workspace.newBlock('text');
@@ -56,7 +104,7 @@ test.describe('Engine Popup Security Validation', () => {
         const setSecureVarBlock = workspace.newBlock('variables_set');
         setSecureVarBlock.setFieldValue(securePopupVar.getId(), 'VAR');
         setSecureVarBlock.getInput('VALUE').connection.connect(createSecureBlock.outputConnection);
-        setProtoVarBlock.nextConnection.connect(setSecureVarBlock.previousConnection);
+        setSafeDataVarBlock.nextConnection.connect(setSecureVarBlock.previousConnection);
 
         // Case 3: Update secure popup with an INSECURE url dynamically
         const setPopupImageBlock = workspace.newBlock('gui_set_popup_image');
@@ -94,6 +142,21 @@ test.describe('Engine Popup Security Validation', () => {
         const protoPanel = protoPopup.children[0];
         const hasProtoImage = protoPanel.children.some(c => c.name === 'protocolRelativePopup_image');
 
+        // Verify Backslash Protocol-relative Popup (should NOT have image child)
+        const backslashPopup = window.sceneManager.uiManager.getControlByName('backslashProtoPopup');
+        const backslashPanel = backslashPopup.children[0];
+        const hasBackslashImage = backslashPanel.children.some(c => c.name === 'backslashProtoPopup_image');
+
+        // Verify Unsafe Data Popup (should NOT have image child)
+        const unsafeDataPopup = window.sceneManager.uiManager.getControlByName('unsafeDataPopup');
+        const unsafeDataPanel = unsafeDataPopup.children[0];
+        const hasUnsafeDataImage = unsafeDataPanel.children.some(c => c.name === 'unsafeDataPopup_image');
+
+        // Verify Safe Data Popup (SHOULD have image child)
+        const safeDataPopup = window.sceneManager.uiManager.getControlByName('safeDataPopup');
+        const safeDataPanel = safeDataPopup.children[0];
+        const hasSafeDataImage = safeDataPanel.children.some(c => c.name === 'safeDataPopup_image');
+
         // Verify Secure Popup
         const securePopup = window.sceneManager.uiManager.getControlByName('securePopup');
         const securePanel = securePopup.children[0];
@@ -103,6 +166,9 @@ test.describe('Engine Popup Security Validation', () => {
         return {
             hasInsecureImage,
             hasProtoImage,
+            hasBackslashImage,
+            hasUnsafeDataImage,
+            hasSafeDataImage,
             hasSecureImage: !!secureImageControl,
             secureImageSrc
         };
@@ -111,6 +177,9 @@ test.describe('Engine Popup Security Validation', () => {
     // Asset sanitization assertions
     expect(result.hasInsecureImage).toBe(false);
     expect(result.hasProtoImage).toBe(false);
+    expect(result.hasBackslashImage).toBe(false);
+    expect(result.hasUnsafeDataImage).toBe(false);
+    expect(result.hasSafeDataImage).toBe(true);
     expect(result.hasSecureImage).toBe(true);
     // The final state of secureImageSrc should be the secure dynamic update, and not blocked or bypassed
     expect(result.secureImageSrc).toBe("https://proxy.functions.io/?url=https%3A%2F%2Fwww.babylonjs-playground.com%2Ftextures%2Fbabylon5.png");
