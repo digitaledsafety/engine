@@ -1933,7 +1933,11 @@ workspace_data: "${base64WorkspaceData}"
                         {
                             kind: 'block',
                             type: 'camera_zoom',
-                        },                        
+                        },
+                        {
+                            kind: 'block',
+                            type: 'set_camera_property',
+                        },
                         {
                             kind: 'block',
                             type: 'create_ground',
@@ -3873,16 +3877,26 @@ workspace_data: "${base64WorkspaceData}"
             }
 
             cameraFollow(target) {
-                let mesh = null;
-                if (typeof target === 'string') {
-                    mesh = this.objects[target];
-                } else if (target && typeof target === 'object') {
-                    // Assumes target is a mesh object
-                    mesh = target;
-                }
-
-                if (mesh && this.scene.activeCamera) {
+                let mesh = this._getMesh(target);
+                if (mesh && this.scene && this.scene.activeCamera) {
                     this.scene.activeCamera.lockedTarget = mesh;
+                }
+            }
+
+            setCameraProperty(property, value) {
+                const camera = this.scene ? this.scene.activeCamera : null;
+                if (!camera) return;
+                const numValue = Number(value);
+                if (isNaN(numValue)) return;
+                const allowedProps = ['inertia', 'wheelPrecision', 'angularSensibility', 'angularSensibilityX', 'angularSensibilityY', 'lowerRadiusLimit', 'upperRadiusLimit', 'speed', 'fov'];
+                if (allowedProps.includes(property)) {
+                    if (property === 'angularSensibility') {
+                        if ('angularSensibilityX' in camera) camera.angularSensibilityX = numValue;
+                        if ('angularSensibilityY' in camera) camera.angularSensibilityY = numValue;
+                        if ('angularSensibility' in camera) camera.angularSensibility = numValue;
+                    } else if (property in camera) {
+                        camera[property] = numValue;
+                    }
                 }
             }
 
@@ -6258,6 +6272,35 @@ workspace_data: "${base64WorkspaceData}"
                 "helpUrl": ""
             },
             {
+                "type": "set_camera_property",
+                "message0": "set camera %1 to %2",
+                "args0": [
+                    {
+                        "type": "field_dropdown",
+                        "name": "PROPERTY",
+                        "options": [
+                            ["inertia", "inertia"],
+                            ["wheel precision", "wheelPrecision"],
+                            ["angular sensibility", "angularSensibility"],
+                            ["lower radius limit", "lowerRadiusLimit"],
+                            ["upper radius limit", "upperRadiusLimit"],
+                            ["speed", "speed"],
+                            ["field of view (fov)", "fov"]
+                        ]
+                    },
+                    {
+                        "type": "input_value",
+                        "name": "VALUE"
+                    }
+                ],
+                "inputsInline": true,
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": 230,
+                "tooltip": "Sets visual and navigation properties on the active camera.",
+                "helpUrl": ""
+            },
+            {
                 type: 'import_3d_file_url',
                 message0: 'Import model URL %1\r\n',
                 args0: [
@@ -8536,7 +8579,13 @@ if (${name}) {
 
             javascript.javascriptGenerator.forBlock['point_camera_at_mesh'] = function (block, generator) {
                 const meshVar = generator.nameDB_.getName(block.getFieldValue('MESH'), Blockly.Variables.NAME_TYPE);
-                return `sceneManager.cameraFollow(${meshVar}.name);\n`;
+                return `sceneManager.cameraFollow(${meshVar});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['set_camera_property'] = function (block, generator) {
+                const property = block.getFieldValue('PROPERTY') || 'inertia';
+                const value = generator.valueToCode(block, 'VALUE', generator.ORDER_ATOMIC) || '0';
+                return `sceneManager.setCameraProperty('${property}', ${value});\n`;
             };
 
             javascript.javascriptGenerator.forBlock['import_3d_file_url'] = function (block, generator) {
