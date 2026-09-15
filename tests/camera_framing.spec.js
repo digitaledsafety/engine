@@ -44,4 +44,51 @@ test.describe('Camera Framing Functionality', () => {
     expect(result.targetZ).toBeCloseTo(-5);
     expect(result.radius).toBeGreaterThan(0);
   });
+
+  test('cameraFollow and setFpsCamera resolve target using _getMesh with string names, mesh instances, and lazy functions', async ({ page }) => {
+    const result = await page.evaluate(async () => {
+      const box1 = sceneManager.createBox('box1', 0, 0, 0);
+      const box2 = sceneManager.createBox('box2', 10, 0, 0);
+
+      // 1. Test cameraFollow with string name
+      sceneManager.cameraFollow('box1');
+      const lockedByString = sceneManager.scene.activeCamera.lockedTarget === box1;
+
+      // 2. Test cameraFollow with mesh object
+      sceneManager.cameraFollow(box2);
+      const lockedByObject = sceneManager.scene.activeCamera.lockedTarget === box2;
+
+      // 3. Test cameraFollow with lazy getter function
+      sceneManager.cameraFollow(() => box1);
+      const lockedByFunction = sceneManager.scene.activeCamera.lockedTarget === box1;
+
+      // 4. Test setFpsCamera with string name
+      sceneManager.setFpsCamera('box1');
+      const fpsParentByString = sceneManager.scene.activeCamera.parent === box1;
+
+      // 5. Test setFpsCamera with mesh object
+      sceneManager.setFpsCamera(box2);
+      const fpsParentByObject = sceneManager.scene.activeCamera.parent === box2;
+
+      // 6. Test setFpsCamera with lazy getter function
+      sceneManager.setFpsCamera(() => box1);
+      const fpsParentByFunction = sceneManager.scene.activeCamera.parent === box1;
+
+      return {
+        lockedByString,
+        lockedByObject,
+        lockedByFunction,
+        fpsParentByString,
+        fpsParentByObject,
+        fpsParentByFunction
+      };
+    });
+
+    expect(result.lockedByString).toBe(true);
+    expect(result.lockedByObject).toBe(true);
+    expect(result.lockedByFunction).toBe(true);
+    expect(result.fpsParentByString).toBe(true);
+    expect(result.fpsParentByObject).toBe(true);
+    expect(result.fpsParentByFunction).toBe(true);
+  });
 });
