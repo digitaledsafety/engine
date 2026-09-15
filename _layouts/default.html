@@ -3873,14 +3873,7 @@ workspace_data: "${base64WorkspaceData}"
             }
 
             cameraFollow(target) {
-                let mesh = null;
-                if (typeof target === 'string') {
-                    mesh = this.objects[target];
-                } else if (target && typeof target === 'object') {
-                    // Assumes target is a mesh object
-                    mesh = target;
-                }
-
+                const mesh = this._getMesh(target);
                 if (mesh && this.scene.activeCamera) {
                     this.scene.activeCamera.lockedTarget = mesh;
                 }
@@ -4208,13 +4201,7 @@ workspace_data: "${base64WorkspaceData}"
             }
 
             setFpsCamera(target) {
-                let mesh = null;
-                if (typeof target === 'string') {
-                    mesh = this.objects[target];
-                } else if (target && typeof target === 'object') {
-                    mesh = target;
-                }
-
+                const mesh = this._getMesh(target);
                 if (!mesh) {
                     console.warn("setFpsCamera: Target object not found.");
                     return;
