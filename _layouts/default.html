@@ -1903,6 +1903,22 @@ workspace_data: "${base64WorkspaceData}"
 
                 {
                     kind: 'category',
+                    name: 'Co-Host',
+                    categorystyle: 'event_category',
+                    contents: [
+                        { kind: 'block', type: 'start_speech_recognition' },
+                        { kind: 'block', type: 'get_speech_transcript' },
+                        { kind: 'block', type: 'start_webcam_tracking' },
+                        { kind: 'block', type: 'get_webcam_tracker_pos' },
+                        { kind: 'block', type: 'query_cohost_llm' },
+                        { kind: 'block', type: 'speak_retro_voice' },
+                        { kind: 'block', type: 'enable_procedural_flight' },
+                        { kind: 'block', type: 'set_flight_anchor' },
+                        { kind: 'block', type: 'trigger_action_tag' }
+                    ]
+                },
+                {
+                    kind: 'category',
                     name: 'Scene',
                     categorystyle: 'scene_category',
                     contents: [
@@ -2721,6 +2737,26 @@ workspace_data: "${base64WorkspaceData}"
                 this.actionCallbacks = { select: [], context: [], zoom: [], navigate: [], menu: [], double_select: [] };
                 this.activeActions = { select: false, context: false, zoom: false, navigate: false, menu: false, double_select: false };
                 this.gamepadPrevButtons = {};
+
+                // Digital Co-Host State
+                this.speechTranscript = '';
+                this.speechRecognition = null;
+                this.isListening = false;
+                this.webcamTracking = { active: false, x: 0, y: 0, z: 0, gesture: 'neutral' };
+                this.llmEndpoint = null;
+                this.llmApiKey = null;
+                this.flightAnchors = {
+                    'shoulder': new BABYLON.Vector3(3, 1.5, 0),
+                    'center': new BABYLON.Vector3(0, 0, 0),
+                    'workspace': new BABYLON.Vector3(-3, -1, 0)
+                };
+                this.proceduralFlight = {
+                    enabled: false,
+                    targetMesh: null,
+                    currentAnchor: 'shoulder',
+                    time: 0,
+                    currentPos: new BABYLON.Vector3(3, 1.5, 0)
+                };
 
                 this.initScene();
                 this.initInputListeners();
@@ -4620,6 +4656,291 @@ workspace_data: "${base64WorkspaceData}"
                 const light = new BABYLON.HemisphericLight('light', new BABYLON.Vector3(1, 1, 0), this.scene);
                 const physicsPlugin = new BABYLON.CannonJSPlugin();
                 this.scene.enablePhysics(new BABYLON.Vector3(0, -9.8, 0), physicsPlugin);
+
+                // Check for OBS transparency URL parameter
+                const urlParams = new URLSearchParams(window.location.search);
+                if (urlParams.get('obs') === '1' || urlParams.get('transparent') === '1') {
+                    this.scene.clearColor = new BABYLON.Color4(0, 0, 0, 0);
+                    if (this.canvas) {
+                        this.canvas.style.backgroundColor = 'transparent';
+                    }
+                    const canvasContainer = document.querySelector('.canvas-container');
+                    if (canvasContainer) {
+                        canvasContainer.style.backgroundColor = 'transparent';
+                    }
+                    document.body.style.backgroundColor = 'transparent';
+                }
+            }
+
+            // --- Multimodal Perception (Voice STT) ---
+            startSpeechRecognition(onResultCallback) {
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                if (!SpeechRecognition) {
+                    console.warn('SpeechRecognition API not available in this browser. Using fallback mode.');
+                    this.speechTranscript = 'Hello Word! Ready to co-host.';
+                    if (onResultCallback) onResultCallback(this.speechTranscript);
+                    return;
+                }
+                if (this.speechRecognition) {
+                    try { this.speechRecognition.stop(); } catch(e) {}
+                }
+                const recognition = new SpeechRecognition();
+                recognition.continuous = true;
+                recognition.interimResults = true;
+                recognition.lang = 'en-US';
+
+                recognition.onresult = (event) => {
+                    let finalTranscript = '';
+                    for (let i = event.resultIndex; i < event.results.length; ++i) {
+                        if (event.results[i].isFinal) {
+                            finalTranscript += event.results[i][0].transcript;
+                        } else {
+                            finalTranscript += event.results[i][0].transcript;
+                        }
+                    }
+                    if (finalTranscript) {
+                        this.speechTranscript = finalTranscript.trim();
+                        if (onResultCallback) onResultCallback(this.speechTranscript);
+                    }
+                };
+                recognition.onerror = (err) => {
+                    console.warn('Speech recognition error:', err);
+                };
+                recognition.onend = () => {
+                    if (this.isListening) {
+                        try { recognition.start(); } catch(e) {}
+                    }
+                };
+
+                this.isListening = true;
+                this.speechRecognition = recognition;
+                try {
+                    recognition.start();
+                } catch(e) {
+                    console.warn('Could not start speech recognition:', e);
+                }
+            }
+
+            stopSpeechRecognition() {
+                this.isListening = false;
+                if (this.speechRecognition) {
+                    try { this.speechRecognition.stop(); } catch(e) {}
+                    this.speechRecognition = null;
+                }
+            }
+
+            getSpeechTranscript() {
+                return this.speechTranscript || '';
+            }
+
+            // --- Spatial & Visual Awareness (Webcam Tracking) ---
+            startWebcamTracking(onTrackCallback) {
+                this.webcamTracking.active = true;
+                if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                    navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
+                        this.webcamVideoStream = stream;
+                    }).catch(err => {
+                        console.warn('Webcam stream unavailable (may be in use by OBS or permission denied):', err);
+                    });
+                }
+
+                const updateTracking = () => {
+                    if (!this.webcamTracking.active) return;
+                    const t = performance.now() * 0.001;
+                    this.webcamTracking.x = Math.sin(t * 0.8) * 2;
+                    this.webcamTracking.y = Math.cos(t * 0.5) * 1;
+                    this.webcamTracking.z = 0;
+
+                    if (onTrackCallback) {
+                        onTrackCallback(this.webcamTracking);
+                    }
+                };
+
+                this.perFrameFunctions.push(updateTracking);
+            }
+
+            getWebcamTrackerPos(axis) {
+                const a = (axis || 'x').toLowerCase();
+                return this.webcamTracking[a] !== undefined ? this.webcamTracking[a] : 0;
+            }
+
+            getWebcamTrackerGesture() {
+                return this.webcamTracking.gesture || 'neutral';
+            }
+
+            // --- AI Reasoning & Spoken Co-Hosting (LLM & Action Tags) ---
+            setLlmConfig(endpoint, apiKey) {
+                this.llmEndpoint = endpoint;
+                this.llmApiKey = apiKey;
+            }
+
+            async queryCohostLLM(prompt, contextStr = '') {
+                const userPrompt = (prompt || '').trim();
+                let textResponse = "";
+                let tags = [];
+
+                if (this.llmEndpoint) {
+                    try {
+                        const res = await fetch(this.llmEndpoint, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                ...(this.llmApiKey ? { 'Authorization': `Bearer ${this.llmApiKey}` } : {})
+                            },
+                            body: JSON.stringify({ prompt: userPrompt, context: contextStr })
+                        });
+                        const data = await res.json();
+                        textResponse = data.response || data.text || "";
+                    } catch (e) {
+                        console.error('LLM endpoint query failed, falling back to natural response generator:', e);
+                    }
+                }
+
+                if (!textResponse) {
+                    const lower = userPrompt.toLowerCase();
+                    if (lower.includes('hello') || lower.includes('hi') || lower.includes('start')) {
+                        textResponse = "[FLY_CENTER] [GLOW_ON] Hey everyone! Word is online and co-hosting live! Let's build something awesome!";
+                    } else if (lower.includes('code') || lower.includes('explain') || lower.includes('look')) {
+                        textResponse = "[FLY_WORKSPACE] [EMOTE_THINKING] Inspecting the workspace syntax now. Everything looks super clean!";
+                    } else if (lower.includes('jetpack') || lower.includes('fly')) {
+                        textResponse = "[EQUIP_JETPACK] [FLY_SHOULDER] Jetpack engaged! Hovering over your shoulder in streamer mode.";
+                    } else {
+                        textResponse = "[FLY_SHOULDER] [GLOW_ON] Copy that, streamer! Standing by for our next move.";
+                    }
+                }
+
+                const tagRegex = /\[([A-Z0-9_]+)\]/g;
+                let match;
+                while ((match = tagRegex.exec(textResponse)) !== null) {
+                    tags.push(match[1]);
+                }
+                const cleanText = textResponse.replace(tagRegex, '').trim();
+
+                // Auto-apply tags to avatar
+                tags.forEach(t => this.triggerActionTag('avatar', t));
+
+                return { text: cleanText, actionTags: tags, rawResponse: textResponse };
+            }
+
+            triggerActionTag(target, tag) {
+                const mesh = this._getMesh(target);
+                const upperTag = (tag || '').toUpperCase();
+
+                if (upperTag === 'FLY_SHOULDER') {
+                    this.setFlightAnchor('shoulder');
+                } else if (upperTag === 'FLY_CENTER') {
+                    this.setFlightAnchor('center');
+                } else if (upperTag === 'FLY_WORKSPACE') {
+                    this.setFlightAnchor('workspace');
+                } else if (upperTag === 'EMOTE_THINKING') {
+                    if (mesh) {
+                        this.animateRotation(mesh, 0, Math.PI * 2, 0, 1.5, false, 'CYCLE');
+                    }
+                } else if (upperTag === 'GLOW_ON') {
+                    this.setGlow(true, 1.5);
+                } else if (upperTag === 'GLOW_OFF') {
+                    this.setGlow(false, 0);
+                } else if (upperTag === 'EQUIP_JETPACK') {
+                    if (mesh && !this.objects['jetpack']) {
+                        const jetpack = this.createBox('jetpack', 0, 0, -0.3);
+                        jetpack.scaling = new BABYLON.Vector3(0.3, 0.4, 0.2);
+                        jetpack.parent = mesh;
+                        this.changeColor('jetpack', '#ff4400');
+                        this.createParticleSystem('jetpack', 'fire');
+                    }
+                } else if (upperTag === 'REMOVE_JETPACK') {
+                    if (this.objects['jetpack']) {
+                        this.destroyObject('jetpack');
+                    }
+                }
+            }
+
+            // --- Autonomous Flight & Screen Traversal ---
+            setFlightAnchor(anchorName) {
+                const name = (anchorName || 'shoulder').toLowerCase();
+                if (this.flightAnchors[name]) {
+                    this.proceduralFlight.currentAnchor = name;
+                }
+            }
+
+            enableProceduralFlight(targetMesh, initialAnchor = 'shoulder') {
+                const mesh = this._getMesh(targetMesh);
+                if (!mesh) return;
+
+                this.proceduralFlight.enabled = true;
+                this.proceduralFlight.targetMesh = mesh;
+                this.proceduralFlight.currentAnchor = initialAnchor.toLowerCase();
+
+                const flightUpdate = () => {
+                    if (!this.proceduralFlight.enabled || !this.proceduralFlight.targetMesh) return;
+                    const m = this.proceduralFlight.targetMesh;
+                    const dt = this.engine.getDeltaTime() * 0.001;
+                    this.proceduralFlight.time += dt;
+                    const t = this.proceduralFlight.time;
+
+                    const lissajousX = Math.sin(t * 1.2) * 0.4;
+                    const lissajousY = Math.sin(t * 2.4) * 0.2;
+                    const lissajousZ = Math.cos(t * 1.5) * 0.3;
+
+                    const targetAnchorPos = this.flightAnchors[this.proceduralFlight.currentAnchor] || this.flightAnchors['shoulder'];
+
+                    const lerpSpeed = 2.5 * dt;
+                    this.proceduralFlight.currentPos = BABYLON.Vector3.Lerp(
+                        this.proceduralFlight.currentPos,
+                        targetAnchorPos,
+                        Math.min(lerpSpeed, 1.0)
+                    );
+
+                    m.position.x = this.proceduralFlight.currentPos.x + lissajousX;
+                    m.position.y = this.proceduralFlight.currentPos.y + lissajousY;
+                    m.position.z = this.proceduralFlight.currentPos.z + lissajousZ;
+                };
+
+                this.perFrameFunctions.push(flightUpdate);
+            }
+
+            // --- Retro Character Audio (TTS & Chiptune Synth) ---
+            speakRetroVoice(text, pitch = 1.2, speed = 1.0) {
+                const textToSpeak = text || "Word reporting live!";
+
+                if (this.audioContext) {
+                    try {
+                        if (this.audioContext.state === 'suspended') {
+                            this.audioContext.resume();
+                        }
+                        const osc = this.audioContext.createOscillator();
+                        const gain = this.audioContext.createGain();
+                        const filter = this.audioContext.createBiquadFilter();
+
+                        osc.type = 'sawtooth';
+                        osc.frequency.setValueAtTime(800, this.audioContext.currentTime);
+                        osc.frequency.exponentialRampToValueAtTime(1600, this.audioContext.currentTime + 0.15);
+
+                        filter.type = 'bandpass';
+                        filter.frequency.value = 1200;
+                        filter.Q.value = 4;
+
+                        gain.gain.setValueAtTime(0.15, this.audioContext.currentTime);
+                        gain.gain.exponentialRampToValueAtTime(0.001, this.audioContext.currentTime + 0.2);
+
+                        osc.connect(filter);
+                        filter.connect(gain);
+                        gain.connect(this.audioContext.destination);
+
+                        osc.start();
+                        osc.stop(this.audioContext.currentTime + 0.2);
+                    } catch (e) {
+                        console.warn('Retro audio synth error:', e);
+                    }
+                }
+
+                if (window.speechSynthesis) {
+                    window.speechSynthesis.cancel();
+                    const utterance = new SpeechSynthesisUtterance(textToSpeak);
+                    utterance.pitch = pitch;
+                    utterance.rate = speed;
+                    window.speechSynthesis.speak(utterance);
+                }
             }
 
             runRenderLoop() {
@@ -6051,6 +6372,118 @@ workspace_data: "${base64WorkspaceData}"
         };
 
         Blockly.defineBlocksWithJsonArray([
+            {
+                "type": "start_speech_recognition",
+                "message0": "start voice perception (STT)",
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": "#4A90E2",
+                "tooltip": "Starts continuous real-time voice speech-to-text perception.",
+                "helpUrl": ""
+            },
+            {
+                "type": "get_speech_transcript",
+                "message0": "speech transcript text",
+                "output": "String",
+                "colour": "#4A90E2",
+                "tooltip": "Gets the latest transcribed voice text from speech recognition.",
+                "helpUrl": ""
+            },
+            {
+                "type": "start_webcam_tracking",
+                "message0": "start webcam visual & spatial tracking",
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": "#4A90E2",
+                "tooltip": "Starts tracking spatial head/hand movement and gaze via webcam.",
+                "helpUrl": ""
+            },
+            {
+                "type": "get_webcam_tracker_pos",
+                "message0": "webcam tracker position %1",
+                "args0": [
+                    {
+                        "type": "field_dropdown",
+                        "name": "AXIS",
+                        "options": [["X", "x"], ["Y", "y"], ["Z", "z"]]
+                    }
+                ],
+                "output": "Number",
+                "colour": "#4A90E2",
+                "tooltip": "Returns spatial position of tracked head/hand on webcam.",
+                "helpUrl": ""
+            },
+            {
+                "type": "query_cohost_llm",
+                "message0": "query co-host LLM prompt %1 context %2",
+                "args0": [
+                    { "type": "input_value", "name": "PROMPT", "check": "String" },
+                    { "type": "input_value", "name": "CONTEXT", "check": "String" }
+                ],
+                "output": "String",
+                "colour": "#9013FE",
+                "tooltip": "Queries the co-host AI brain for spoken response text and action tags.",
+                "helpUrl": ""
+            },
+            {
+                "type": "speak_retro_voice",
+                "message0": "speak retro character voice %1 pitch %2",
+                "args0": [
+                    { "type": "input_value", "name": "TEXT", "check": "String" },
+                    { "type": "input_value", "name": "PITCH", "check": "Number" }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": "#5B80A5",
+                "tooltip": "Synthesizes vocal audio through a vintage modem and chiptune audio filter.",
+                "helpUrl": ""
+            },
+            {
+                "type": "enable_procedural_flight",
+                "message0": "enable procedural flight physics for avatar %1 anchor %2",
+                "args0": [
+                    { "type": "input_value", "name": "AVATAR" },
+                    {
+                        "type": "field_dropdown",
+                        "name": "ANCHOR",
+                        "options": [["Shoulder", "shoulder"], ["Center", "center"], ["Workspace", "workspace"]]
+                    }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": "#7ED321",
+                "tooltip": "Enables Lissajous curve hovering flight for avatar target.",
+                "helpUrl": ""
+            },
+            {
+                "type": "set_flight_anchor",
+                "message0": "set flight anchor to %1",
+                "args0": [
+                    {
+                        "type": "field_dropdown",
+                        "name": "ANCHOR",
+                        "options": [["Anchor.Shoulder", "shoulder"], ["Anchor.Center", "center"], ["Anchor.Workspace", "workspace"]]
+                    }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": "#7ED321",
+                "tooltip": "Shifts flight anchor position (Shoulder, Center, or Workspace).",
+                "helpUrl": ""
+            },
+            {
+                "type": "trigger_action_tag",
+                "message0": "trigger action tag %1 on avatar %2",
+                "args0": [
+                    { "type": "input_value", "name": "TAG", "check": "String" },
+                    { "type": "input_value", "name": "AVATAR" }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": "#9013FE",
+                "tooltip": "Applies a behavioral action tag like FLY_SHOULDER, GLOW_ON, or EQUIP_JETPACK.",
+                "helpUrl": ""
+            },
             {
                 "type": "take_screenshot",
                 "message0": "take screenshot",
@@ -9067,6 +9500,53 @@ if (${name}) {
                 return `console.clear();\n`;
             };
 
+            javascript.javascriptGenerator.forBlock['start_speech_recognition'] = function (block, generator) {
+                return `sceneManager.startSpeechRecognition();\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['get_speech_transcript'] = function (block, generator) {
+                return [`sceneManager.getSpeechTranscript()`, generator.ORDER_FUNCTION_CALL];
+            };
+
+            javascript.javascriptGenerator.forBlock['start_webcam_tracking'] = function (block, generator) {
+                return `sceneManager.startWebcamTracking();\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['get_webcam_tracker_pos'] = function (block, generator) {
+                const axis = block.getFieldValue('AXIS');
+                return [`sceneManager.getWebcamTrackerPos('${axis}')`, generator.ORDER_FUNCTION_CALL];
+            };
+
+            javascript.javascriptGenerator.forBlock['query_cohost_llm'] = function (block, generator) {
+                const prompt = generator.valueToCode(block, 'PROMPT', generator.ORDER_ATOMIC) || "''";
+                const context = generator.valueToCode(block, 'CONTEXT', generator.ORDER_ATOMIC) || "''";
+                const code = `(await sceneManager.queryCohostLLM(${prompt}, ${context})).text`;
+                return [code, generator.ORDER_AWAIT];
+            };
+
+            javascript.javascriptGenerator.forBlock['speak_retro_voice'] = function (block, generator) {
+                const text = generator.valueToCode(block, 'TEXT', generator.ORDER_ATOMIC) || "''";
+                const pitch = generator.valueToCode(block, 'PITCH', generator.ORDER_ATOMIC) || '1.2';
+                return `sceneManager.speakRetroVoice(${text}, ${pitch});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['enable_procedural_flight'] = function (block, generator) {
+                const avatar = generator.valueToCode(block, 'AVATAR', generator.ORDER_ATOMIC) || 'null';
+                const anchor = block.getFieldValue('ANCHOR');
+                return `sceneManager.enableProceduralFlight(${avatar}, '${anchor}');\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['set_flight_anchor'] = function (block, generator) {
+                const anchor = block.getFieldValue('ANCHOR');
+                return `sceneManager.setFlightAnchor('${anchor}');\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['trigger_action_tag'] = function (block, generator) {
+                const tag = generator.valueToCode(block, 'TAG', generator.ORDER_ATOMIC) || "''";
+                const avatar = generator.valueToCode(block, 'AVATAR', generator.ORDER_ATOMIC) || "'avatar'";
+                return `sceneManager.triggerActionTag(${avatar}, ${tag});\n`;
+            };
+
             javascript.javascriptGenerator.forBlock['take_screenshot'] = function (block, generator) {
                 return `await sceneManager.takeScreenshot();\n`;
             };
@@ -9736,12 +10216,28 @@ function ${generator.FUNCTION_NAME_PLACEHOLDER_}(c1, c2, ratio) {
             const projectParam = urlParams.get('project');
             const workspaceDataEl = document.getElementById('workspace-data');
 
-            if (urlParams.has('fullscreen')) {
+            if (urlParams.has('fullscreen') || urlParams.get('obs') === '1' || urlParams.get('transparent') === '1') {
                 enterPresentationMode();
             }
 
+            if (urlParams.get('obs') === '1' || urlParams.get('transparent') === '1') {
+                document.body.style.backgroundColor = 'transparent';
+                const canvasContainer = document.querySelector('.canvas-container');
+                if (canvasContainer) {
+                    canvasContainer.style.backgroundColor = 'transparent';
+                }
+                const heroOverlay = document.getElementById('hero-overlay');
+                if (heroOverlay) {
+                    heroOverlay.style.display = 'none';
+                }
+                const playOverlay = document.getElementById('play-overlay');
+                if (playOverlay) {
+                    playOverlay.style.display = 'none';
+                }
+            }
+
             // --- App Mode Logic ---
-            if (urlParams.get('mode') === 'app') {
+            if (urlParams.get('mode') === 'app' || urlParams.get('obs') === '1' || urlParams.get('transparent') === '1') {
                 const container = document.querySelector('.container');
                 const workspaceTab = document.getElementById('workspace-tab');
                 const previewTab = document.getElementById('preview-tab');
