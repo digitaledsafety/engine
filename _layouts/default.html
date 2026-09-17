@@ -1914,7 +1914,8 @@ workspace_data: "${base64WorkspaceData}"
                         { kind: 'block', type: 'speak_retro_voice' },
                         { kind: 'block', type: 'enable_procedural_flight' },
                         { kind: 'block', type: 'set_flight_anchor' },
-                        { kind: 'block', type: 'trigger_action_tag' }
+                        { kind: 'block', type: 'trigger_action_tag' },
+                        { kind: 'block', type: 'wait_seconds' }
                     ]
                 },
                 {
@@ -2755,7 +2756,8 @@ workspace_data: "${base64WorkspaceData}"
                     targetMesh: null,
                     currentAnchor: 'shoulder',
                     time: 0,
-                    currentPos: new BABYLON.Vector3(3, 1.5, 0)
+                    currentPos: new BABYLON.Vector3(3, 1.5, 0),
+                    isRegistered: false
                 };
 
                 this.initScene();
@@ -4672,8 +4674,24 @@ workspace_data: "${base64WorkspaceData}"
                 }
             }
 
+            // --- ESM Dynamic Module Loading for Co-Host Capabilities ---
+            async loadCohostDependencies() {
+                if (this._cohostDependenciesLoaded) return this._cohostModule;
+                try {
+                    const module = await import('https://cdn.jsdelivr.net/npm/@viamrobotics/sdk@0.22.0/+esm').catch(() => null);
+                    this._cohostModule = module;
+                    this._cohostDependenciesLoaded = true;
+                    return module;
+                } catch (err) {
+                    console.warn('Co-Host ESM module dynamic load fallback:', err);
+                    this._cohostDependenciesLoaded = true;
+                    return null;
+                }
+            }
+
             // --- Multimodal Perception (Voice STT) ---
-            startSpeechRecognition(onResultCallback) {
+            async startSpeechRecognition(onResultCallback) {
+                await this.loadCohostDependencies();
                 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
                 if (!SpeechRecognition) {
                     console.warn('SpeechRecognition API not available in this browser. Using fallback mode.');
@@ -4734,7 +4752,8 @@ workspace_data: "${base64WorkspaceData}"
             }
 
             // --- Spatial & Visual Awareness (Webcam Tracking) ---
-            startWebcamTracking(onTrackCallback) {
+            async startWebcamTracking(onTrackCallback) {
+                await this.loadCohostDependencies();
                 this.webcamTracking.active = true;
                 if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
                     navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
@@ -4775,6 +4794,7 @@ workspace_data: "${base64WorkspaceData}"
             }
 
             async queryCohostLLM(prompt, contextStr = '') {
+                await this.loadCohostDependencies();
                 const userPrompt = (prompt || '').trim();
                 let textResponse = "";
                 let tags = [];
@@ -4824,7 +4844,7 @@ workspace_data: "${base64WorkspaceData}"
 
             triggerActionTag(target, tag) {
                 const mesh = this._getMesh(target);
-                const upperTag = (tag || '').toUpperCase();
+                const upperTag = (tag || '').replace(/[\[\]]/g, '').toUpperCase();
 
                 if (upperTag === 'FLY_SHOULDER') {
                     this.setFlightAnchor('shoulder');
@@ -4856,6 +4876,11 @@ workspace_data: "${base64WorkspaceData}"
             }
 
             // --- Autonomous Flight & Screen Traversal ---
+            async wait(seconds) {
+                const sec = (typeof seconds === 'number' && !isNaN(seconds)) ? seconds : 1;
+                await new Promise(resolve => setTimeout(resolve, sec * 1000));
+            }
+
             setFlightAnchor(anchorName) {
                 const name = (anchorName || 'shoulder').toLowerCase();
                 if (this.flightAnchors[name]) {
@@ -4864,39 +4889,48 @@ workspace_data: "${base64WorkspaceData}"
             }
 
             enableProceduralFlight(targetMesh, initialAnchor = 'shoulder') {
-                const mesh = this._getMesh(targetMesh);
-                if (!mesh) return;
-
                 this.proceduralFlight.enabled = true;
-                this.proceduralFlight.targetMesh = mesh;
-                this.proceduralFlight.currentAnchor = initialAnchor.toLowerCase();
+                this.proceduralFlight.targetMesh = targetMesh;
+                this.proceduralFlight.currentAnchor = (initialAnchor || 'shoulder').toLowerCase();
 
-                const flightUpdate = () => {
-                    if (!this.proceduralFlight.enabled || !this.proceduralFlight.targetMesh) return;
-                    const m = this.proceduralFlight.targetMesh;
-                    const dt = this.engine.getDeltaTime() * 0.001;
-                    this.proceduralFlight.time += dt;
-                    const t = this.proceduralFlight.time;
+                const mesh = this._getMesh(targetMesh);
+                if (mesh && mesh.position) {
+                    this.proceduralFlight.currentPos = mesh.position.clone();
+                } else {
+                    const defaultAnchor = this.flightAnchors[this.proceduralFlight.currentAnchor] || this.flightAnchors['shoulder'];
+                    this.proceduralFlight.currentPos = defaultAnchor.clone();
+                }
 
-                    const lissajousX = Math.sin(t * 1.2) * 0.4;
-                    const lissajousY = Math.sin(t * 2.4) * 0.2;
-                    const lissajousZ = Math.cos(t * 1.5) * 0.3;
+                if (!this.proceduralFlight.isRegistered) {
+                    this.proceduralFlight.isRegistered = true;
+                    const flightUpdate = () => {
+                        if (!this.proceduralFlight.enabled || !this.proceduralFlight.targetMesh) return;
+                        const m = this._getMesh(this.proceduralFlight.targetMesh);
+                        if (!m) return;
+                        const dt = this.engine.getDeltaTime() * 0.001;
+                        this.proceduralFlight.time += dt;
+                        const t = this.proceduralFlight.time;
 
-                    const targetAnchorPos = this.flightAnchors[this.proceduralFlight.currentAnchor] || this.flightAnchors['shoulder'];
+                        const lissajousX = Math.sin(t * 1.2) * 0.4;
+                        const lissajousY = Math.sin(t * 2.4) * 0.2;
+                        const lissajousZ = Math.cos(t * 1.5) * 0.3;
 
-                    const lerpSpeed = 2.5 * dt;
-                    this.proceduralFlight.currentPos = BABYLON.Vector3.Lerp(
-                        this.proceduralFlight.currentPos,
-                        targetAnchorPos,
-                        Math.min(lerpSpeed, 1.0)
-                    );
+                        const targetAnchorPos = this.flightAnchors[this.proceduralFlight.currentAnchor] || this.flightAnchors['shoulder'];
 
-                    m.position.x = this.proceduralFlight.currentPos.x + lissajousX;
-                    m.position.y = this.proceduralFlight.currentPos.y + lissajousY;
-                    m.position.z = this.proceduralFlight.currentPos.z + lissajousZ;
-                };
+                        const lerpSpeed = 2.5 * dt;
+                        this.proceduralFlight.currentPos = BABYLON.Vector3.Lerp(
+                            this.proceduralFlight.currentPos,
+                            targetAnchorPos,
+                            Math.min(lerpSpeed, 1.0)
+                        );
 
-                this.perFrameFunctions.push(flightUpdate);
+                        m.position.x = this.proceduralFlight.currentPos.x + lissajousX;
+                        m.position.y = this.proceduralFlight.currentPos.y + lissajousY;
+                        m.position.z = this.proceduralFlight.currentPos.z + lissajousZ;
+                    };
+
+                    this.perFrameFunctions.push(flightUpdate);
+                }
             }
 
             // --- Retro Character Audio (TTS & Chiptune Synth) ---
@@ -5062,6 +5096,14 @@ workspace_data: "${base64WorkspaceData}"
                 this.player = null;
                 this.perFrameFunctions = [];
                 this.buttonPressActions = {};
+                this.proceduralFlight = {
+                    enabled: false,
+                    targetMesh: null,
+                    currentAnchor: 'shoulder',
+                    time: 0,
+                    currentPos: new BABYLON.Vector3(3, 1.5, 0),
+                    isRegistered: false
+                };
                 this.inputState = { keys: {} }; // Reset state on clear
                 this.background = null;
                 this.backgroundLayer = null;
@@ -5428,13 +5470,17 @@ workspace_data: "${base64WorkspaceData}"
 
             _getMesh(target) {
                 target = this._resolveTarget(target);
+                if (!target) return null;
+                if (target instanceof BABYLON.AbstractMesh || target instanceof BABYLON.TransformNode) {
+                    return target;
+                }
                 let name;
                 if (typeof target === 'string') {
                     name = target;
-                } else if (target && typeof target === 'object' && target.name) {
+                } else if (typeof target === 'object' && target.name) {
                     name = target.name;
                 }
-                return this.objects[name];
+                return this.objects[name] || (typeof target === 'object' ? target : null);
             }
 
             getProperty(target, property) {
@@ -6482,6 +6528,22 @@ workspace_data: "${base64WorkspaceData}"
                 "nextStatement": null,
                 "colour": "#9013FE",
                 "tooltip": "Applies a behavioral action tag like FLY_SHOULDER, GLOW_ON, or EQUIP_JETPACK.",
+                "helpUrl": ""
+            },
+            {
+                "type": "wait_seconds",
+                "message0": "wait %1 seconds",
+                "args0": [
+                    {
+                        "type": "input_value",
+                        "name": "SECONDS",
+                        "check": "Number"
+                    }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": "#FFBF00",
+                "tooltip": "Pauses execution for specified number of seconds.",
                 "helpUrl": ""
             },
             {
@@ -9501,7 +9563,7 @@ if (${name}) {
             };
 
             javascript.javascriptGenerator.forBlock['start_speech_recognition'] = function (block, generator) {
-                return `sceneManager.startSpeechRecognition();\n`;
+                return `await sceneManager.startSpeechRecognition();\n`;
             };
 
             javascript.javascriptGenerator.forBlock['get_speech_transcript'] = function (block, generator) {
@@ -9509,7 +9571,7 @@ if (${name}) {
             };
 
             javascript.javascriptGenerator.forBlock['start_webcam_tracking'] = function (block, generator) {
-                return `sceneManager.startWebcamTracking();\n`;
+                return `await sceneManager.startWebcamTracking();\n`;
             };
 
             javascript.javascriptGenerator.forBlock['get_webcam_tracker_pos'] = function (block, generator) {
@@ -9545,6 +9607,11 @@ if (${name}) {
                 const tag = generator.valueToCode(block, 'TAG', generator.ORDER_ATOMIC) || "''";
                 const avatar = generator.valueToCode(block, 'AVATAR', generator.ORDER_ATOMIC) || "'avatar'";
                 return `sceneManager.triggerActionTag(${avatar}, ${tag});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['wait_seconds'] = function (block, generator) {
+                const seconds = generator.valueToCode(block, 'SECONDS', generator.ORDER_ATOMIC) || '1';
+                return `await sceneManager.wait(${seconds});\n`;
             };
 
             javascript.javascriptGenerator.forBlock['take_screenshot'] = function (block, generator) {
