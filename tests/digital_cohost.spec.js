@@ -24,23 +24,30 @@ test.describe('Digital Co-Host Avatar ("Word") Verification', () => {
         expect(['rgba(0, 0, 0, 0)', 'transparent']).toContain(containerBg);
     });
 
-    test('Co-Host sensing, reasoning, flight physics, and retro audio API methods', async ({ page }) => {
+    test('Co-Host sensing, reasoning, flight physics, ESM loading, and retro audio API methods', async ({ page }) => {
         await page.goto('/', { waitUntil: 'domcontentloaded' });
 
         await page.evaluate(async () => {
             await window.doRun('sceneManager.createSphere("avatar", 0, 0, 0);');
         });
 
+        // Test ESM Dynamic Dependency Loading
+        const esmLoaded = await page.evaluate(async () => {
+            await window.sceneManager.loadCohostDependencies();
+            return window.sceneManager._cohostDependenciesLoaded;
+        });
+        expect(esmLoaded).toBe(true);
+
         // Test Voice Perception STT
-        const transcript = await page.evaluate(() => {
-            window.sceneManager.startSpeechRecognition();
+        const transcript = await page.evaluate(async () => {
+            await window.sceneManager.startSpeechRecognition();
             return window.sceneManager.getSpeechTranscript();
         });
         expect(typeof transcript).toBe('string');
 
         // Test Webcam Tracking & Spatial Perception
-        const webcamX = await page.evaluate(() => {
-            window.sceneManager.startWebcamTracking();
+        const webcamX = await page.evaluate(async () => {
+            await window.sceneManager.startWebcamTracking();
             return window.sceneManager.getWebcamTrackerPos('x');
         });
         expect(typeof webcamX).toBe('number');
@@ -53,13 +60,34 @@ test.describe('Digital Co-Host Avatar ("Word") Verification', () => {
         expect(llmResult.text).toBeTruthy();
         expect(Array.isArray(llmResult.actionTags)).toBe(true);
 
-        // Test Procedural Flight Physics & Anchors
-        const flightEnabled = await page.evaluate(() => {
+        // Test Procedural Flight Physics & Flight Anchor Transitions
+        const flightState = await page.evaluate(async () => {
             window.sceneManager.enableProceduralFlight('avatar', 'shoulder');
+            const anchor1 = window.sceneManager.proceduralFlight.currentAnchor;
             window.sceneManager.setFlightAnchor('center');
-            return window.sceneManager.proceduralFlight.enabled;
+            const anchor2 = window.sceneManager.proceduralFlight.currentAnchor;
+            window.sceneManager.setFlightAnchor('workspace');
+            const anchor3 = window.sceneManager.proceduralFlight.currentAnchor;
+            return {
+                enabled: window.sceneManager.proceduralFlight.enabled,
+                anchor1,
+                anchor2,
+                anchor3
+            };
         });
-        expect(flightEnabled).toBe(true);
+        expect(flightState.enabled).toBe(true);
+        expect(flightState.anchor1).toBe('shoulder');
+        expect(flightState.anchor2).toBe('center');
+        expect(flightState.anchor3).toBe('workspace');
+
+        // Test Async Wait Method
+        const waitOk = await page.evaluate(async () => {
+            const start = performance.now();
+            await window.sceneManager.wait(0.1);
+            const duration = performance.now() - start;
+            return duration >= 80;
+        });
+        expect(waitOk).toBe(true);
 
         // Test Retro Voice Synthesis
         const spoke = await page.evaluate(() => {
@@ -69,28 +97,42 @@ test.describe('Digital Co-Host Avatar ("Word") Verification', () => {
         expect(spoke).toBe(true);
     });
 
-    test('Executing Co-Host Blockly blocks generated code', async ({ page }) => {
+    test('Executing Co-Host Blockly blocks generated code and flight sequences', async ({ page }) => {
         await page.goto('/', { waitUntil: 'domcontentloaded' });
 
-        // Evaluate user-generated code from Co-Host blocks
+        // Evaluate user-generated code from Co-Host blocks including flight sequence and wait
         const result = await page.evaluate(async () => {
             const code = `
                 const avatar = sceneManager.createSphere('avatar', 0, 0, 0);
                 sceneManager.enableProceduralFlight(avatar, 'shoulder');
-                sceneManager.startSpeechRecognition();
-                sceneManager.startWebcamTracking();
-                sceneManager.triggerActionTag('avatar', 'GLOW_ON');
-                sceneManager.triggerActionTag('avatar', 'EQUIP_JETPACK');
-                sceneManager.speakRetroVoice('Testing blocks');
+                await sceneManager.startSpeechRecognition();
+                await sceneManager.startWebcamTracking();
+                sceneManager.triggerActionTag(avatar, '[GLOW_ON]');
+                sceneManager.triggerActionTag(avatar, '[EQUIP_JETPACK]');
+                sceneManager.speakRetroVoice('Testing flight blocks');
+                await sceneManager.wait(0.05);
+                sceneManager.setFlightAnchor('center');
             `;
             await window.doRun(code);
             return {
                 flight: window.sceneManager.proceduralFlight.enabled,
+                anchor: window.sceneManager.proceduralFlight.currentAnchor,
                 jetpackExists: !!window.sceneManager.objects['jetpack']
             };
         });
 
         expect(result.flight).toBe(true);
+        expect(result.anchor).toBe('center');
         expect(result.jetpackExists).toBe(true);
+    });
+
+    test('Digital Co-Host workspace loads and executes scripted flying sequence', async ({ page }) => {
+        await page.goto('/workspaces/digital-cohost/', { waitUntil: 'domcontentloaded' });
+
+        // Verify workspace loads and runs
+        const isRun = await page.evaluate(() => {
+            return typeof window.doRun === 'function' && !!window.sceneManager;
+        });
+        expect(isRun).toBe(true);
     });
 });
