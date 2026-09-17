@@ -1888,6 +1888,10 @@ workspace_data: "${base64WorkspaceData}"
                         },
                         {
                             kind: 'block',
+                            type: 'set_texture_from_url',
+                        },
+                        {
+                            kind: 'block',
                             type: 'create_particles',
                         },
                         {
@@ -2818,6 +2822,24 @@ workspace_data: "${base64WorkspaceData}"
                         mesh.material.diffuseTexture = texture;
                     }
                 }
+            }
+
+            async setTextureFromUrl(target, url) {
+                if (!isValidAssetURL(url)) {
+                    console.error('Invalid texture URL:', url, 'Only HTTPS or blob URLs are allowed.');
+                    return null;
+                }
+                const mesh = this._getMesh(target);
+                if (mesh) {
+                    const proxiedUrl = getProxiedUrl(url);
+                    const texture = new BABYLON.Texture(proxiedUrl, this.scene);
+                    if (!mesh.material) {
+                        mesh.material = new BABYLON.StandardMaterial(mesh.name + "_material", this.scene);
+                    }
+                    mesh.material.diffuseTexture = texture;
+                    return texture;
+                }
+                return null;
             }
 
             setPopupTitle(target, title) {
@@ -6646,6 +6668,26 @@ workspace_data: "${base64WorkspaceData}"
                 "helpUrl": ""
             },
             {
+                "type": "set_texture_from_url",
+                "message0": "set texture of %1 to URL %2",
+                "args0": [
+                    {
+                        "type": "input_value",
+                        "name": "OBJECT"
+                    },
+                    {
+                        "type": "input_value",
+                        "name": "URL",
+                        "check": "String"
+                    }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": "%{BKY_MATH_HUE}",
+                "tooltip": "Sets the texture of an object from an image URL.",
+                "helpUrl": ""
+            },
+            {
                 "type": "position_model",
                 "message0": "position model %1 at X %2 Y %3 Z %4",
                 "args0": [
@@ -9379,6 +9421,12 @@ if (${name}) {
                 const object = generator.valueToCode(block, 'OBJECT', generator.ORDER_ATOMIC) || 'null';
                 const assetName = generator.valueToCode(block, 'ASSET', generator.ORDER_ATOMIC) || 'null';
                 return `await sceneManager.setTexture(${object}, ${assetName}, assetManager);\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['set_texture_from_url'] = function (block, generator) {
+                const object = generator.valueToCode(block, 'OBJECT', generator.ORDER_ATOMIC) || 'null';
+                const url = generator.valueToCode(block, 'URL', generator.ORDER_ATOMIC) || "''";
+                return `await sceneManager.setTextureFromUrl(${object}, ${url});\n`;
             };
 
             // --- GUI Block Generators ---
