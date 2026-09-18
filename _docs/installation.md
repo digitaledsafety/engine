@@ -1,23 +1,45 @@
 ---
 layout: "docs"
-title: "installation"
+title: "Installation"
 ---
 
-# Installation
+# Installation & Local Setup
 
-To run this project locally, you'll need a modern web browser and a local web server.
+To run and test **Engine** locally, you only need a modern web browser and a static web server (or Jekyll for local site serving).
 
-## Steps
+## Quick Start (Static Web Server)
 
-1. **Navigate to the project directory:**
-   Open a terminal or command prompt and navigate to the root directory of this project.
-
-2. **Start a local web server:**
-   If you have Python 3 installed, you can use its built-in server:
+1. **Clone or Navigate to the Repository:**
    ```bash
-   python3 -m http.server
+   git clone https://github.com/digitaledsafety/engine.digitaledsafety.github.io.git
+   cd engine.digitaledsafety.github.io
    ```
-   Otherwise, you can use any other simple web server.
 
-3. **Open in your browser:**
-   Navigate to `http://localhost:8000` (or the appropriate port for your server) in your web browser.
+2. **Start a Local Web Server:**
+   Using Python 3 built-in HTTP server:
+   ```bash
+   python3 -m http.server 8000
+   ```
+   Or using Node.js `npx http-server`:
+   ```bash
+   npx http-server -p 8000
+   ```
+
+3. **Launch in Browser:**
+   Open `http://localhost:8000` in your web browser.
+
+---
+
+## Development & Automated Testing
+
+To run the project's Playwright integration test suite:
+
+1. **Install Node.js dependencies:**
+   ```bash
+   npm install
+   ```
+
+2. **Run Playwright Tests:**
+   ```bash
+   npx playwright test
+   ```

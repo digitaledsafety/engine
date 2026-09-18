@@ -1,25 +1,35 @@
 ---
 layout: "docs"
-title: "usage"
+title: "Usage Guide"
 ---
 
-# Usage
+# Usage Guide
 
-This guide explains how to use the block-based coding environment to create 3D scenes and interactions.
+This guide explains how to use the block-based coding environment to build 3D worlds, import models, handle inputs, and program interactive logic.
+
+---
 
 ## The Interface
 
-The interface is divided into a few main areas:
+The environment consists of several key interactive areas:
 
-* **Toolbox:** On the left side, you'll find a list of block categories. Click on a category to see the available blocks.
-* **Workspace:** This is the main area where you drag and drop blocks to build your programs.
-* **3D View:** The 3D scene that you create will be rendered here.
-* **Code View:** You can switch to this view to see the JavaScript code that is generated from your blocks.
+* **Toolbox:** Located on the left, containing categorized visual blocks (e.g., Objects, Physics, Events, Assets, Co-Host, GUI, Actions).
+* **Workspace:** The central canvas where you drag, drop, and snap blocks together to program your 3D application.
+* **3D Viewport:** The interactive WebGL canvas powered by Babylon.js where your 3D scene renders in real time.
+* **Play Overlay & Toolbar:** Controls to play/stop scene execution, reset workspace, framing camera views, and switching workspaces.
 
-## Creating Objects
+---
 
-To create an object, drag a block from the "Create" category into the workspace. For example, the "create box" block will create a new cube in your scene. You can customize the object's properties, such as its color and size, by connecting other blocks to it.
+## Creating & Manipulating 3D Objects
 
-## Adding Interactions
+1. **Primitives:** Drag blocks from the "Create" or "Objects" category to instantiate primitive shapes (e.g., Box, Sphere, Cylinder, Plane, Voxel Mesh).
+2. **Importing Models & Avatars:** Use blocks like `import 3D model` or `import VRM avatar` to load GLTF/GLB models, VRM characters, or `.mcstructure` voxel files directly into your scene.
+3. **Materials & Textures:** Apply colors, PBR materials, or image textures to objects using texture blocks from the Assets category.
 
-You can make your scenes interactive by using blocks from the "Events" category. For example, you can use the "when object is clicked" block to make something happen when a user clicks on an object.
+---
+
+## Adding Physics & Interactions
+
+* **Physics & Collisions:** Enable physics on objects, select impostors (Box, Sphere, Mesh), and register collision handlers with `when [object A] collides with [object B]`.
+* **Unified Input Actions:** Program cross-device interactions using unified action events (`select`, `context`, `zoom`, `navigate`, `menu`) that seamlessly map across touch screens, desktop mouse/keyboard, and game controllers.
+* **GUI & Popups:** Create 2D user interface elements, buttons, input fields, and popups over the 3D scene.
