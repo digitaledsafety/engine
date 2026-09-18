@@ -12,6 +12,7 @@ Enhance your 3D creations with free, open-source, and public domain 3D models, t
 ## Free & Open Source Asset Resources
 
 ### 3D Models & Avatars
+* **[babylon.js](https://doc.babylonjs.com/toolsAndResources/assetLibraries/):** This section includes a range of libraries for textures, models, and more that you can load into the Playground.
 * **[Poly Pizza](https://poly.pizza/):** Thousands of low-poly 3D models offered under free licenses, ideal for performance-friendly 3D web scenes.
 * **[Sketchfab](https://sketchfab.com/):** A massive repository of downloadable 3D models with filter options for Creative Commons (CC) licensed and free content.
 * **[Kenney.nl](https://kenney.nl/):** High-quality, public domain (CC0) 2D and 3D game assets, textures, and audio clips with no copyright restrictions.
@@ -31,7 +32,7 @@ Enhance your 3D creations with free, open-source, and public domain 3D models, t
 
 If you prefer to design custom assets or generate original soundscapes, consider these free tools:
 
-* **[Digital Education Safety Audio Tools](https://audio.digitaleducationsafety.org/):** An accessible suite of web-based tools designed for creating, editing, and generating custom sound effects and audio assets for your projects.
+* **[Digital Education & Safety Foundation Audio Tools](https://audio.digitaleducationsafety.org/):** An accessible suite of web-based tools designed for creating, editing, and generating custom sound effects and audio assets for your projects.
 * **[Blender](https://www.blender.org/):** A powerful, free, and open-source 3D creation suite for modeling, sculpting, animating, and exporting `.gltf` / `.glb` files.
 * **[MagicaVoxel](https://ephtracy.github.io/):** A free, lightweight 8-bit voxel art editor for creating 3D blocky models and `.obj` / `.mcstructure` assets.
 * **[Audacity](https://www.audacityteam.org/):** A free, open-source, cross-platform audio editor for recording and editing sound files.
