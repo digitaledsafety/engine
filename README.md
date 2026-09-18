@@ -30,11 +30,23 @@
 
 For detailed guides on how to use the tool, create custom workspaces, or contribute to the engine, please visit our **[Wiki](_docs/home.md)**.
 
+* **[Assets & Free Resources Guide](_docs/assets.md):** Discover free-to-use/open-source 3D models, textures, audio tools (including [audio.digitaleducationsafety.org](https://audio.digitaleducationsafety.org/)), and guidelines on creator attribution and licensing.
+
 ### Getting Started
 
 1. **Explore the Editor:** Open `index.md` (or the hosted GitHub Pages site) to launch the environment.
 2. **Pick a Workspace:** Choose from pre-configured layouts in the `_workspaces` directory, such as `space-shooter` or `virtual-pet`.
 3. **Run Your Code:** Snap blocks together and hit play to see your 3D creation move.
+
+---
+
+### Free & Open Source Assets
+
+We strongly encourage exploration and attributing open-source creators who share their work for free! Check out our **[Assets & Free Resources Guide](_docs/assets.md)** to find:
+* **3D Models & Avatars:** Poly Pizza, Sketchfab, Kenney.nl, VRoid Hub.
+* **Textures & Materials:** AmbientCG, Poly Haven.
+* **Audio & Sound Effects:** Freesound, OpenGameArt, and [Digital Education Safety Audio Tools](https://audio.digitaleducationsafety.org/).
+* **Licensing & Attribution Guidance:** Best practices for attributing creators and respecting open license terms.
 
 ---
 
