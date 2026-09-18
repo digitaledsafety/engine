@@ -204,4 +204,25 @@ test.describe('Engine Popup Security Validation', () => {
     expect(result.hasProxyImage).toBe(false);
     expect(result.hasValidImage).toBe(true);
   });
+
+  test('Backslash protocol-relative URLs and unsafe data URIs are rejected', async ({ page }) => {
+    await page.goto('/');
+    await page.click('#start-button');
+
+    const result = await page.evaluate(async () => {
+        const backslashRel = '\\\\tracking-pixel.com/image.png';
+        const unsafeData = 'data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==';
+        const safeData = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+
+        return {
+            backslashRelValid: window.isValidAssetURL(backslashRel),
+            unsafeDataValid: window.isValidAssetURL(unsafeData),
+            safeDataValid: window.isValidAssetURL(safeData)
+        };
+    });
+
+    expect(result.backslashRelValid).toBe(false);
+    expect(result.unsafeDataValid).toBe(false);
+    expect(result.safeDataValid).toBe(true);
+  });
 });

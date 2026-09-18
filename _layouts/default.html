@@ -708,7 +708,7 @@
         // --- URL Sanitization ---
         function isValidAssetURL(url) {
             if (typeof url !== 'string') return false;
-            const normalized = url.trim().toLowerCase();
+            let normalized = url.trim().replace(/\\/g, '/').toLowerCase();
             if (normalized.startsWith('//')) {
                 console.error('Invalid URL:', url, 'Protocol-relative URLs are not allowed.');
                 return false;
@@ -749,7 +749,24 @@
                 return isValidAssetURL(innerUrl);
             }
 
-            if (normalized.startsWith('https://') || normalized.startsWith('blob:') || normalized.startsWith('data:') || normalized.startsWith('/') || normalized.startsWith('./') || normalized.startsWith('assets/')) {
+            if (normalized.startsWith('data:')) {
+                const safeDataPrefixes = [
+                    'data:image/',
+                    'data:audio/',
+                    'data:model/',
+                    'data:font/',
+                    'data:application/octet-stream',
+                    'data:application/json',
+                    'data:text/plain'
+                ];
+                if (safeDataPrefixes.some(prefix => normalized.startsWith(prefix))) {
+                    return true;
+                }
+                console.error('Invalid URL:', url, 'Unsafe data URI MIME type.');
+                return false;
+            }
+
+            if (normalized.startsWith('https://') || normalized.startsWith('blob:') || normalized.startsWith('/') || normalized.startsWith('./') || normalized.startsWith('assets/')) {
                 return true;
             }
             console.error('Invalid URL:', url, 'Only HTTPS or blob URLs are allowed for assets.');
