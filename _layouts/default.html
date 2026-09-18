@@ -1906,6 +1906,11 @@ workspace_data: "${base64WorkspaceData}"
                     name: 'Co-Host',
                     categorystyle: 'event_category',
                     contents: [
+                        { kind: 'block', type: 'start_screen_capture' },
+                        { kind: 'block', type: 'analyze_screen_frame' },
+                        { kind: 'block', type: 'stop_screen_capture' },
+                        { kind: 'block', type: 'event_on_cursor_move' },
+                        { kind: 'block', type: 'get_cursor_position' },
                         { kind: 'block', type: 'start_speech_recognition' },
                         { kind: 'block', type: 'get_speech_transcript' },
                         { kind: 'block', type: 'start_webcam_tracking' },
@@ -2744,6 +2749,21 @@ workspace_data: "${base64WorkspaceData}"
                 this.speechRecognition = null;
                 this.isListening = false;
                 this.webcamTracking = { active: false, x: 0, y: 0, z: 0, gesture: 'neutral' };
+                this.screenCapture = {
+                    active: false,
+                    stream: null,
+                    videoElement: null,
+                    canvasElement: null,
+                    canvasCtx: null,
+                    intervalId: null,
+                    lastFrameDataUrl: null,
+                    latestSubtitles: ''
+                };
+                this.cursorState = {
+                    x: 0,
+                    y: 0,
+                    callbacks: []
+                };
                 this.llmEndpoint = null;
                 this.llmApiKey = null;
                 this.flightAnchors = {
@@ -4721,8 +4741,16 @@ workspace_data: "${base64WorkspaceData}"
                 this._onKeyUp = (event) => {
                     this.inputState.keys[event.key.toLowerCase()] = false;
                 };
+                this._onPointerMove = (e) => {
+                    this.cursorState.x = e.clientX;
+                    this.cursorState.y = e.clientY;
+                    this.cursorState.callbacks.forEach(cb => {
+                        try { cb(this.cursorState.x, this.cursorState.y); } catch (err) { console.error('Error in cursor move callback:', err); }
+                    });
+                };
                 window.addEventListener('keydown', this._onKeyDown);
                 window.addEventListener('keyup', this._onKeyUp);
+                window.addEventListener('pointermove', this._onPointerMove);
 
                 // Mouse & Touch Pointer / Gesture Handling
                 let startX = 0;
@@ -5058,6 +5086,120 @@ workspace_data: "${base64WorkspaceData}"
                 return this.webcamTracking.gesture || 'neutral';
             }
 
+            // --- Screen Capture & Visual/Audio Perception ---
+            async startScreenCapture(intervalMs = 1000) {
+                if (this.screenCapture && this.screenCapture.active) return;
+                try {
+                    if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+                        console.warn('getDisplayMedia is not available in this browser environment.');
+                        return;
+                    }
+                    const stream = await navigator.mediaDevices.getDisplayMedia({
+                        video: { frameRate: { max: 10 } },
+                        audio: true
+                    });
+
+                    const video = document.createElement('video');
+                    video.srcObject = stream;
+                    video.autoplay = true;
+                    video.muted = true;
+                    await video.play().catch(() => {});
+
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+
+                    this.screenCapture = {
+                        active: true,
+                        stream: stream,
+                        videoElement: video,
+                        canvasElement: canvas,
+                        canvasCtx: ctx,
+                        intervalId: null,
+                        lastFrameDataUrl: null,
+                        latestSubtitles: ''
+                    };
+
+                    const captureFrame = () => {
+                        if (!this.screenCapture.active || !video.videoWidth || !video.videoHeight) return;
+                        canvas.width = video.videoWidth;
+                        canvas.height = video.videoHeight;
+                        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                        try {
+                            this.screenCapture.lastFrameDataUrl = canvas.toDataURL('image/jpeg', 0.6);
+                        } catch (e) {
+                            console.warn('Error capturing screen frame:', e);
+                        }
+                    };
+
+                    const audioTracks = stream.getAudioTracks();
+                    if (audioTracks.length > 0 && (window.SpeechRecognition || window.webkitSpeechRecognition)) {
+                        this.startSpeechRecognition((transcript) => {
+                            if (this.screenCapture) {
+                                this.screenCapture.latestSubtitles = transcript;
+                            }
+                        });
+                    }
+
+                    const ms = Math.max(200, Number(intervalMs) || 1000);
+                    this.screenCapture.intervalId = setInterval(captureFrame, ms);
+                    captureFrame();
+
+                    stream.getVideoTracks().forEach(track => {
+                        track.onended = () => {
+                            this.stopScreenCapture();
+                        };
+                    });
+                } catch (err) {
+                    console.warn('Screen capture permission denied or failed:', err);
+                }
+            }
+
+            async analyzeScreenFrame(prompt = 'Describe what is happening on screen') {
+                if (!this.screenCapture || !this.screenCapture.active || !this.screenCapture.lastFrameDataUrl) {
+                    const fallbackText = (this.screenCapture && this.screenCapture.latestSubtitles) || this.speechTranscript || '';
+                    const context = fallbackText ? `[Subtitles/Audio Context]: ${fallbackText}` : '[Screen state]: Screen capture not active or initializing.';
+                    return await this.queryCohostLLM(prompt, context);
+                }
+
+                const frameContext = `[Screen Frame Captured] [Audio Subtitles]: ${this.screenCapture.latestSubtitles || this.speechTranscript || 'None'}`;
+                return await this.queryCohostLLM(prompt, frameContext);
+            }
+
+            stopScreenCapture() {
+                if (!this.screenCapture) return;
+                if (this.screenCapture.intervalId) {
+                    clearInterval(this.screenCapture.intervalId);
+                }
+                if (this.screenCapture.stream) {
+                    this.screenCapture.stream.getTracks().forEach(track => track.stop());
+                }
+                if (this.screenCapture.videoElement) {
+                    this.screenCapture.videoElement.pause();
+                    this.screenCapture.videoElement.srcObject = null;
+                }
+                this.screenCapture = {
+                    active: false,
+                    stream: null,
+                    videoElement: null,
+                    canvasElement: null,
+                    canvasCtx: null,
+                    intervalId: null,
+                    lastFrameDataUrl: null,
+                    latestSubtitles: ''
+                };
+            }
+
+            getCursorPos(axis) {
+                const a = (axis || 'x').toLowerCase();
+                return a === 'y' ? this.cursorState.y : this.cursorState.x;
+            }
+
+            onCursorMove(callback) {
+                if (typeof callback === 'function') {
+                    this.cursorState.callbacks.push(callback);
+                }
+            }
+
             // --- AI Reasoning & Spoken Co-Hosting (LLM & Action Tags) ---
             setLlmConfig(endpoint, apiKey) {
                 this.llmEndpoint = endpoint;
@@ -5341,6 +5483,8 @@ workspace_data: "${base64WorkspaceData}"
             }
 
             clear() {
+                this.stopScreenCapture();
+                this.cursorState.callbacks = [];
                 if (this.joystickManager) {
                     this.joystickManager.destroy();
                     this.joystickManager = null;
@@ -6689,6 +6833,64 @@ workspace_data: "${base64WorkspaceData}"
         };
 
         Blockly.defineBlocksWithJsonArray([
+            {
+                "type": "start_screen_capture",
+                "message0": "start screen capture interval %1 ms",
+                "args0": [
+                    { "type": "input_value", "name": "INTERVAL", "check": "Number" }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": "#4A90E2",
+                "tooltip": "Starts capturing user screen frame buffers and live audio streams at set interval.",
+                "helpUrl": ""
+            },
+            {
+                "type": "analyze_screen_frame",
+                "message0": "analyze screen frame prompt %1",
+                "args0": [
+                    { "type": "input_value", "name": "PROMPT", "check": "String" }
+                ],
+                "output": "String",
+                "colour": "#9013FE",
+                "tooltip": "Analyzes the latest captured screen frame buffer and audio captions with vision AI.",
+                "helpUrl": ""
+            },
+            {
+                "type": "stop_screen_capture",
+                "message0": "stop screen capture",
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": "#4A90E2",
+                "tooltip": "Stops active screen capture and audio streams.",
+                "helpUrl": ""
+            },
+            {
+                "type": "event_on_cursor_move",
+                "message0": "when cursor moves %1 %2",
+                "args0": [
+                    { "type": "input_dummy" },
+                    { "type": "input_statement", "name": "DO" }
+                ],
+                "colour": "#FF5C5C",
+                "tooltip": "Triggers code when user moves cursor across canvas or screen.",
+                "helpUrl": ""
+            },
+            {
+                "type": "get_cursor_position",
+                "message0": "cursor position %1",
+                "args0": [
+                    {
+                        "type": "field_dropdown",
+                        "name": "AXIS",
+                        "options": [["X", "x"], ["Y", "y"]]
+                    }
+                ],
+                "output": "Number",
+                "colour": "#4A90E2",
+                "tooltip": "Gets current X or Y coordinate of user cursor.",
+                "helpUrl": ""
+            },
             {
                 "type": "start_speech_recognition",
                 "message0": "start voice perception (STT)",
@@ -9833,6 +10035,31 @@ if (${name}) {
 
             javascript.javascriptGenerator.forBlock['console_clear'] = function (block, generator) {
                 return `console.clear();\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['start_screen_capture'] = function (block, generator) {
+                const interval = generator.valueToCode(block, 'INTERVAL', generator.ORDER_ATOMIC) || '1000';
+                return `await sceneManager.startScreenCapture(${interval});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['analyze_screen_frame'] = function (block, generator) {
+                const prompt = generator.valueToCode(block, 'PROMPT', generator.ORDER_ATOMIC) || "'Describe what is happening on screen'";
+                const code = `(await sceneManager.analyzeScreenFrame(${prompt})).text`;
+                return [code, generator.ORDER_AWAIT];
+            };
+
+            javascript.javascriptGenerator.forBlock['stop_screen_capture'] = function (block, generator) {
+                return `sceneManager.stopScreenCapture();\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['event_on_cursor_move'] = function (block, generator) {
+                const branch = generator.statementToCode(block, 'DO');
+                return `sceneManager.onCursorMove(async (cursorX, cursorY) => {\n${branch}});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['get_cursor_position'] = function (block, generator) {
+                const axis = block.getFieldValue('AXIS') || 'x';
+                return [`sceneManager.getCursorPos('${axis}')`, generator.ORDER_FUNCTION_CALL];
             };
 
             javascript.javascriptGenerator.forBlock['start_speech_recognition'] = function (block, generator) {

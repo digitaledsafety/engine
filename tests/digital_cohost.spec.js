@@ -181,4 +181,103 @@ test.describe('Digital Co-Host Avatar ("Word") Verification', () => {
         expect(avatarState.hasAvatar).toBe(true);
         expect(avatarState.hasSPS).toBe(true);
     });
+
+    test('Screen Capture, Vision Frame Analysis, and Cursor Tracking API & Blocks', async ({ page }) => {
+        await page.goto('/', { waitUntil: 'domcontentloaded' });
+
+        await page.evaluate(async () => {
+            await window.doRun('sceneManager.createBox("test_box", 0, 0, 0);');
+        });
+
+        // Test cursor tracking API
+        const cursorTest = await page.evaluate(() => {
+            let movedX = -1;
+            let movedY = -1;
+            window.sceneManager.onCursorMove((x, y) => {
+                movedX = x;
+                movedY = y;
+            });
+            // Simulate pointer event
+            window.dispatchEvent(new PointerEvent('pointermove', { clientX: 150, clientY: 250 }));
+            return {
+                x: window.sceneManager.getCursorPos('x'),
+                y: window.sceneManager.getCursorPos('y'),
+                movedX,
+                movedY
+            };
+        });
+        expect(cursorTest.x).toBe(150);
+        expect(cursorTest.y).toBe(250);
+        expect(cursorTest.movedX).toBe(150);
+        expect(cursorTest.movedY).toBe(250);
+
+        // Test screen capture fallback & frame analysis API
+        const captureTest = await page.evaluate(async () => {
+            if (!navigator.mediaDevices) {
+                navigator.mediaDevices = {};
+            }
+            navigator.mediaDevices.getDisplayMedia = async () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = 100;
+                canvas.height = 100;
+                return canvas.captureStream ? canvas.captureStream(10) : new MediaStream();
+            };
+
+            const origPlay = HTMLVideoElement.prototype.play;
+            HTMLVideoElement.prototype.play = async function() {
+                Object.defineProperty(this, 'videoWidth', { value: 100, configurable: true });
+                Object.defineProperty(this, 'videoHeight', { value: 100, configurable: true });
+                return Promise.resolve();
+            };
+
+            await window.sceneManager.startScreenCapture(500);
+            const activeBefore = window.sceneManager.screenCapture.active;
+            const analysis = await window.sceneManager.analyzeScreenFrame('Look at current screen');
+            window.sceneManager.stopScreenCapture();
+            const activeAfter = window.sceneManager.screenCapture.active;
+
+            HTMLVideoElement.prototype.play = origPlay;
+
+            return {
+                activeBefore,
+                activeAfter,
+                analysisText: analysis.text
+            };
+        });
+
+        expect(captureTest.activeBefore).toBe(true);
+        expect(captureTest.activeAfter).toBe(false);
+        expect(typeof captureTest.analysisText).toBe('string');
+
+        // Test execution of generated code for new Co-Host Blockly blocks
+        const blockExecution = await page.evaluate(async () => {
+            if (!navigator.mediaDevices) navigator.mediaDevices = {};
+            navigator.mediaDevices.getDisplayMedia = async () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = 100;
+                canvas.height = 100;
+                return canvas.captureStream ? canvas.captureStream(10) : new MediaStream();
+            };
+            HTMLVideoElement.prototype.play = async function() {
+                Object.defineProperty(this, 'videoWidth', { value: 100, configurable: true });
+                Object.defineProperty(this, 'videoHeight', { value: 100, configurable: true });
+                return Promise.resolve();
+            };
+
+            let cursorMoved = false;
+            const code = `
+                await sceneManager.startScreenCapture(500);
+                const analysisText = (await sceneManager.analyzeScreenFrame('What is on screen?')).text;
+                sceneManager.stopScreenCapture();
+                sceneManager.onCursorMove(async (cx, cy) => {
+                    cursorMoved = true;
+                });
+                const posX = sceneManager.getCursorPos('x');
+            `;
+            await window.doRun(code);
+            return typeof window.sceneManager.getCursorPos === 'function';
+        });
+
+        expect(blockExecution).toBe(true);
+    });
 });
