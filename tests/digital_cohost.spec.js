@@ -126,13 +126,59 @@ test.describe('Digital Co-Host Avatar ("Word") Verification', () => {
         expect(result.jetpackExists).toBe(true);
     });
 
-    test('Digital Co-Host workspace loads and executes scripted flying sequence', async ({ page }) => {
+    test('Particle Cube Avatar creation, color change, and procedural flight support', async ({ page }) => {
+        await page.goto('/', { waitUntil: 'domcontentloaded' });
+
+        const particleResult = await page.evaluate(async () => {
+            const avatar = window.sceneManager.createParticleCube('p_avatar', 0, 1.5, 0);
+            window.sceneManager.changeColor('p_avatar', '#ff00ff');
+            window.sceneManager.enableProceduralFlight(avatar, 'shoulder');
+
+            const hasSPS = !!avatar._sps;
+            const particleColor = avatar._sps.particles[0].baseColor;
+
+            return {
+                exists: !!window.sceneManager.objects['p_avatar'],
+                hasSPS,
+                r: particleColor.r,
+                b: particleColor.b,
+                flightEnabled: window.sceneManager.proceduralFlight.enabled
+            };
+        });
+
+        expect(particleResult.exists).toBe(true);
+        expect(particleResult.hasSPS).toBe(true);
+        expect(particleResult.r).toBeCloseTo(1.0);
+        expect(particleResult.b).toBeCloseTo(1.0);
+        expect(particleResult.flightEnabled).toBe(true);
+    });
+
+    test('Digital Co-Host workspace loads and executes scripted flying sequence with particle cube avatar', async ({ page }) => {
         await page.goto('/workspaces/digital-cohost/', { waitUntil: 'domcontentloaded' });
 
-        // Verify workspace loads and runs
+        // Verify workspace loads
         const isRun = await page.evaluate(() => {
             return typeof window.doRun === 'function' && !!window.sceneManager;
         });
         expect(isRun).toBe(true);
+
+        // Trigger workspace code execution via window.doRun()
+        await page.evaluate(async () => {
+            await window.doRun();
+        });
+
+        await page.waitForTimeout(1000);
+
+        const avatarState = await page.evaluate(async () => {
+            const keys = Object.keys(window.sceneManager.objects);
+            const avatarObj = window.sceneManager.objects['avatar'] || window.sceneManager.objects[keys[0]];
+            return {
+                keys,
+                hasAvatar: !!avatarObj,
+                hasSPS: !!(avatarObj && avatarObj._sps)
+            };
+        });
+        expect(avatarState.hasAvatar).toBe(true);
+        expect(avatarState.hasSPS).toBe(true);
     });
 });

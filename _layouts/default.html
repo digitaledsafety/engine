@@ -3090,6 +3090,273 @@ workspace_data: "${base64WorkspaceData}"
                 return capsuleMesh;
             }
 
+            createParticleCube(name, x = 0, y = 0, z = 0) {
+                this._cleanupExisting(name);
+
+                const rootMesh = BABYLON.MeshBuilder.CreateBox(name + "_root", { size: 0.1 }, this.scene);
+                rootMesh.isVisible = false;
+                rootMesh.position.set(x, y, z);
+
+                const particleModel = BABYLON.MeshBuilder.CreateBox("particleModel_" + name, { size: 1 }, this.scene);
+                const sps = new BABYLON.SolidParticleSystem("SPS_" + name, this.scene, { updatable: true });
+
+                const gridSize = 10;
+                const totalParticles = gridSize * gridSize * gridSize;
+                sps.addShape(particleModel, totalParticles);
+                const spsMesh = sps.buildMesh();
+                spsMesh.parent = rootMesh;
+                particleModel.dispose();
+
+                const precalculatedGridOffsets = [];
+                sps.initParticles = () => {
+                    let i = 0;
+                    const offset = gridSize / 2;
+                    for (let px = 0; px < gridSize; px++) {
+                        for (let py = 0; py < gridSize; py++) {
+                            for (let pz = 0; pz < gridSize; pz++) {
+                                const particle = sps.particles[i];
+                                particle.position.x = px - offset;
+                                particle.position.y = py - offset;
+                                particle.position.z = pz - offset;
+
+                                const ox = px - offset;
+                                const oy = py - offset;
+                                const oz = pz - offset;
+
+                                const isShellSlot = px === 0 || px === gridSize - 1 || py === 0 || py === gridSize - 1 || pz === 0 || pz === gridSize - 1;
+                                precalculatedGridOffsets.push({
+                                    x: ox,
+                                    y: oy,
+                                    z: oz,
+                                    isShellSlot
+                                });
+
+                                particle.homeX = particle.position.x;
+                                particle.homeY = particle.position.y;
+                                particle.homeZ = particle.position.z;
+
+                                particle.localGridOffsetX = ox;
+                                particle.localGridOffsetY = oy;
+                                particle.localGridOffsetZ = oz;
+
+                                particle.velocity = new BABYLON.Vector3(0, 0, 0);
+                                particle.randomOrderWeight = Math.random();
+                                if (!particle.color) particle.color = new BABYLON.Color4(0, 0.9, 1, 1);
+                                particle.baseColor = particle.color.clone();
+                                particle.isOuterShell = isShellSlot;
+                                i++;
+                            }
+                        }
+                    }
+                };
+
+                let target3DPosition = new BABYLON.Vector3(0, 0, 0);
+                let isMouseMoving = false;
+                let mouseTimeout = null;
+                let lastValidTargetPosition = new BABYLON.Vector3(0, 0, 0);
+
+                const optimizeHomePositionsOutsideWins = () => {
+                    const availableSlots = [];
+                    for (let i = 0; i < precalculatedGridOffsets.length; i++) {
+                        availableSlots.push({
+                            x: target3DPosition.x + precalculatedGridOffsets[i].x,
+                            y: target3DPosition.y + precalculatedGridOffsets[i].y,
+                            z: target3DPosition.z + precalculatedGridOffsets[i].z,
+                            ox: precalculatedGridOffsets[i].x,
+                            oy: precalculatedGridOffsets[i].y,
+                            oz: precalculatedGridOffsets[i].z,
+                            isShellSlot: precalculatedGridOffsets[i].isShellSlot,
+                            taken: false
+                        });
+                    }
+
+                    const sortedParticleRefs = [];
+                    for (let p = 0; p < sps.particles.length; p++) {
+                        const particle = sps.particles[p];
+                        const dx = target3DPosition.x - particle.position.x;
+                        const dy = target3DPosition.y - particle.position.y;
+                        const dz = target3DPosition.z - particle.position.z;
+                        const distToTargetSq = dx * dx + dy * dy + dz * dz;
+                        sortedParticleRefs.push({
+                            particle,
+                            distSq: distToTargetSq
+                        });
+                    }
+
+                    sortedParticleRefs.sort((a, b) => b.distSq - a.distSq);
+
+                    for (let i = 0; i < sortedParticleRefs.length; i++) {
+                        const particle = sortedParticleRefs[i].particle;
+                        let closestSlotIdx = -1;
+                        let minDistanceSq = Infinity;
+
+                        for (let s = 0; s < availableSlots.length; s++) {
+                            if (availableSlots[s].taken) continue;
+                            const dx = availableSlots[s].x - particle.position.x;
+                            const dy = availableSlots[s].y - particle.position.y;
+                            const dz = availableSlots[s].z - particle.position.z;
+                            const distSq = dx * dx + dy * dy + dz * dz;
+                            if (distSq < minDistanceSq) {
+                                minDistanceSq = distSq;
+                                closestSlotIdx = s;
+                            }
+                        }
+
+                        if (closestSlotIdx !== -1) {
+                            availableSlots[closestSlotIdx].taken = true;
+                            particle.homeX = availableSlots[closestSlotIdx].x;
+                            particle.homeY = availableSlots[closestSlotIdx].y;
+                            particle.homeZ = availableSlots[closestSlotIdx].z;
+                            particle.localGridOffsetX = availableSlots[closestSlotIdx].ox;
+                            particle.localGridOffsetY = availableSlots[closestSlotIdx].oy;
+                            particle.localGridOffsetZ = availableSlots[closestSlotIdx].oz;
+                            particle.isOuterShell = availableSlots[closestSlotIdx].isShellSlot;
+                        }
+                    }
+                };
+
+                const pointerObserver = this.scene.onPointerObservable.add((pointerInfo) => {
+                    if (pointerInfo.type === BABYLON.PointerEventTypes.POINTERMOVE) {
+                        const ray = this.scene.createPickingRay(this.scene.pointerX, this.scene.pointerY, BABYLON.Matrix.Identity(), this.scene.activeCamera);
+                        if (!ray || !ray.direction || Math.abs(ray.direction.z) < 1e-5) return;
+                        const distance = -ray.origin.z / ray.direction.z;
+                        const currentMouse3D = ray.origin.add(ray.direction.scale(distance));
+                        const dx = currentMouse3D.x - lastValidTargetPosition.x;
+                        const dy = currentMouse3D.y - lastValidTargetPosition.y;
+                        const dz = currentMouse3D.z - lastValidTargetPosition.z;
+                        const moveDistance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+                        const moveThreshold = 5.5;
+
+                        if (moveDistance > moveThreshold) {
+                            isMouseMoving = true;
+                            target3DPosition.copyFrom(currentMouse3D);
+                            lastValidTargetPosition.copyFrom(currentMouse3D);
+
+                            if (mouseTimeout) clearTimeout(mouseTimeout);
+                            mouseTimeout = setTimeout(() => {
+                                isMouseMoving = false;
+                                optimizeHomePositionsOutsideWins();
+                            }, 300);
+                        }
+                    }
+                });
+
+                sps.updateParticle = (particle) => {
+                    if (isMouseMoving) {
+                        const friction = 0.92;
+                        const dirX = target3DPosition.x - particle.position.x;
+                        const dirY = target3DPosition.y - particle.position.y;
+                        const dirZ = target3DPosition.z - particle.position.z;
+                        const dist = Math.sqrt(dirX * dirX + dirY * dirY + dirZ * dirZ) || 1e-3;
+
+                        const speed = 0.03 + particle.randomOrderWeight * 0.09;
+                        particle.velocity.x += (dirX / dist) * speed;
+                        particle.velocity.y += (dirY / dist) * speed;
+                        particle.velocity.z += (dirZ / dist) * speed;
+
+                        particle.velocity.x *= friction;
+                        particle.velocity.y *= friction;
+                        particle.velocity.z *= friction;
+
+                        particle.position.x += particle.velocity.x;
+                        particle.position.y += particle.velocity.y;
+                        particle.position.z += particle.velocity.z;
+
+                        particle.color.copyFrom(particle.baseColor);
+                        particle.scaling.setAll(1.0);
+                    } else {
+                        if (particle.isOuterShell) {
+                            particle.velocity.setAll(0);
+                            const easeSpeed = 0.3 + particle.randomOrderWeight * 0.05;
+
+                            particle.position.x += (particle.homeX - particle.position.x) * easeSpeed;
+                            particle.position.y += (particle.homeY - particle.position.y) * easeSpeed;
+                            particle.position.z += (particle.homeZ - particle.position.z) * easeSpeed;
+
+                            particle.color.copyFrom(particle.baseColor);
+                        } else {
+                            const thrustPower = 0.12 + particle.randomOrderWeight * 0.18;
+                            particle.velocity.y -= thrustPower;
+
+                            particle.velocity.x += (Math.random() - 0.5) * 0.06;
+                            particle.velocity.z += (Math.random() - 0.5) * 0.06;
+
+                            particle.position.x += particle.velocity.x;
+                            particle.position.y += particle.velocity.y;
+                            particle.position.z += particle.velocity.z;
+
+                            const currentCubeCenterX = particle.homeX - particle.localGridOffsetX;
+                            const currentCubeCenterY = particle.homeY - particle.localGridOffsetY;
+                            const currentCubeCenterZ = particle.homeZ - particle.localGridOffsetZ;
+
+                            const wallLimit = 4.0;
+
+                            if (particle.position.y >= currentCubeCenterY - wallLimit) {
+                                const relX = particle.position.x - currentCubeCenterX;
+                                if (Math.abs(relX) > wallLimit) {
+                                    particle.position.x = currentCubeCenterX + Math.sign(relX) * wallLimit;
+                                    particle.velocity.x *= -0.4;
+                                }
+
+                                const relZ = particle.position.z - currentCubeCenterZ;
+                                if (Math.abs(relZ) > wallLimit) {
+                                    particle.position.z = currentCubeCenterZ + Math.sign(relZ) * wallLimit;
+                                    particle.velocity.z *= -0.4;
+                                }
+                            }
+
+                            const relY = particle.position.y - currentCubeCenterY;
+                            if (relY > wallLimit) {
+                                particle.position.y = currentCubeCenterY + wallLimit;
+                                particle.velocity.y = 0;
+                            }
+
+                            particle.color.r = particle.baseColor.r;
+                            particle.color.g = Math.max(0, particle.baseColor.g - (Math.abs(particle.velocity.y) * 0.08));
+                            particle.color.b = particle.baseColor.b;
+
+                            const jetisonDistance = 7.0;
+                            const exhaustThreshold = currentCubeCenterY - wallLimit - jetisonDistance;
+                            if (particle.position.y < exhaustThreshold) {
+                                particle.position.x = currentCubeCenterX + (Math.random() - 0.5) * 7.0;
+                                particle.position.z = currentCubeCenterZ + (Math.random() - 0.5) * 7.0;
+                                particle.position.y = currentCubeCenterY + 3.5;
+                                particle.velocity.setAll(0);
+                            }
+                        }
+                    }
+                    return particle;
+                };
+
+                sps.initParticles();
+                sps.setParticles();
+
+                const renderObserver = this.scene.onBeforeRenderObservable.add(() => {
+                    if (sps && sps.mesh && !sps.mesh.isDisposed()) {
+                        sps.setParticles();
+                    }
+                });
+
+                rootMesh.onDisposeObservable.add(() => {
+                    if (pointerObserver) this.scene.onPointerObservable.remove(pointerObserver);
+                    if (renderObserver) this.scene.onBeforeRenderObservable.remove(renderObserver);
+                    if (mouseTimeout) clearTimeout(mouseTimeout);
+                    sps.dispose();
+                });
+
+                rootMesh._sps = sps;
+                rootMesh._setParticleBaseColor = (color4) => {
+                    for (let p = 0; p < sps.particles.length; p++) {
+                        sps.particles[p].baseColor.copyFrom(color4);
+                        sps.particles[p].color.copyFrom(color4);
+                    }
+                };
+
+                this.objects[name] = rootMesh;
+                this._tagMesh(rootMesh, name);
+                return rootMesh;
+            }
+
             async createText(name, text, fontUrl, size = 1, resolution = 16, depth = 0.5) {
                 if (!isValidAssetURL(fontUrl)) {
                     return null;
@@ -3710,6 +3977,10 @@ workspace_data: "${base64WorkspaceData}"
             changeColor(target, color) {
                 let mesh = this._getMesh(target);
                 if (mesh) {
+                    if (mesh._setParticleBaseColor) {
+                        const c3 = BABYLON.Color3.FromHexString(color);
+                        mesh._setParticleBaseColor(new BABYLON.Color4(c3.r, c3.g, c3.b, 1.0));
+                    }
                     if (!mesh.material) {
                         mesh.material = new BABYLON.StandardMaterial(mesh.name + "_material", this.scene);
                     }
@@ -6827,7 +7098,8 @@ workspace_data: "${base64WorkspaceData}"
                             ['ground', 'ground'],
                             ['cone', 'cone'],
                             ['torus', 'torus'],
-                            ['capsule', 'capsule']
+                            ['capsule', 'capsule'],
+                            ['particle_cube', 'particle_cube']
                         ],
                     },
                     { type: 'input_value', name: 'X', check: 'Number' },
@@ -9094,6 +9366,7 @@ if (${name}) {
                 else if (type === 'cone') method = 'createCone';
                 else if (type === 'torus') method = 'createTorus';
                 else if (type === 'capsule') method = 'createCapsule';
+                else if (type === 'particle_cube') method = 'createParticleCube';
 
                 const code = `sceneManager.${method}(${idStr}, ${x}, ${y}, ${z})`;
                 return [code, generator.ORDER_FUNCTION_CALL];
