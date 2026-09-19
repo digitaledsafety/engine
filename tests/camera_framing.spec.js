@@ -44,4 +44,34 @@ test.describe('Camera Framing Functionality', () => {
     expect(result.targetZ).toBeCloseTo(-5);
     expect(result.radius).toBeGreaterThan(0);
   });
+
+  test('cameraFollow locks camera target using string name, object instance, and target getter', async ({ page }) => {
+    const result = await page.evaluate(async () => {
+      const box = sceneManager.createBox('followTestBox', 0, 0, 0);
+
+      // 1. Follow using string name
+      sceneManager.cameraFollow('followTestBox');
+      const lockedByString = sceneManager.scene.activeCamera.lockedTarget === box;
+
+      // 2. Follow using direct mesh reference
+      sceneManager.cameraFollow(null); // reset first
+      sceneManager.cameraFollow(box);
+      const lockedByObject = sceneManager.scene.activeCamera.lockedTarget === box;
+
+      // 3. Follow using target getter function
+      sceneManager.cameraFollow(null); // reset first
+      sceneManager.cameraFollow(() => box);
+      const lockedByGetter = sceneManager.scene.activeCamera.lockedTarget === box;
+
+      return {
+        lockedByString,
+        lockedByObject,
+        lockedByGetter
+      };
+    });
+
+    expect(result.lockedByString).toBe(true);
+    expect(result.lockedByObject).toBe(true);
+    expect(result.lockedByGetter).toBe(true);
+  });
 });
