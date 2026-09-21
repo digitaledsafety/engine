@@ -204,4 +204,34 @@ test.describe('Engine Popup Security Validation', () => {
     expect(result.hasProxyImage).toBe(false);
     expect(result.hasValidImage).toBe(true);
   });
+
+  test('Backslash protocol-relative URLs and unsafe data URIs are blocked', async ({ page }) => {
+    await page.goto('/');
+    await page.click("#start-button");
+
+    const result = await page.evaluate(async () => {
+        const backslashProto = window.isValidAssetURL('\\\\tracking-pixel.com/image.png');
+        const unsafeDataHtml = window.isValidAssetURL('data:text/html,<script>alert(1)</script>');
+        const unsafeDataJs = window.isValidAssetURL('data:application/javascript,console.log(1)');
+        const safeDataImage = window.isValidAssetURL('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==');
+        const safeDataAudio = window.isValidAssetURL('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=');
+        const safeDataJson = window.isValidAssetURL('data:application/json,{"key":"value"}');
+
+        return {
+            backslashProto,
+            unsafeDataHtml,
+            unsafeDataJs,
+            safeDataImage,
+            safeDataAudio,
+            safeDataJson
+        };
+    });
+
+    expect(result.backslashProto).toBe(false);
+    expect(result.unsafeDataHtml).toBe(false);
+    expect(result.unsafeDataJs).toBe(false);
+    expect(result.safeDataImage).toBe(true);
+    expect(result.safeDataAudio).toBe(true);
+    expect(result.safeDataJson).toBe(true);
+  });
 });
