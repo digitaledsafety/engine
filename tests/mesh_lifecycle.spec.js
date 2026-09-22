@@ -149,4 +149,81 @@ test.describe('Mesh Lifecycle and Resource Cleanup', () => {
 
     expect(textTaggingInfo).toBe('testText');
   });
+
+  test('Re-creating async imported model or text mesh cleans up old mesh without disposing new mesh', async ({ page }) => {
+    // 1. Create initial primitive box named 'asyncObj'
+    await page.evaluate(() => {
+      window.sceneManager.createBox('asyncObj', 0, 0, 0);
+    });
+
+    const oldUniqueId = await page.evaluate(() => {
+      return window.sceneManager.objects['asyncObj'].uniqueId;
+    });
+
+    // 2. Re-create 'asyncObj' using importModel
+    await page.evaluate(async () => {
+      const originalImportMeshAsync = BABYLON.SceneLoader.ImportMeshAsync;
+      BABYLON.SceneLoader.ImportMeshAsync = async () => {
+        const root = new BABYLON.Mesh("importedRoot", window.sceneManager.scene);
+        return {
+          meshes: [root],
+          animationGroups: []
+        };
+      };
+
+      try {
+        await window.sceneManager.importModel('asyncObj', 'data:text/plain;base64,AAAA');
+      } finally {
+        BABYLON.SceneLoader.ImportMeshAsync = originalImportMeshAsync;
+      }
+    });
+
+    // Check old mesh is disposed and new mesh in sceneManager.objects is valid and not disposed
+    const modelCleanupResult = await page.evaluate((oldId) => {
+      const oldMesh = window.sceneManager.scene.getMeshByUniqueId(oldId);
+      const newMesh = window.sceneManager.objects['asyncObj'];
+      return {
+        oldDisposed: !oldMesh || oldMesh.isDisposed(),
+        newActive: !!newMesh && !newMesh.isDisposed(),
+        newUniqueId: newMesh ? newMesh.uniqueId : null
+      };
+    }, oldUniqueId);
+
+    expect(modelCleanupResult.oldDisposed).toBe(true);
+    expect(modelCleanupResult.newActive).toBe(true);
+    expect(modelCleanupResult.newUniqueId).not.toBe(oldUniqueId);
+
+    // 3. Re-create 'asyncObj' using createText
+    await page.evaluate(async () => {
+      const originalFetch = window.fetch;
+      window.fetch = async () => ({
+        ok: true,
+        json: async () => ({})
+      });
+
+      const originalCreateText = BABYLON.MeshBuilder.CreateText;
+      BABYLON.MeshBuilder.CreateText = () => {
+        return new BABYLON.Mesh("textMesh", window.sceneManager.scene);
+      };
+
+      try {
+        await window.sceneManager.createText('asyncObj', 'New Text', 'data:application/json,{}');
+      } finally {
+        window.fetch = originalFetch;
+        BABYLON.MeshBuilder.CreateText = originalCreateText;
+      }
+    });
+
+    const textCleanupResult = await page.evaluate((previousId) => {
+      const prevMesh = window.sceneManager.scene.getMeshByUniqueId(previousId);
+      const newMesh = window.sceneManager.objects['asyncObj'];
+      return {
+        prevDisposed: !prevMesh || prevMesh.isDisposed(),
+        newActive: !!newMesh && !newMesh.isDisposed()
+      };
+    }, modelCleanupResult.newUniqueId);
+
+    expect(textCleanupResult.prevDisposed).toBe(true);
+    expect(textCleanupResult.newActive).toBe(true);
+  });
 });
