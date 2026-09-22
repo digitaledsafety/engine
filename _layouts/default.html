@@ -1955,7 +1955,11 @@ workspace_data: "${base64WorkspaceData}"
                         {
                             kind: 'block',
                             type: 'camera_zoom',
-                        },                        
+                        },
+                        {
+                            kind: 'block',
+                            type: 'set_camera_property',
+                        },
                         {
                             kind: 'block',
                             type: 'create_ground',
@@ -4218,6 +4222,20 @@ workspace_data: "${base64WorkspaceData}"
             cameraZoom(value) {
                 if (this.scene.activeCamera && typeof this.scene.activeCamera.radius === 'number') {
                     this.scene.activeCamera.radius = Math.max(1, this.scene.activeCamera.radius - value);
+                }
+            }
+
+            setCameraProperty(property, value) {
+                if (!this.scene || !this.scene.activeCamera) return;
+                const camera = this.scene.activeCamera;
+                const val = Number(value);
+                if (isNaN(val)) return;
+
+                if (property === 'angularSensibility') {
+                    camera.angularSensibilityX = val;
+                    camera.angularSensibilityY = val;
+                } else if (property in camera) {
+                    camera[property] = val;
                 }
             }
 
@@ -8220,6 +8238,35 @@ workspace_data: "${base64WorkspaceData}"
                 "helpUrl": ""
             },
             {
+                "type": "set_camera_property",
+                "message0": "set camera %1 to %2",
+                "args0": [
+                    {
+                        "type": "field_dropdown",
+                        "name": "PROPERTY",
+                        "options": [
+                            ["inertia", "inertia"],
+                            ["wheel precision", "wheelPrecision"],
+                            ["angular sensibility", "angularSensibility"],
+                            ["angular sensibility X", "angularSensibilityX"],
+                            ["angular sensibility Y", "angularSensibilityY"],
+                            ["speed", "speed"],
+                            ["field of view (fov)", "fov"]
+                        ]
+                    },
+                    {
+                        "type": "input_value",
+                        "name": "VALUE",
+                        "check": "Number"
+                    }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": 180,
+                "tooltip": "Sets a camera property (e.g. inertia, wheelPrecision, angularSensibility, speed, fov) on the active camera.",
+                "helpUrl": ""
+            },
+            {
                 "type": "play_sound_url",
                 "message0": "play sound from URL %1",
                 "args0": [
@@ -9431,6 +9478,12 @@ if (${name}) {
             javascript.javascriptGenerator.forBlock['camera_zoom'] = function (block, generator) {
                 const zoomValue = generator.valueToCode(block, 'ZOOM', generator.ORDER_ATOMIC) || 0;
                 return `sceneManager.cameraZoom(${zoomValue});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['set_camera_property'] = function (block, generator) {
+                const property = block.getFieldValue('PROPERTY');
+                const value = generator.valueToCode(block, 'VALUE', generator.ORDER_ATOMIC) || 0;
+                return `sceneManager.setCameraProperty('${property}', ${value});\n`;
             };
 
             // --- Gameplay Block Generators ---
