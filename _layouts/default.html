@@ -4093,7 +4093,7 @@ workspace_data: "${base64WorkspaceData}"
             }
 
             onClick(name, callback) {
-                let targetMesh = this.objects[name];
+                let targetMesh = this._getMesh(name);
                 if (targetMesh) {
                     if (!targetMesh.actionManager) {
                         targetMesh.actionManager = new BABYLON.ActionManager(this.scene);
@@ -4105,7 +4105,7 @@ workspace_data: "${base64WorkspaceData}"
             }
 
             everyFrame(name, callback) {
-                let targetMesh = this.objects[name];
+                let targetMesh = this._getMesh(name);
                 if (targetMesh) {
                     this.perFrameFunctions.push({
                         targetMesh: targetMesh,
@@ -4190,26 +4190,14 @@ workspace_data: "${base64WorkspaceData}"
             }
 
             setAsPlayer(target) {
-                let name;
-                if (typeof target === 'string') {
-                    name = target;
-                } else if (target && typeof target === 'object' && target.name) {
-                    name = target.name;
-                }
-                if (this.objects[name]) {
-                    this.player = this.objects[name];
+                const mesh = this._getMesh(target);
+                if (mesh) {
+                    this.player = mesh;
                 }
             }
 
             cameraFollow(target) {
-                let mesh = null;
-                if (typeof target === 'string') {
-                    mesh = this.objects[target];
-                } else if (target && typeof target === 'object') {
-                    // Assumes target is a mesh object
-                    mesh = target;
-                }
-
+                const mesh = this._getMesh(target);
                 if (mesh && this.scene.activeCamera) {
                     this.scene.activeCamera.lockedTarget = mesh;
                 }
@@ -4537,13 +4525,7 @@ workspace_data: "${base64WorkspaceData}"
             }
 
             setFpsCamera(target) {
-                let mesh = null;
-                if (typeof target === 'string') {
-                    mesh = this.objects[target];
-                } else if (target && typeof target === 'object') {
-                    mesh = target;
-                }
-
+                const mesh = this._getMesh(target);
                 if (!mesh) {
                     console.warn("setFpsCamera: Target object not found.");
                     return;
@@ -9505,7 +9487,7 @@ if (${name}) {
 
             javascript.javascriptGenerator.forBlock['point_camera_at_mesh'] = function (block, generator) {
                 const meshVar = generator.nameDB_.getName(block.getFieldValue('MESH'), Blockly.Variables.NAME_TYPE);
-                return `sceneManager.cameraFollow(${meshVar}.name);\n`;
+                return `sceneManager.cameraFollow(${meshVar});\n`;
             };
 
             javascript.javascriptGenerator.forBlock['import_3d_file_url'] = function (block, generator) {
