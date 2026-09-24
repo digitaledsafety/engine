@@ -175,11 +175,25 @@ test.describe('Digital Co-Host Avatar ("Word") Verification', () => {
             return {
                 keys,
                 hasAvatar: !!avatarObj,
-                hasSPS: !!(avatarObj && avatarObj._sps)
+                hasSPS: !!(avatarObj && avatarObj._sps),
+                flightEnabled: window.sceneManager.proceduralFlight.enabled,
+                currentAnchor: window.sceneManager.proceduralFlight.currentAnchor
             };
         });
         expect(avatarState.hasAvatar).toBe(true);
         expect(avatarState.hasSPS).toBe(true);
+        expect(avatarState.flightEnabled).toBe(true);
+
+        // Verify swipe anchor change handling
+        const swipeState = await page.evaluate(() => {
+            window.sceneManager.setFlightAnchor('center');
+            const centerAnchor = window.sceneManager.proceduralFlight.currentAnchor;
+            window.sceneManager.setFlightAnchor('workspace');
+            const workspaceAnchor = window.sceneManager.proceduralFlight.currentAnchor;
+            return { centerAnchor, workspaceAnchor };
+        });
+        expect(swipeState.centerAnchor).toBe('center');
+        expect(swipeState.workspaceAnchor).toBe('workspace');
     });
 
     test('Screen Capture, Vision Frame Analysis, and Cursor Tracking API & Blocks', async ({ page }) => {
