@@ -204,4 +204,90 @@ test.describe('Engine Popup Security Validation', () => {
     expect(result.hasProxyImage).toBe(false);
     expect(result.hasValidImage).toBe(true);
   });
+
+  test('Backslash normalization and data URI MIME-type validation', async ({ page }) => {
+    await page.goto('/');
+    await page.click("#start-button");
+
+    const result = await page.evaluate(() => {
+        // Direct testing of isValidAssetURL helper function via page scope if accessible
+        const testUrls = [
+            { url: '\\\\tracking-pixel.com/image.png', expected: false },
+            { url: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', expected: true },
+            { url: 'data:text/html,<script>alert(1)</script>', expected: false },
+            { url: 'data:application/javascript;base64,YWxlcnQoMSk=', expected: false }
+        ];
+
+        return testUrls.map(item => ({
+            url: item.url,
+            actual: window.isValidAssetURL ? window.isValidAssetURL(item.url) : null,
+            expected: item.expected
+        }));
+    });
+
+    // If window.isValidAssetURL is not global, test via workspace popups
+    const popupResults = await page.evaluate(async () => {
+        const workspace = window.workspace;
+        workspace.clear();
+        workspace.clearUndo();
+
+        const backslashPopupVar = workspace.createVariable('backslashPopup');
+        const safeDataPopupVar = workspace.createVariable('safeDataPopup');
+        const unsafeDataPopupVar = workspace.createVariable('unsafeDataPopup');
+
+        // Backslash URL block
+        const createBackslash = workspace.newBlock('create_popup');
+        const title1 = workspace.newBlock('text'); title1.setFieldValue('Backslash', 'TEXT');
+        createBackslash.getInput('TITLE').connection.connect(title1.outputConnection);
+        const url1 = workspace.newBlock('text'); url1.setFieldValue('\\\\evil.com/image.png', 'TEXT');
+        createBackslash.getInput('IMAGE').connection.connect(url1.outputConnection);
+        const setVar1 = workspace.newBlock('variables_set');
+        setVar1.setFieldValue(backslashPopupVar.getId(), 'VAR');
+        setVar1.getInput('VALUE').connection.connect(createBackslash.outputConnection);
+
+        // Safe Data URI block
+        const createSafeData = workspace.newBlock('create_popup');
+        const title2 = workspace.newBlock('text'); title2.setFieldValue('SafeData', 'TEXT');
+        createSafeData.getInput('TITLE').connection.connect(title2.outputConnection);
+        const url2 = workspace.newBlock('text'); url2.setFieldValue('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'TEXT');
+        createSafeData.getInput('IMAGE').connection.connect(url2.outputConnection);
+        const setVar2 = workspace.newBlock('variables_set');
+        setVar2.setFieldValue(safeDataPopupVar.getId(), 'VAR');
+        setVar2.getInput('VALUE').connection.connect(createSafeData.outputConnection);
+        setVar1.nextConnection.connect(setVar2.previousConnection);
+
+        // Unsafe Data URI block
+        const createUnsafeData = workspace.newBlock('create_popup');
+        const title3 = workspace.newBlock('text'); title3.setFieldValue('UnsafeData', 'TEXT');
+        createUnsafeData.getInput('TITLE').connection.connect(title3.outputConnection);
+        const url3 = workspace.newBlock('text'); url3.setFieldValue('data:text/html,<script>alert("xss")</script>', 'TEXT');
+        createUnsafeData.getInput('IMAGE').connection.connect(url3.outputConnection);
+        const setVar3 = workspace.newBlock('variables_set');
+        setVar3.setFieldValue(unsafeDataPopupVar.getId(), 'VAR');
+        setVar3.getInput('VALUE').connection.connect(createUnsafeData.outputConnection);
+        setVar2.nextConnection.connect(setVar3.previousConnection);
+
+        const code = Blockly.JavaScript.workspaceToCode(workspace);
+        await window.doRun(code);
+
+        const backslashPopup = window.sceneManager.uiManager.getControlByName('backslashPopup');
+        const hasBackslashImage = backslashPopup.children[0].children.some(c => c.name === 'backslashPopup_image');
+
+        const safeDataPopup = window.sceneManager.uiManager.getControlByName('safeDataPopup');
+        const hasSafeDataImage = safeDataPopup.children[0].children.some(c => c.name === 'safeDataPopup_image');
+
+        const unsafeDataPopup = window.sceneManager.uiManager.getControlByName('unsafeDataPopup');
+        const hasUnsafeDataImage = unsafeDataPopup.children[0].children.some(c => c.name === 'unsafeDataPopup_image');
+
+        return {
+            hasBackslashImage,
+            hasSafeDataImage,
+            hasUnsafeDataImage
+        };
+    });
+
+    expect(popupResults.hasBackslashImage).toBe(false);
+    expect(popupResults.hasSafeDataImage).toBe(true);
+    expect(popupResults.hasUnsafeDataImage).toBe(false);
+  });
 });
