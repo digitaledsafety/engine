@@ -10169,7 +10169,7 @@ if (${name}) {
 
             javascript.javascriptGenerator.forBlock['parse_number_from'] = function (block, generator) {
                 const string = generator.valueToCode(block, 'STRING', generator.ORDER_ATOMIC) || "''";
-                const code = `parseFloat(${string});\n`;
+                const code = `parseFloat(${string})`;
                 return [code, generator.ORDER_ATOMIC];
             };
 
