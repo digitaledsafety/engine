@@ -172,4 +172,45 @@ test.describe('GUI Value Blocks & Creation Blocks Conversion', () => {
     expect(result.generatedCode).toContain('await sceneManager.importModelAsset');
     expect(result.generatedCode).toContain('await sceneManager.importAnimation');
   });
+
+  test('parse_number_from generates clean parseFloat without trailing semicolon and works when nested', async ({ page }) => {
+    const result = await page.evaluate(async () => {
+      const workspace = window.Blockly.getMainWorkspace();
+      workspace.clear();
+
+      // Create parse_number_from with string "42.5"
+      const parseBlock = workspace.newBlock('parse_number_from');
+      const textVal = workspace.newBlock('text');
+      textVal.setFieldValue('42.5', 'TEXT');
+      parseBlock.getInput('STRING').connection.connect(textVal.outputConnection);
+
+      // Create math_arithmetic block: parse_number_from + 10
+      const mathAddBlock = workspace.newBlock('math_arithmetic');
+      mathAddBlock.setFieldValue('ADD', 'OP');
+      mathAddBlock.getInput('A').connection.connect(parseBlock.outputConnection);
+
+      const numTen = workspace.newBlock('math_number');
+      numTen.setFieldValue(10, 'NUM');
+      mathAddBlock.getInput('B').connection.connect(numTen.outputConnection);
+
+      // Set variable resultVal = parse_number_from + 10
+      const setNumVar = workspace.newBlock('variables_set');
+      setNumVar.setFieldValue(workspace.createVariable('resultVal').getId(), 'VAR');
+      setNumVar.getInput('VALUE').connection.connect(mathAddBlock.outputConnection);
+
+      const generatedCode = window.javascript.javascriptGenerator.workspaceToCode(workspace);
+
+      // Evaluate generated expression directly
+      const evaluated = eval(generatedCode.replace(/var resultVal;/g, '') + '; resultVal');
+
+      return {
+        generatedCode,
+        evaluated
+      };
+    });
+
+    expect(result.generatedCode).toContain('resultVal = parseFloat(\'42.5\') + 10;');
+    expect(result.generatedCode).not.toContain('parseFloat(\'42.5\');');
+    expect(result.evaluated).toBe(52.5);
+  });
 });
