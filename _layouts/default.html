@@ -749,7 +749,20 @@
                 return isValidAssetURL(innerUrl);
             }
 
-            if (normalized.startsWith('https://') || normalized.startsWith('blob:') || normalized.startsWith('data:') || normalized.startsWith('/') || normalized.startsWith('./') || normalized.startsWith('assets/')) {
+            if (normalized.startsWith('data:')) {
+                // Prevent XSS vectors via HTML or executable script data URIs
+                if (normalized.startsWith('data:text/html') ||
+                    normalized.startsWith('data:text/xml') ||
+                    normalized.startsWith('data:image/svg+xml') ||
+                    normalized.startsWith('data:application/javascript') ||
+                    normalized.startsWith('data:text/javascript')) {
+                    console.error('Invalid URL:', url, 'HTML, XML, or JavaScript data URLs are not allowed.');
+                    return false;
+                }
+                return true;
+            }
+
+            if (normalized.startsWith('https://') || normalized.startsWith('blob:') || normalized.startsWith('/') || normalized.startsWith('./') || normalized.startsWith('assets/')) {
                 return true;
             }
             console.error('Invalid URL:', url, 'Only HTTPS or blob URLs are allowed for assets.');
