@@ -1560,6 +1560,10 @@ workspace_data: "${base64WorkspaceData}"
                         },
                         {
                             kind: 'block',
+                            type: 'event_on_object_detected',
+                        },
+                        {
+                            kind: 'block',
                             type: 'multiplayer_on_peer_join',
                         },
                         {
@@ -1922,6 +1926,7 @@ workspace_data: "${base64WorkspaceData}"
                         { kind: 'block', type: 'start_screen_capture' },
                         { kind: 'block', type: 'analyze_screen_frame' },
                         { kind: 'block', type: 'stop_screen_capture' },
+                        { kind: 'block', type: 'event_on_object_detected' },
                         { kind: 'block', type: 'event_on_cursor_move' },
                         { kind: 'block', type: 'get_cursor_position' },
                         { kind: 'block', type: 'start_speech_recognition' },
@@ -2762,6 +2767,17 @@ workspace_data: "${base64WorkspaceData}"
                 this.speechRecognition = null;
                 this.isListening = false;
                 this.webcamTracking = { active: false, x: 0, y: 0, z: 0, gesture: 'neutral' };
+                this.objectRecognition = {
+                    active: false,
+                    model: null,
+                    loadingPromise: null,
+                    videoElement: null,
+                    previewContainer: null,
+                    stream: null,
+                    listeners: [],
+                    cooldownMs: 1500,
+                    detectionTimer: null
+                };
                 this.screenCapture = {
                     active: false,
                     stream: null,
@@ -5099,6 +5115,176 @@ workspace_data: "${base64WorkspaceData}"
                 return this.webcamTracking.gesture || 'neutral';
             }
 
+            // --- Object Recognition (TensorFlow.js & COCO-SSD) ---
+            async loadObjectRecognitionDependencies() {
+                if (window.cocoSsd && window.tf) return window.cocoSsd;
+                if (this.objectRecognition.loadingPromise) return this.objectRecognition.loadingPromise;
+
+                this.objectRecognition.loadingPromise = (async () => {
+                    if (!window.tf) {
+                        await new Promise((resolve, reject) => {
+                            const s = document.createElement('script');
+                            s.src = 'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest';
+                            s.onload = resolve;
+                            s.onerror = (e) => reject(new Error('Failed to load TensorFlow.js'));
+                            document.head.appendChild(s);
+                        });
+                    }
+                    if (!window.cocoSsd) {
+                        await new Promise((resolve, reject) => {
+                            const s = document.createElement('script');
+                            s.src = 'https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd';
+                            s.onload = resolve;
+                            s.onerror = (e) => reject(new Error('Failed to load COCO-SSD model package'));
+                            document.head.appendChild(s);
+                        });
+                    }
+                    if (window.cocoSsd) {
+                        try {
+                            this.objectRecognition.model = await window.cocoSsd.load();
+                        } catch (e) {
+                            console.warn('COCO-SSD model initialization failed:', e);
+                        }
+                    }
+                    return window.cocoSsd;
+                })();
+
+                return this.objectRecognition.loadingPromise;
+            }
+
+            async startObjectRecognition() {
+                if (this.objectRecognition.active) return;
+                this.objectRecognition.active = true;
+
+                // Load model in background or wait
+                this.loadObjectRecognitionDependencies().catch(err => {
+                    console.warn('Object recognition model loading error:', err);
+                });
+
+                // Set up PIP camera preview UI
+                let container = document.getElementById('webcam-preview-container');
+                if (!container) {
+                    container = document.createElement('div');
+                    container.id = 'webcam-preview-container';
+                    container.style.position = 'absolute';
+                    container.style.top = '12px';
+                    container.style.right = '12px';
+                    container.style.width = '160px';
+                    container.style.height = '120px';
+                    container.style.borderRadius = '8px';
+                    container.style.overflow = 'hidden';
+                    container.style.border = '2px solid rgba(255, 255, 255, 0.5)';
+                    container.style.boxShadow = '0 4px 12px rgba(0,0,0,0.4)';
+                    container.style.zIndex = '100';
+                    container.style.backgroundColor = '#000';
+                    container.style.pointerEvents = 'none';
+
+                    const video = document.createElement('video');
+                    video.id = 'webcam-preview-video';
+                    video.autoplay = true;
+                    video.playsInline = true;
+                    video.muted = true;
+                    video.style.width = '100%';
+                    video.style.height = '100%';
+                    video.style.objectFit = 'cover';
+                    video.style.transform = 'scaleX(-1)';
+
+                    container.appendChild(video);
+                    const canvasContainer = document.querySelector('.canvas-container');
+                    if (canvasContainer) {
+                        canvasContainer.appendChild(container);
+                    }
+                    this.objectRecognition.previewContainer = container;
+                    this.objectRecognition.videoElement = video;
+                }
+
+                // Acquire webcam stream
+                if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                    try {
+                        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                        this.objectRecognition.stream = stream;
+                        if (this.objectRecognition.videoElement) {
+                            this.objectRecognition.videoElement.srcObject = stream;
+                        }
+                    } catch (err) {
+                        console.warn('Webcam stream unavailable for object recognition:', err);
+                    }
+                }
+
+                // Object detection frame processing loop
+                const processFrame = async () => {
+                    if (!this.objectRecognition.active) return;
+                    const video = this.objectRecognition.videoElement;
+                    if (this.objectRecognition.model && video && video.readyState >= 2) {
+                        try {
+                            const predictions = await this.objectRecognition.model.detect(video);
+                            this._processPredictions(predictions);
+                        } catch (e) {
+                            console.warn('Object detection frame process error:', e);
+                        }
+                    }
+                    if (this.objectRecognition.active) {
+                        this.objectRecognition.detectionTimer = setTimeout(processFrame, 250);
+                    }
+                };
+                processFrame();
+            }
+
+            onObjectDetected(targetLabel, callback) {
+                const label = (targetLabel || 'any object').toLowerCase().trim();
+                this.objectRecognition.listeners.push({
+                    label: label,
+                    callback: callback,
+                    lastTriggered: 0
+                });
+                this.startObjectRecognition();
+            }
+
+            _processPredictions(predictions) {
+                if (!predictions || predictions.length === 0) return;
+                const now = Date.now();
+
+                for (const listener of this.objectRecognition.listeners) {
+                    const targetLabel = listener.label;
+                    const isAny = targetLabel === 'any object' || targetLabel === 'any' || targetLabel === '' || targetLabel === '*';
+
+                    const matched = predictions.find(p => {
+                        const pClass = (p.class || '').toLowerCase();
+                        if (isAny) return (p.score || p.percentage / 100 || 0) >= 0.4;
+                        return (pClass === targetLabel || pClass.includes(targetLabel)) && ((p.score || p.percentage / 100 || 0) >= 0.4);
+                    });
+
+                    if (matched) {
+                        if (now - listener.lastTriggered >= this.objectRecognition.cooldownMs) {
+                            listener.lastTriggered = now;
+                            try {
+                                listener.callback(matched.class, matched.score || 0);
+                            } catch (err) {
+                                console.error('Error executing onObjectDetected callback:', err);
+                            }
+                        }
+                    }
+                }
+            }
+
+            stopObjectRecognition() {
+                this.objectRecognition.active = false;
+                if (this.objectRecognition.detectionTimer) {
+                    clearTimeout(this.objectRecognition.detectionTimer);
+                    this.objectRecognition.detectionTimer = null;
+                }
+                if (this.objectRecognition.stream) {
+                    this.objectRecognition.stream.getTracks().forEach(track => track.stop());
+                    this.objectRecognition.stream = null;
+                }
+                if (this.objectRecognition.previewContainer) {
+                    this.objectRecognition.previewContainer.remove();
+                    this.objectRecognition.previewContainer = null;
+                    this.objectRecognition.videoElement = null;
+                }
+                this.objectRecognition.listeners = [];
+            }
+
             // --- Screen Capture & Visual/Audio Perception ---
             async startScreenCapture(intervalMs = 1000) {
                 if (this.screenCapture && this.screenCapture.active) return;
@@ -5497,6 +5683,7 @@ workspace_data: "${base64WorkspaceData}"
 
             clear() {
                 this.stopScreenCapture();
+                this.stopObjectRecognition();
                 this.cursorState.callbacks = [];
                 if (this.joystickManager) {
                     this.joystickManager.destroy();
@@ -6876,6 +7063,38 @@ workspace_data: "${base64WorkspaceData}"
                 "nextStatement": null,
                 "colour": "#4A90E2",
                 "tooltip": "Stops active screen capture and audio streams.",
+                "helpUrl": ""
+            },
+            {
+                "type": "event_on_object_detected",
+                "message0": "when %1 detected %2 %3",
+                "args0": [
+                    {
+                        "type": "field_dropdown",
+                        "name": "OBJECT",
+                        "options": [
+                            [ "person", "person" ],
+                            [ "cell phone", "cell phone" ],
+                            [ "cup", "cup" ],
+                            [ "bottle", "bottle" ],
+                            [ "laptop", "laptop" ],
+                            [ "mouse", "mouse" ],
+                            [ "keyboard", "keyboard" ],
+                            [ "book", "book" ],
+                            [ "chair", "chair" ],
+                            [ "cat", "cat" ],
+                            [ "dog", "dog" ],
+                            [ "backpack", "backpack" ],
+                            [ "scissors", "scissors" ],
+                            [ "clock", "clock" ],
+                            [ "any object", "any object" ]
+                        ]
+                    },
+                    { "type": "input_dummy" },
+                    { "type": "input_statement", "name": "DO_CODE" }
+                ],
+                "style": "event_blocks",
+                "tooltip": "Triggers code when the selected object is recognized via webcam feed.",
                 "helpUrl": ""
             },
             {
@@ -10063,6 +10282,12 @@ if (${name}) {
 
             javascript.javascriptGenerator.forBlock['stop_screen_capture'] = function (block, generator) {
                 return `sceneManager.stopScreenCapture();\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['event_on_object_detected'] = function (block, generator) {
+                const objectName = block.getFieldValue('OBJECT') || 'any object';
+                const doCode = generator.statementToCode(block, 'DO_CODE');
+                return `sceneManager.onObjectDetected('${objectName}', async function() {\n${doCode}\n});\n`;
             };
 
             javascript.javascriptGenerator.forBlock['event_on_cursor_move'] = function (block, generator) {
