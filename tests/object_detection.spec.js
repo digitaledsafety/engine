@@ -108,4 +108,21 @@ test.describe('Webcam Object Recognition Verification', () => {
         expect(workspaceHasBlock).toBe(true);
     });
 
+    test('loadObjectRecognitionDependencies uses ESM imports without injecting script elements into DOM', async ({ page }) => {
+        await page.goto('/', { waitUntil: 'domcontentloaded' });
+
+        const scriptCountBefore = await page.evaluate(() => document.querySelectorAll('script').length);
+
+        await page.evaluate(async () => {
+            try {
+                await window.sceneManager.loadObjectRecognitionDependencies();
+            } catch (e) {
+                // Catch any network errors in offline test runner environments
+            }
+        });
+
+        const scriptCountAfter = await page.evaluate(() => document.querySelectorAll('script').length);
+        expect(scriptCountAfter).toBe(scriptCountBefore);
+    });
+
 });

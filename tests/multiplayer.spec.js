@@ -169,4 +169,20 @@ test.describe('Multiplayer PeerJS Functionality', () => {
 
         expect(syncedPosition).toEqual({ x: 10, y: 20, z: 30 });
     });
+
+    test('loadPeerJS uses ESM dynamic import without injecting script elements into DOM', async ({ page }) => {
+        const scriptCountBefore = await page.evaluate(() => document.querySelectorAll('script').length);
+
+        await page.evaluate(async () => {
+            delete window.Peer;
+            try {
+                await window.sceneManager.loadPeerJS();
+            } catch (e) {
+                // Catch any load errors in offline environments
+            }
+        });
+
+        const scriptCountAfter = await page.evaluate(() => document.querySelectorAll('script').length);
+        expect(scriptCountAfter).toBe(scriptCountBefore);
+    });
 });
