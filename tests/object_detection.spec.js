@@ -50,11 +50,15 @@ test.describe('Webcam Object Recognition Verification', () => {
 
             const previewExists = !!document.getElementById('webcam-preview-container');
             const videoExists = !!document.getElementById('webcam-preview-video');
+            const canvasExists = !!document.getElementById('webcam-preview-canvas');
 
-            // Simulate prediction processing
+            // Simulate prediction processing with bounding box
             window.sceneManager._processPredictions([
-                { class: 'person', score: 0.95 }
+                { class: 'person', score: 0.95, bbox: [20, 30, 100, 80] }
             ]);
+
+            const canvasElement = document.getElementById('webcam-preview-canvas');
+            const canvasHasDimensions = canvasElement && canvasElement.width > 0 && canvasElement.height > 0;
 
             const firedFirstTime = callbackFired;
             callbackFired = false;
@@ -72,6 +76,8 @@ test.describe('Webcam Object Recognition Verification', () => {
             return {
                 previewExists,
                 videoExists,
+                canvasExists,
+                canvasHasDimensions,
                 firedFirstTime,
                 detectedClass,
                 firedSecondTime,
@@ -81,6 +87,8 @@ test.describe('Webcam Object Recognition Verification', () => {
 
         expect(state.previewExists).toBe(true);
         expect(state.videoExists).toBe(true);
+        expect(state.canvasExists).toBe(true);
+        expect(state.canvasHasDimensions).toBe(true);
         expect(state.firedFirstTime).toBe(true);
         expect(state.detectedClass).toBe('person');
         expect(state.firedSecondTime).toBe(false);
