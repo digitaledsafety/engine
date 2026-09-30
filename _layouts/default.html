@@ -2772,6 +2772,7 @@ workspace_data: "${base64WorkspaceData}"
                     model: null,
                     loadingPromise: null,
                     videoElement: null,
+                    canvasElement: null,
                     previewContainer: null,
                     stream: null,
                     listeners: [],
@@ -5189,13 +5190,25 @@ workspace_data: "${base64WorkspaceData}"
                     video.style.objectFit = 'cover';
                     video.style.transform = 'scaleX(-1)';
 
+                    const overlayCanvas = document.createElement('canvas');
+                    overlayCanvas.id = 'webcam-preview-canvas';
+                    overlayCanvas.style.position = 'absolute';
+                    overlayCanvas.style.top = '0';
+                    overlayCanvas.style.left = '0';
+                    overlayCanvas.style.width = '100%';
+                    overlayCanvas.style.height = '100%';
+                    overlayCanvas.style.pointerEvents = 'none';
+                    overlayCanvas.style.zIndex = '1';
+
                     container.appendChild(video);
+                    container.appendChild(overlayCanvas);
                     const canvasContainer = document.querySelector('.canvas-container');
                     if (canvasContainer) {
                         canvasContainer.appendChild(container);
                     }
                     this.objectRecognition.previewContainer = container;
                     this.objectRecognition.videoElement = video;
+                    this.objectRecognition.canvasElement = overlayCanvas;
                 }
 
                 // Acquire webcam stream
@@ -5240,7 +5253,98 @@ workspace_data: "${base64WorkspaceData}"
                 this.startObjectRecognition();
             }
 
+            _renderBoundingBoxes(predictions) {
+                const canvas = this.objectRecognition.canvasElement;
+                if (!canvas) return;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) return;
+
+                const video = this.objectRecognition.videoElement;
+                if (video && video.videoWidth && video.videoHeight) {
+                    if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+                        canvas.width = video.videoWidth;
+                        canvas.height = video.videoHeight;
+                    }
+                } else if (!canvas.width || !canvas.height) {
+                    canvas.width = 320;
+                    canvas.height = 240;
+                }
+
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                if (!predictions || predictions.length === 0) return;
+
+                for (const p of predictions) {
+                    if (!p || !p.bbox || !Array.isArray(p.bbox) || p.bbox.length < 4) continue;
+                    const [x, y, w, h] = p.bbox;
+                    const videoW = (video && video.videoWidth) ? video.videoWidth : canvas.width;
+                    const videoH = (video && video.videoHeight) ? video.videoHeight : canvas.height;
+                    const scaleX = canvas.width / videoW;
+                    const scaleY = canvas.height / videoH;
+
+                    // Mirrored x because video element has CSS transform: scaleX(-1)
+                    const mirroredX = (videoW - x - w) * scaleX;
+                    const scaledY = y * scaleY;
+                    const scaledW = w * scaleX;
+                    const scaledH = h * scaleY;
+
+                    // Outlined box
+                    ctx.strokeStyle = '#00E5FF';
+                    ctx.lineWidth = 2;
+                    ctx.fillStyle = 'rgba(0, 229, 255, 0.2)';
+                    ctx.fillRect(mirroredX, scaledY, scaledW, scaledH);
+                    ctx.strokeRect(mirroredX, scaledY, scaledW, scaledH);
+
+                    // Corner accents for HUD look
+                    const cornerLen = Math.min(10, scaledW / 4, scaledH / 4);
+                    if (cornerLen > 2) {
+                        ctx.strokeStyle = '#FFFFFF';
+                        ctx.lineWidth = 3;
+                        // Top-left
+                        ctx.beginPath();
+                        ctx.moveTo(mirroredX, scaledY + cornerLen);
+                        ctx.lineTo(mirroredX, scaledY);
+                        ctx.lineTo(mirroredX + cornerLen, scaledY);
+                        ctx.stroke();
+                        // Top-right
+                        ctx.beginPath();
+                        ctx.moveTo(mirroredX + scaledW - cornerLen, scaledY);
+                        ctx.lineTo(mirroredX + scaledW, scaledY);
+                        ctx.lineTo(mirroredX + scaledW, scaledY + cornerLen);
+                        ctx.stroke();
+                        // Bottom-left
+                        ctx.beginPath();
+                        ctx.moveTo(mirroredX, scaledY + scaledH - cornerLen);
+                        ctx.lineTo(mirroredX, scaledY + scaledH);
+                        ctx.lineTo(mirroredX + cornerLen, scaledY + scaledH);
+                        ctx.stroke();
+                        // Bottom-right
+                        ctx.beginPath();
+                        ctx.moveTo(mirroredX + scaledW - cornerLen, scaledY + scaledH);
+                        ctx.lineTo(mirroredX + scaledW, scaledY + scaledH);
+                        ctx.lineTo(mirroredX + scaledW, scaledY + scaledH - cornerLen);
+                        ctx.stroke();
+                    }
+
+                    // Label badge
+                    const score = Math.round((p.score || p.percentage / 100 || 0) * 100);
+                    const label = `${p.class || 'object'} ${score}%`;
+                    ctx.font = 'bold 12px sans-serif';
+                    const textWidth = ctx.measureText(label).width;
+                    const textHeight = 16;
+
+                    const labelX = mirroredX;
+                    const labelY = Math.max(0, scaledY - textHeight);
+
+                    ctx.fillStyle = '#00E5FF';
+                    ctx.fillRect(labelX, labelY, textWidth + 8, textHeight);
+
+                    ctx.fillStyle = '#000000';
+                    ctx.fillText(label, labelX + 4, labelY + 12);
+                }
+            }
+
             _processPredictions(predictions) {
+                this._renderBoundingBoxes(predictions);
                 if (!predictions || predictions.length === 0) return;
                 const now = Date.now();
 
@@ -5281,6 +5385,7 @@ workspace_data: "${base64WorkspaceData}"
                     this.objectRecognition.previewContainer.remove();
                     this.objectRecognition.previewContainer = null;
                     this.objectRecognition.videoElement = null;
+                    this.objectRecognition.canvasElement = null;
                 }
                 this.objectRecognition.listeners = [];
             }
