@@ -294,4 +294,43 @@ test.describe('Digital Co-Host Avatar ("Word") Verification', () => {
 
         expect(blockExecution).toBe(true);
     });
+
+    test('Speech Bubble API, Block Execution, and Fallback Quips Verification', async ({ page }) => {
+        await page.goto('/', { waitUntil: 'domcontentloaded' });
+
+        const res = await page.evaluate(async () => {
+            const avatar = window.sceneManager.createBox('avatar', 0, 1, 0);
+
+            // Test Speech Bubble API creation
+            const bubble = window.sceneManager.showSpeechBubble(avatar, 'Hello from speech bubble!', 2);
+            const exists = !!window.sceneManager.uiManager.controls['speech_bubble_avatar'];
+            const textContent = window.sceneManager.uiManager.controls['speech_bubble_avatar'].children[0].text;
+
+            // Test fallback LLM quips for jokes and questions
+            const jokeRes = await window.sceneManager.queryCohostLLM('tell me a funny joke');
+            const questionRes = await window.sceneManager.queryCohostLLM('what is your purpose?');
+
+            // Test show_speech_bubble block execution via doRun (including avatar creation)
+            const code = `
+                const avatarMesh = sceneManager.createBox('avatar', 0, 1, 0);
+                sceneManager.showSpeechBubble(avatarMesh, 'Block test speech', 3);
+            `;
+            await window.doRun(code);
+            const updatedText = window.sceneManager.uiManager.controls['speech_bubble_avatar'].children[0].text;
+
+            return {
+                exists,
+                textContent,
+                jokeText: jokeRes.text,
+                questionText: questionRes.text,
+                updatedText
+            };
+        });
+
+        expect(res.exists).toBe(true);
+        expect(res.textContent).toBe('Hello from speech bubble!');
+        expect(res.jokeText).toBeTruthy();
+        expect(res.questionText).toBeTruthy();
+        expect(res.updatedText).toBe('Block test speech');
+    });
 });
