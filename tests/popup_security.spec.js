@@ -231,4 +231,27 @@ test.describe('Engine Popup Security Validation', () => {
     expect(result.safeImageData).toBe(true);
     expect(result.safeAudioData).toBe(true);
   });
+
+  test('Backslash protocol-relative URLs and unsupported data URIs are rejected', async ({ page }) => {
+    await page.goto('/');
+    await page.click("#start-button");
+
+    const result = await page.evaluate(() => {
+      const fn = window.isValidAssetURL;
+      if (typeof fn !== 'function') return null;
+
+      return {
+        backslashDouble: fn('\\\\tracking-pixel.com/image.png'),
+        backslashSlash: fn('\\/tracking-pixel.com/image.png'),
+        unsupportedDataMime: fn('data:application/x-executable;base64,AAAA'),
+        unsupportedDataText: fn('data:text/x-python;base64,cHJpbnQoMSk=')
+      };
+    });
+
+    expect(result).not.toBeNull();
+    expect(result.backslashDouble).toBe(false);
+    expect(result.backslashSlash).toBe(false);
+    expect(result.unsupportedDataMime).toBe(false);
+    expect(result.unsupportedDataText).toBe(false);
+  });
 });
