@@ -1935,6 +1935,7 @@ workspace_data: "${base64WorkspaceData}"
                         { kind: 'block', type: 'get_webcam_tracker_pos' },
                         { kind: 'block', type: 'query_cohost_llm' },
                         { kind: 'block', type: 'speak_retro_voice' },
+                        { kind: 'block', type: 'show_speech_bubble' },
                         { kind: 'block', type: 'enable_procedural_flight' },
                         { kind: 'block', type: 'set_flight_anchor' },
                         { kind: 'block', type: 'trigger_action_tag' },
@@ -2824,6 +2825,10 @@ workspace_data: "${base64WorkspaceData}"
 
             resumeEngine() {
                 this.runRenderLoop();
+            }
+
+            showSpeechBubble(target, text, duration = 4) {
+                return this.uiManager.showSpeechBubble(target, text, duration, this);
             }
 
             createPopup(name, title, options) {
@@ -5139,12 +5144,17 @@ workspace_data: "${base64WorkspaceData}"
                         console.warn('ESM dynamic import for TensorFlow/COCO-SSD failed:', err);
                     }
 
-                    const cocoSsdObj = window.cocoSsd;
-                    if (cocoSsdObj && typeof cocoSsdObj.load === 'function') {
-                        try {
-                            this.objectRecognition.model = await cocoSsdObj.load();
-                        } catch (e) {
-                            console.warn('COCO-SSD model initialization failed:', e);
+                    if (window._cocoSsdModel) {
+                        this.objectRecognition.model = window._cocoSsdModel;
+                    } else {
+                        const cocoSsdObj = window.cocoSsd;
+                        if (cocoSsdObj && typeof cocoSsdObj.load === 'function') {
+                            try {
+                                this.objectRecognition.model = await cocoSsdObj.load();
+                                window._cocoSsdModel = this.objectRecognition.model;
+                            } catch (e) {
+                                console.warn('COCO-SSD model initialization failed:', e);
+                            }
                         }
                     }
                     return window.cocoSsd;
@@ -5155,6 +5165,13 @@ workspace_data: "${base64WorkspaceData}"
 
             async startObjectRecognition() {
                 if (this.objectRecognition.active) return;
+
+                // Clean up any existing leftover preview container in DOM to ensure a fresh UI for the current scene
+                const existingContainer = document.getElementById('webcam-preview-container');
+                if (existingContainer) {
+                    existingContainer.remove();
+                }
+
                 this.objectRecognition.active = true;
 
                 // Load model in background or wait
@@ -5163,53 +5180,50 @@ workspace_data: "${base64WorkspaceData}"
                 });
 
                 // Set up PIP camera preview UI
-                let container = document.getElementById('webcam-preview-container');
-                if (!container) {
-                    container = document.createElement('div');
-                    container.id = 'webcam-preview-container';
-                    container.style.position = 'absolute';
-                    container.style.top = '12px';
-                    container.style.right = '12px';
-                    container.style.width = '160px';
-                    container.style.height = '120px';
-                    container.style.borderRadius = '8px';
-                    container.style.overflow = 'hidden';
-                    container.style.border = '2px solid rgba(255, 255, 255, 0.5)';
-                    container.style.boxShadow = '0 4px 12px rgba(0,0,0,0.4)';
-                    container.style.zIndex = '100';
-                    container.style.backgroundColor = '#000';
-                    container.style.pointerEvents = 'none';
+                let container = document.createElement('div');
+                container.id = 'webcam-preview-container';
+                container.style.position = 'absolute';
+                container.style.top = '12px';
+                container.style.right = '12px';
+                container.style.width = '160px';
+                container.style.height = '120px';
+                container.style.borderRadius = '8px';
+                container.style.overflow = 'hidden';
+                container.style.border = '2px solid rgba(255, 255, 255, 0.5)';
+                container.style.boxShadow = '0 4px 12px rgba(0,0,0,0.4)';
+                container.style.zIndex = '100';
+                container.style.backgroundColor = '#000';
+                container.style.pointerEvents = 'none';
 
-                    const video = document.createElement('video');
-                    video.id = 'webcam-preview-video';
-                    video.autoplay = true;
-                    video.playsInline = true;
-                    video.muted = true;
-                    video.style.width = '100%';
-                    video.style.height = '100%';
-                    video.style.objectFit = 'cover';
-                    video.style.transform = 'scaleX(-1)';
+                const video = document.createElement('video');
+                video.id = 'webcam-preview-video';
+                video.autoplay = true;
+                video.playsInline = true;
+                video.muted = true;
+                video.style.width = '100%';
+                video.style.height = '100%';
+                video.style.objectFit = 'cover';
+                video.style.transform = 'scaleX(-1)';
 
-                    const overlayCanvas = document.createElement('canvas');
-                    overlayCanvas.id = 'webcam-preview-canvas';
-                    overlayCanvas.style.position = 'absolute';
-                    overlayCanvas.style.top = '0';
-                    overlayCanvas.style.left = '0';
-                    overlayCanvas.style.width = '100%';
-                    overlayCanvas.style.height = '100%';
-                    overlayCanvas.style.pointerEvents = 'none';
-                    overlayCanvas.style.zIndex = '1';
+                const overlayCanvas = document.createElement('canvas');
+                overlayCanvas.id = 'webcam-preview-canvas';
+                overlayCanvas.style.position = 'absolute';
+                overlayCanvas.style.top = '0';
+                overlayCanvas.style.left = '0';
+                overlayCanvas.style.width = '100%';
+                overlayCanvas.style.height = '100%';
+                overlayCanvas.style.pointerEvents = 'none';
+                overlayCanvas.style.zIndex = '1';
 
-                    container.appendChild(video);
-                    container.appendChild(overlayCanvas);
-                    const canvasContainer = document.querySelector('.canvas-container');
-                    if (canvasContainer) {
-                        canvasContainer.appendChild(container);
-                    }
-                    this.objectRecognition.previewContainer = container;
-                    this.objectRecognition.videoElement = video;
-                    this.objectRecognition.canvasElement = overlayCanvas;
+                container.appendChild(video);
+                container.appendChild(overlayCanvas);
+                const canvasContainer = document.querySelector('.canvas-container');
+                if (canvasContainer) {
+                    canvasContainer.appendChild(container);
                 }
+                this.objectRecognition.previewContainer = container;
+                this.objectRecognition.videoElement = video;
+                this.objectRecognition.canvasElement = overlayCanvas;
 
                 // Acquire webcam stream
                 if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
@@ -5535,14 +5549,28 @@ workspace_data: "${base64WorkspaceData}"
 
                 if (!textResponse) {
                     const lower = userPrompt.toLowerCase();
-                    if (lower.includes('hello') || lower.includes('hi') || lower.includes('start')) {
+                    if (lower.includes('hello') || lower.includes('hi') || lower.includes('start') || lower.includes('hey')) {
                         textResponse = "[FLY_CENTER] [GLOW_ON] Hey everyone! Word is online and co-hosting live! Let's build something awesome!";
-                    } else if (lower.includes('code') || lower.includes('explain') || lower.includes('look')) {
+                    } else if (lower.includes('code') || lower.includes('explain') || lower.includes('look') || lower.includes('script')) {
                         textResponse = "[FLY_WORKSPACE] [EMOTE_THINKING] Inspecting the workspace syntax now. Everything looks super clean!";
-                    } else if (lower.includes('jetpack') || lower.includes('fly')) {
+                    } else if (lower.includes('jetpack') || lower.includes('fly') || lower.includes('hover')) {
                         textResponse = "[EQUIP_JETPACK] [FLY_SHOULDER] Jetpack engaged! Hovering over your shoulder in streamer mode.";
+                    } else if (lower.includes('joke') || lower.includes('quip') || lower.includes('funny')) {
+                        const jokes = [
+                            "[EMOTE_THINKING] Why do programmers prefer dark mode? Because light attracts bugs!",
+                            "[GLOW_ON] There are 10 types of people in the world: those who understand binary, and those who don't!",
+                            "[FLY_CENTER] Why did the developer go broke? Because they used up all their cache!"
+                        ];
+                        textResponse = jokes[Math.floor(Math.random() * jokes.length)];
+                    } else if (lower.includes('question') || lower.includes('what') || lower.includes('how') || lower.includes('why')) {
+                        textResponse = "[EMOTE_THINKING] Great question! As your AI co-host, I analyze logic blocks in real time to optimize our 3D stream!";
                     } else {
-                        textResponse = "[FLY_SHOULDER] [GLOW_ON] Copy that, streamer! Standing by for our next move.";
+                        const defaultQuips = [
+                            "[FLY_SHOULDER] [GLOW_ON] Copy that, streamer! Standing by for our next move.",
+                            "[EMOTE_THINKING] [FLY_CENTER] Analyzing stream metrics... looking 100% operational!",
+                            "[GLOW_ON] Systems primed and synced. What are we building next?"
+                        ];
+                        textResponse = defaultQuips[Math.floor(Math.random() * defaultQuips.length)];
                     }
                 }
 
@@ -5839,6 +5867,18 @@ workspace_data: "${base64WorkspaceData}"
             }
 
             dispose() {
+                this.stopScreenCapture();
+                this.stopObjectRecognition();
+                this.stopSpeechRecognition();
+                this.webcamTracking.active = false;
+                if (this.webcamVideoStream) {
+                    this.webcamVideoStream.getTracks().forEach(track => track.stop());
+                    this.webcamVideoStream = null;
+                }
+                if (this.cursorState) {
+                    this.cursorState.callbacks = [];
+                }
+
                 if (this.joystickManager) {
                     this.joystickManager.destroy();
                     this.joystickManager = null;
@@ -6777,6 +6817,76 @@ workspace_data: "${base64WorkspaceData}"
                 return this._getControl(name);
             }
 
+            showSpeechBubble(target, text, duration = 4, sceneManager = null) {
+                let mesh = null;
+                if (sceneManager && typeof sceneManager._getMesh === 'function') {
+                    mesh = sceneManager._getMesh(target);
+                } else if (target && target.position) {
+                    mesh = target;
+                }
+
+                const bubbleName = "speech_bubble_" + (mesh ? (mesh.name || "mesh") : "global");
+                let bubble = this.controls[bubbleName];
+
+                if (!bubble) {
+                    bubble = new BABYLON.GUI.Rectangle(bubbleName);
+                    bubble.cornerRadius = 12;
+                    bubble.thickness = 2;
+                    bubble.color = "#00e5ff";
+                    bubble.background = "rgba(10, 20, 35, 0.88)";
+                    bubble.paddingLeft = "8px";
+                    bubble.paddingRight = "8px";
+                    bubble.paddingTop = "6px";
+                    bubble.paddingBottom = "6px";
+                    bubble.adaptWidthToChildren = true;
+                    bubble.adaptHeightToChildren = true;
+                    bubble.isHitTestVisible = false;
+
+                    const textBlock = new BABYLON.GUI.TextBlock(bubbleName + "_text");
+                    textBlock.text = text || "";
+                    textBlock.color = "#ffffff";
+                    textBlock.fontSize = 18;
+                    textBlock.resizeToFit = true;
+                    textBlock.textWrapping = true;
+                    textBlock.maxWidth = "280px";
+                    textBlock.paddingLeft = "10px";
+                    textBlock.paddingRight = "10px";
+                    textBlock.paddingTop = "6px";
+                    textBlock.paddingBottom = "6px";
+
+                    bubble.addControl(textBlock);
+                    this.advancedTexture.addControl(bubble);
+                    this.controls[bubbleName] = bubble;
+                } else {
+                    if (bubble.children && bubble.children[0]) {
+                        bubble.children[0].text = text || "";
+                    }
+                    bubble.isVisible = true;
+                }
+
+                if (mesh) {
+                    bubble.linkWithMesh(mesh);
+                    bubble.linkOffsetY = -70;
+                } else {
+                    bubble.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_CENTER;
+                    bubble.verticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_TOP;
+                    bubble.top = "80px";
+                }
+
+                if (bubble._hideTimeout) {
+                    clearTimeout(bubble._hideTimeout);
+                    bubble._hideTimeout = null;
+                }
+
+                if (duration > 0) {
+                    bubble._hideTimeout = setTimeout(() => {
+                        if (bubble) bubble.isVisible = false;
+                    }, duration * 1000);
+                }
+
+                return bubble;
+            }
+
             createPopup(name, title, options = {}) {
                 if (this.controls[name]) {
                     console.warn(`Popup with name "${name}" already exists. Creation ignored.`);
@@ -7281,6 +7391,20 @@ workspace_data: "${base64WorkspaceData}"
                 "nextStatement": null,
                 "colour": "#5B80A5",
                 "tooltip": "Synthesizes vocal audio through a vintage modem and chiptune audio filter.",
+                "helpUrl": ""
+            },
+            {
+                "type": "show_speech_bubble",
+                "message0": "show speech bubble for avatar %1 text %2 seconds %3",
+                "args0": [
+                    { "type": "input_value", "name": "AVATAR" },
+                    { "type": "input_value", "name": "TEXT", "check": "String" },
+                    { "type": "input_value", "name": "DURATION", "check": "Number" }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": "#5B80A5",
+                "tooltip": "Displays a 3D-linked text speech bubble floating above the avatar.",
                 "helpUrl": ""
             },
             {
@@ -10422,6 +10546,13 @@ if (${name}) {
                 const text = generator.valueToCode(block, 'TEXT', generator.ORDER_ATOMIC) || "''";
                 const pitch = generator.valueToCode(block, 'PITCH', generator.ORDER_ATOMIC) || '1.2';
                 return `sceneManager.speakRetroVoice(${text}, ${pitch});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['show_speech_bubble'] = function (block, generator) {
+                const avatar = generator.valueToCode(block, 'AVATAR', generator.ORDER_ATOMIC) || 'null';
+                const text = generator.valueToCode(block, 'TEXT', generator.ORDER_ATOMIC) || "''";
+                const duration = generator.valueToCode(block, 'DURATION', generator.ORDER_ATOMIC) || '4';
+                return `sceneManager.showSpeechBubble(${avatar}, ${text}, ${duration});\n`;
             };
 
             javascript.javascriptGenerator.forBlock['enable_procedural_flight'] = function (block, generator) {
