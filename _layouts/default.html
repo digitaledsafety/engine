@@ -5139,12 +5139,17 @@ workspace_data: "${base64WorkspaceData}"
                         console.warn('ESM dynamic import for TensorFlow/COCO-SSD failed:', err);
                     }
 
-                    const cocoSsdObj = window.cocoSsd;
-                    if (cocoSsdObj && typeof cocoSsdObj.load === 'function') {
-                        try {
-                            this.objectRecognition.model = await cocoSsdObj.load();
-                        } catch (e) {
-                            console.warn('COCO-SSD model initialization failed:', e);
+                    if (window._cocoSsdModel) {
+                        this.objectRecognition.model = window._cocoSsdModel;
+                    } else {
+                        const cocoSsdObj = window.cocoSsd;
+                        if (cocoSsdObj && typeof cocoSsdObj.load === 'function') {
+                            try {
+                                this.objectRecognition.model = await cocoSsdObj.load();
+                                window._cocoSsdModel = this.objectRecognition.model;
+                            } catch (e) {
+                                console.warn('COCO-SSD model initialization failed:', e);
+                            }
                         }
                     }
                     return window.cocoSsd;
@@ -5155,6 +5160,13 @@ workspace_data: "${base64WorkspaceData}"
 
             async startObjectRecognition() {
                 if (this.objectRecognition.active) return;
+
+                // Clean up any existing leftover preview container in DOM to ensure a fresh UI for the current scene
+                const existingContainer = document.getElementById('webcam-preview-container');
+                if (existingContainer) {
+                    existingContainer.remove();
+                }
+
                 this.objectRecognition.active = true;
 
                 // Load model in background or wait
@@ -5163,53 +5175,50 @@ workspace_data: "${base64WorkspaceData}"
                 });
 
                 // Set up PIP camera preview UI
-                let container = document.getElementById('webcam-preview-container');
-                if (!container) {
-                    container = document.createElement('div');
-                    container.id = 'webcam-preview-container';
-                    container.style.position = 'absolute';
-                    container.style.top = '12px';
-                    container.style.right = '12px';
-                    container.style.width = '160px';
-                    container.style.height = '120px';
-                    container.style.borderRadius = '8px';
-                    container.style.overflow = 'hidden';
-                    container.style.border = '2px solid rgba(255, 255, 255, 0.5)';
-                    container.style.boxShadow = '0 4px 12px rgba(0,0,0,0.4)';
-                    container.style.zIndex = '100';
-                    container.style.backgroundColor = '#000';
-                    container.style.pointerEvents = 'none';
+                let container = document.createElement('div');
+                container.id = 'webcam-preview-container';
+                container.style.position = 'absolute';
+                container.style.top = '12px';
+                container.style.right = '12px';
+                container.style.width = '160px';
+                container.style.height = '120px';
+                container.style.borderRadius = '8px';
+                container.style.overflow = 'hidden';
+                container.style.border = '2px solid rgba(255, 255, 255, 0.5)';
+                container.style.boxShadow = '0 4px 12px rgba(0,0,0,0.4)';
+                container.style.zIndex = '100';
+                container.style.backgroundColor = '#000';
+                container.style.pointerEvents = 'none';
 
-                    const video = document.createElement('video');
-                    video.id = 'webcam-preview-video';
-                    video.autoplay = true;
-                    video.playsInline = true;
-                    video.muted = true;
-                    video.style.width = '100%';
-                    video.style.height = '100%';
-                    video.style.objectFit = 'cover';
-                    video.style.transform = 'scaleX(-1)';
+                const video = document.createElement('video');
+                video.id = 'webcam-preview-video';
+                video.autoplay = true;
+                video.playsInline = true;
+                video.muted = true;
+                video.style.width = '100%';
+                video.style.height = '100%';
+                video.style.objectFit = 'cover';
+                video.style.transform = 'scaleX(-1)';
 
-                    const overlayCanvas = document.createElement('canvas');
-                    overlayCanvas.id = 'webcam-preview-canvas';
-                    overlayCanvas.style.position = 'absolute';
-                    overlayCanvas.style.top = '0';
-                    overlayCanvas.style.left = '0';
-                    overlayCanvas.style.width = '100%';
-                    overlayCanvas.style.height = '100%';
-                    overlayCanvas.style.pointerEvents = 'none';
-                    overlayCanvas.style.zIndex = '1';
+                const overlayCanvas = document.createElement('canvas');
+                overlayCanvas.id = 'webcam-preview-canvas';
+                overlayCanvas.style.position = 'absolute';
+                overlayCanvas.style.top = '0';
+                overlayCanvas.style.left = '0';
+                overlayCanvas.style.width = '100%';
+                overlayCanvas.style.height = '100%';
+                overlayCanvas.style.pointerEvents = 'none';
+                overlayCanvas.style.zIndex = '1';
 
-                    container.appendChild(video);
-                    container.appendChild(overlayCanvas);
-                    const canvasContainer = document.querySelector('.canvas-container');
-                    if (canvasContainer) {
-                        canvasContainer.appendChild(container);
-                    }
-                    this.objectRecognition.previewContainer = container;
-                    this.objectRecognition.videoElement = video;
-                    this.objectRecognition.canvasElement = overlayCanvas;
+                container.appendChild(video);
+                container.appendChild(overlayCanvas);
+                const canvasContainer = document.querySelector('.canvas-container');
+                if (canvasContainer) {
+                    canvasContainer.appendChild(container);
                 }
+                this.objectRecognition.previewContainer = container;
+                this.objectRecognition.videoElement = video;
+                this.objectRecognition.canvasElement = overlayCanvas;
 
                 // Acquire webcam stream
                 if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
@@ -5839,6 +5848,18 @@ workspace_data: "${base64WorkspaceData}"
             }
 
             dispose() {
+                this.stopScreenCapture();
+                this.stopObjectRecognition();
+                this.stopSpeechRecognition();
+                this.webcamTracking.active = false;
+                if (this.webcamVideoStream) {
+                    this.webcamVideoStream.getTracks().forEach(track => track.stop());
+                    this.webcamVideoStream = null;
+                }
+                if (this.cursorState) {
+                    this.cursorState.callbacks = [];
+                }
+
                 if (this.joystickManager) {
                     this.joystickManager.destroy();
                     this.joystickManager = null;
