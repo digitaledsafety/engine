@@ -125,4 +125,69 @@ test.describe('Webcam Object Recognition Verification', () => {
         expect(scriptCountAfter).toBe(scriptCountBefore);
     });
 
+    test('object detection listeners and logic are cleared and rebuilt on workspace re-run (doRun)', async ({ page }) => {
+        await page.goto('/', { waitUntil: 'domcontentloaded' });
+
+        // Mock getUserMedia
+        await page.evaluate(() => {
+            if (!navigator.mediaDevices) navigator.mediaDevices = {};
+            navigator.mediaDevices.getUserMedia = async () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = 320;
+                canvas.height = 240;
+                return canvas.captureStream ? canvas.captureStream(30) : new MediaStream();
+            };
+        });
+
+        // Run 1: Code with event_on_object_detected logic
+        const run1State = await page.evaluate(async () => {
+            window.testObjectDetectedCount = 0;
+            const code = `
+                sceneManager.onObjectDetected('cup', () => {
+                    window.testObjectDetectedCount++;
+                });
+            `;
+            await window.doRun(code);
+
+            // Simulate prediction
+            window.sceneManager._processPredictions([
+                { class: 'cup', score: 0.9, bbox: [10, 10, 50, 50] }
+            ]);
+
+            return {
+                listenersCount: window.sceneManager.objectRecognition.listeners.length,
+                detectedCount: window.testObjectDetectedCount
+            };
+        });
+
+        expect(run1State.listenersCount).toBe(1);
+        expect(run1State.detectedCount).toBe(1);
+
+        // Run 2: Re-run doRun without object detected logic (simulating user deleting the block)
+        const run2State = await page.evaluate(async () => {
+            const emptyCode = `// Object detected block deleted`;
+            await window.doRun(emptyCode);
+
+            // Verify active status and listeners on new sceneManager
+            const activeStatus = window.sceneManager.objectRecognition.active;
+            const listenersCount = window.sceneManager.objectRecognition.listeners.length;
+
+            // Attempt to trigger prediction
+            window.sceneManager._processPredictions([
+                { class: 'cup', score: 0.9, bbox: [10, 10, 50, 50] }
+            ]);
+
+            return {
+                activeStatus,
+                listenersCount,
+                detectedCount: window.testObjectDetectedCount
+            };
+        });
+
+        expect(run2State.activeStatus).toBe(false);
+        expect(run2State.listenersCount).toBe(0);
+        // Count should still be 1 from run 1 and NOT increment to 2
+        expect(run2State.detectedCount).toBe(1);
+    });
+
 });
