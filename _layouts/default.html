@@ -9577,6 +9577,7 @@ workspace_data: "${base64WorkspaceData}"
         ]);
 
         {
+            javascript.javascriptGenerator.ORDER_AWAIT = 0;
             javascript.javascriptGenerator.forBlock['create_particles'] = function (block, generator) {
                 const type = block.getFieldValue('TYPE');
                 const target = generator.valueToCode(block, 'TARGET', generator.ORDER_ATOMIC) || 'null';
@@ -10732,7 +10733,7 @@ if (${name}) {
                     args[i] = generator.valueToCode(block, 'ARG' + i, generator.ORDER_NONE) || 'null';
                 }
                 const code = 'await ' + funcName + '(' + args.join(', ') + ')';
-                return [code, generator.ORDER_FUNCTION_CALL];
+                return [code, generator.ORDER_AWAIT];
             };
 
             javascript.javascriptGenerator.forBlock['procedures_callnoreturn'] = function (block, generator) {
