@@ -117,4 +117,28 @@ test.describe('Engine Features V2', () => {
         expect(result.countAfterSecond).toBe(1);
         expect(result.countAfterHide).toBe(0);
     });
+
+    test('should define ORDER_AWAIT on javascriptGenerator and use ORDER_AWAIT in procedures_callreturn', async ({ page }) => {
+        const result = await page.evaluate(() => {
+            const gen = javascript.javascriptGenerator;
+            const orderAwaitValue = gen.ORDER_AWAIT;
+
+            const workspace = window.Blockly.getMainWorkspace();
+            gen.init(workspace);
+            const procBlock = workspace.newBlock('procedures_callreturn');
+            procBlock.setFieldValue('myFunc', 'NAME');
+            const generated = gen.forBlock['procedures_callreturn'](procBlock, gen);
+            procBlock.dispose();
+
+            return {
+                orderAwaitValue,
+                code: generated[0],
+                orderUsed: generated[1]
+            };
+        });
+
+        expect(result.orderAwaitValue).toBe(0);
+        expect(result.code).toContain('await myFunc()');
+        expect(result.orderUsed).toBe(0);
+    });
 });
