@@ -5011,6 +5011,7 @@ workspace_data: "${base64WorkspaceData}"
             // --- ESM Dynamic Module Loading for Co-Host Capabilities ---
             async loadCohostDependencies() {
                 if (this._cohostDependenciesLoaded) return this._cohostModule;
+                this.loadObjectRecognitionDependencies().catch(() => {});
                 try {
                     const module = await import('https://cdn.jsdelivr.net/npm/@viamrobotics/sdk@0.22.0/+esm').catch(() => null);
                     this._cohostModule = module;
@@ -5123,10 +5124,19 @@ workspace_data: "${base64WorkspaceData}"
 
             // --- Object Recognition (TensorFlow.js & COCO-SSD) ---
             async loadObjectRecognitionDependencies() {
-                if (window.cocoSsd && window.tf) return window.cocoSsd;
-                if (this.objectRecognition.loadingPromise) return this.objectRecognition.loadingPromise;
+                if (window._cocoSsdModel) {
+                    this.objectRecognition.model = window._cocoSsdModel;
+                    return window.cocoSsd;
+                }
+                if (window._cocoSsdLoadingPromise) {
+                    await window._cocoSsdLoadingPromise;
+                    if (window._cocoSsdModel) {
+                        this.objectRecognition.model = window._cocoSsdModel;
+                    }
+                    return window.cocoSsd;
+                }
 
-                this.objectRecognition.loadingPromise = (async () => {
+                window._cocoSsdLoadingPromise = (async () => {
                     try {
                         if (!window.tf) {
                             const tfModule = await import('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/+esm');
@@ -5144,23 +5154,21 @@ workspace_data: "${base64WorkspaceData}"
                         console.warn('ESM dynamic import for TensorFlow/COCO-SSD failed:', err);
                     }
 
-                    if (window._cocoSsdModel) {
-                        this.objectRecognition.model = window._cocoSsdModel;
-                    } else {
-                        const cocoSsdObj = window.cocoSsd;
-                        if (cocoSsdObj && typeof cocoSsdObj.load === 'function') {
-                            try {
-                                this.objectRecognition.model = await cocoSsdObj.load();
-                                window._cocoSsdModel = this.objectRecognition.model;
-                            } catch (e) {
-                                console.warn('COCO-SSD model initialization failed:', e);
-                            }
+                    const cocoSsdObj = window.cocoSsd;
+                    if (cocoSsdObj && typeof cocoSsdObj.load === 'function') {
+                        try {
+                            const model = await cocoSsdObj.load({ base: 'lite_mobilenet_v2' });
+                            window._cocoSsdModel = model;
+                            this.objectRecognition.model = model;
+                        } catch (e) {
+                            console.warn('COCO-SSD model initialization failed:', e);
                         }
                     }
                     return window.cocoSsd;
                 })();
 
-                return this.objectRecognition.loadingPromise;
+                this.objectRecognition.loadingPromise = window._cocoSsdLoadingPromise;
+                return window._cocoSsdLoadingPromise;
             }
 
             async startObjectRecognition() {
