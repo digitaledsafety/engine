@@ -190,4 +190,67 @@ test.describe('Webcam Object Recognition Verification', () => {
         expect(run2State.detectedCount).toBe(1);
     });
 
+    test('object detection model is retained and reinitialized across consecutive play button presses', async ({ page }) => {
+        await page.goto('/', { waitUntil: 'domcontentloaded' });
+
+        // Mock getUserMedia and cocoSsd
+        await page.evaluate(() => {
+            if (!navigator.mediaDevices) navigator.mediaDevices = {};
+            navigator.mediaDevices.getUserMedia = async () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = 320;
+                canvas.height = 240;
+                return canvas.captureStream ? canvas.captureStream(30) : new MediaStream();
+            };
+
+            // Set up mock window.cocoSsd and mock model
+            window.cocoSsd = {
+                load: async () => ({ detect: async () => [{ class: 'person', score: 0.9, bbox: [0,0,10,10] }] })
+            };
+            window.tf = {};
+        });
+
+        // First play press
+        const run1Result = await page.evaluate(async () => {
+            window.run1Triggered = false;
+            const code = `
+                sceneManager.onObjectDetected('person', () => { window.run1Triggered = true; });
+            `;
+            await window.doRun(code);
+            await window.sceneManager.loadObjectRecognitionDependencies();
+
+            const hasModelRun1 = !!window.sceneManager.objectRecognition.model;
+
+            window.sceneManager._processPredictions([
+                { class: 'person', score: 0.9, bbox: [0,0,10,10] }
+            ]);
+
+            return { hasModelRun1, triggered: window.run1Triggered };
+        });
+
+        expect(run1Result.hasModelRun1).toBe(true);
+        expect(run1Result.triggered).toBe(true);
+
+        // Second play press (re-run doRun)
+        const run2Result = await page.evaluate(async () => {
+            window.run2Triggered = false;
+            const code = `
+                sceneManager.onObjectDetected('person', () => { window.run2Triggered = true; });
+            `;
+            await window.doRun(code);
+            await window.sceneManager.loadObjectRecognitionDependencies();
+
+            const hasModelRun2 = !!window.sceneManager.objectRecognition.model;
+
+            window.sceneManager._processPredictions([
+                { class: 'person', score: 0.9, bbox: [0,0,10,10] }
+            ]);
+
+            return { hasModelRun2, triggered: window.run2Triggered };
+        });
+
+        expect(run2Result.hasModelRun2).toBe(true);
+        expect(run2Result.triggered).toBe(true);
+    });
+
 });
