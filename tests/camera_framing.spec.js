@@ -44,4 +44,73 @@ test.describe('Camera Framing Functionality', () => {
     expect(result.targetZ).toBeCloseTo(-5);
     expect(result.radius).toBeGreaterThan(0);
   });
+
+  test('target resolution in setAsPlayer, cameraFollow, setFpsCamera, onClick, and everyFrame supports string and object references', async ({ page }) => {
+    const testResult = await page.evaluate(async () => {
+      const boxMesh = sceneManager.createBox('resolutionTestBox', 1, 2, 3);
+
+      // Test cameraFollow with mesh object directly
+      sceneManager.cameraFollow(boxMesh);
+      const followWithObject = sceneManager.scene.activeCamera.lockedTarget === boxMesh;
+
+      // Test cameraFollow with string name
+      sceneManager.cameraFollow('resolutionTestBox');
+      const followWithString = sceneManager.scene.activeCamera.lockedTarget === boxMesh;
+
+      // Test setAsPlayer with mesh object
+      sceneManager.setAsPlayer(boxMesh);
+      const playerWithObject = sceneManager.player === boxMesh;
+
+      // Test setAsPlayer with string name
+      sceneManager.setAsPlayer('resolutionTestBox');
+      const playerWithString = sceneManager.player === boxMesh;
+
+      // Test setFpsCamera with direct mesh object
+      sceneManager.setFpsCamera(boxMesh);
+      const fpsCameraCreated = sceneManager.scene.activeCamera.name === 'fpsCamera';
+
+      // Test onClick with direct mesh object
+      let clickRegistered = false;
+      sceneManager.onClick(boxMesh, () => { clickRegistered = true; });
+
+      // Test everyFrame with direct mesh object
+      let frameFuncRegistered = false;
+      sceneManager.everyFrame(boxMesh, (m) => { frameFuncRegistered = true; });
+
+      const lastFrameFunc = sceneManager.perFrameFunctions[sceneManager.perFrameFunctions.length - 1];
+      if (lastFrameFunc && lastFrameFunc.targetMesh === boxMesh) {
+        lastFrameFunc.func(boxMesh, 16);
+      }
+
+      return {
+        followWithObject,
+        followWithString,
+        playerWithObject,
+        playerWithString,
+        fpsCameraCreated,
+        frameFuncRegistered
+      };
+    });
+
+    expect(testResult.followWithObject).toBe(true);
+    expect(testResult.followWithString).toBe(true);
+    expect(testResult.playerWithObject).toBe(true);
+    expect(testResult.playerWithString).toBe(true);
+    expect(testResult.fpsCameraCreated).toBe(true);
+    expect(testResult.frameFuncRegistered).toBe(true);
+  });
+
+  test('point_camera_at_mesh block generator passes mesh variable directly', async ({ page }) => {
+    const generatorResult = await page.evaluate(() => {
+      javascript.javascriptGenerator.init(window.workspace);
+      const myVar = window.workspace.createVariable('myMeshVar');
+      const block = window.workspace.newBlock('point_camera_at_mesh');
+      block.setFieldValue(myVar.getId(), 'MESH');
+      const code = javascript.javascriptGenerator.forBlock['point_camera_at_mesh'](block, javascript.javascriptGenerator);
+      block.dispose();
+      return code;
+    });
+
+    expect(generatorResult).toBe('sceneManager.cameraFollow(myMeshVar);\n');
+  });
 });
