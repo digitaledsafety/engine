@@ -1974,7 +1974,19 @@ workspace_data: "${base64WorkspaceData}"
                         {
                             kind: 'block',
                             type: 'camera_zoom',
-                        },                        
+                        },
+                        {
+                            kind: 'block',
+                            type: 'set_camera_property',
+                        },
+                        {
+                            kind: 'block',
+                            type: 'set_skybox_url',
+                        },
+                        {
+                            kind: 'block',
+                            type: 'set_light_property',
+                        },
                         {
                             kind: 'block',
                             type: 'create_ground',
@@ -2053,6 +2065,10 @@ workspace_data: "${base64WorkspaceData}"
                         {
                             kind: 'block',
                             type: 'colour_blend',
+                        },
+                        {
+                            kind: 'block',
+                            type: 'get_distance_between',
                         },
                         {
                             kind: 'block',
@@ -4256,6 +4272,45 @@ workspace_data: "${base64WorkspaceData}"
                 }
             }
 
+            setCameraProperty(property, value) {
+                const camera = this.scene ? this.scene.activeCamera : null;
+                if (!camera || !property) return;
+                const numVal = Number(value);
+                if (isNaN(numVal)) return;
+
+                const allowedProps = [
+                    'inertia',
+                    'wheelPrecision',
+                    'angularSensibility',
+                    'angularSensibilityX',
+                    'angularSensibilityY',
+                    'speed',
+                    'fov'
+                ];
+
+                if (allowedProps.includes(property)) {
+                    if (property === 'angularSensibility') {
+                        camera.angularSensibilityX = numVal;
+                        camera.angularSensibilityY = numVal;
+                        if ('angularSensibility' in camera) {
+                            camera.angularSensibility = numVal;
+                        }
+                    } else {
+                        camera[property] = numVal;
+                    }
+                }
+            }
+
+            getDistance(targetA, targetB) {
+                const meshA = this._getMesh(targetA);
+                const meshB = this._getMesh(targetB);
+                if (!meshA || !meshB) return 0;
+                const posA = meshA.getAbsolutePosition ? meshA.getAbsolutePosition() : meshA.position;
+                const posB = meshB.getAbsolutePosition ? meshB.getAbsolutePosition() : meshB.position;
+                if (!posA || !posB) return 0;
+                return BABYLON.Vector3.Distance(posA, posB);
+            }
+
             frameCameraOnMesh(target) {
                 let camera = this.scene.activeCamera;
                 if (!camera) return;
@@ -4453,6 +4508,47 @@ workspace_data: "${base64WorkspaceData}"
                         shadowGenerator.addShadowCaster(mesh);
                         mesh.receiveShadows = true;
                     }
+                }
+            }
+
+            setSkyboxUrl(url) {
+                if (!this.scene) return;
+                if (!isValidAssetURL(url)) return;
+                const proxiedUrl = getProxiedUrl(url);
+
+                this._clearBackground();
+
+                const skybox = BABYLON.MeshBuilder.CreateBox("customSkyBox", { size: 1000.0 }, this.scene);
+                const skyboxMaterial = new BABYLON.StandardMaterial("customSkyBoxMaterial", this.scene);
+                skyboxMaterial.backFaceCulling = false;
+                skyboxMaterial.disableLighting = true;
+                skybox.infiniteDistance = true;
+
+                const texture = new BABYLON.Texture(proxiedUrl, this.scene);
+                skyboxMaterial.reflectionTexture = texture;
+                skyboxMaterial.reflectionTexture.coordinatesMode = BABYLON.Texture.SKYBOX_MODE;
+                skybox.material = skyboxMaterial;
+                this.background = skybox;
+            }
+
+            setLightProperty(targetLight, property, value) {
+                if (!this.scene) return;
+                let light = null;
+                if (typeof targetLight === 'string' && targetLight.trim() !== '') {
+                    light = this.scene.getLightByName(targetLight);
+                } else if (targetLight && targetLight.intensity !== undefined) {
+                    light = targetLight;
+                }
+                if (!light) {
+                    light = this.scene.lights && this.scene.lights.length > 0 ? this.scene.lights[0] : null;
+                }
+                if (!light || !property) return;
+                const numVal = Number(value);
+                if (isNaN(numVal)) return;
+
+                const allowedProps = ['intensity', 'range', 'radius'];
+                if (allowedProps.includes(property) && property in light) {
+                    light[property] = numVal;
                 }
             }
 
@@ -8928,6 +9024,98 @@ workspace_data: "${base64WorkspaceData}"
                 "helpUrl": ""
             },
             {
+                "type": "set_camera_property",
+                "message0": "set camera %1 to %2",
+                "args0": [
+                    {
+                        "type": "field_dropdown",
+                        "name": "PROPERTY",
+                        "options": [
+                            ["inertia", "inertia"],
+                            ["wheel precision", "wheelPrecision"],
+                            ["angular sensibility", "angularSensibility"],
+                            ["angular sensibility X", "angularSensibilityX"],
+                            ["angular sensibility Y", "angularSensibilityY"],
+                            ["speed", "speed"],
+                            ["field of view (fov)", "fov"]
+                        ]
+                    },
+                    {
+                        "type": "input_value",
+                        "name": "VALUE",
+                        "check": "Number"
+                    }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": "#A55B80",
+                "tooltip": "Sets a camera property (e.g. inertia, wheel precision, angular sensibility, speed, fov).",
+                "helpUrl": ""
+            },
+            {
+                "type": "get_distance_between",
+                "message0": "distance between %1 and %2",
+                "args0": [
+                    {
+                        "type": "input_value",
+                        "name": "MESH1"
+                    },
+                    {
+                        "type": "input_value",
+                        "name": "MESH2"
+                    }
+                ],
+                "output": "Number",
+                "colour": "%{BKY_MATH_HUE}",
+                "tooltip": "Calculates the distance between two 3D objects.",
+                "helpUrl": ""
+            },
+            {
+                "type": "set_skybox_url",
+                "message0": "set skybox image from URL %1",
+                "args0": [
+                    {
+                        "type": "input_value",
+                        "name": "URL",
+                        "check": "String"
+                    }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": "#A55B80",
+                "tooltip": "Sets the scene skybox background using an image URL.",
+                "helpUrl": ""
+            },
+            {
+                "type": "set_light_property",
+                "message0": "set light %1 property %2 to %3",
+                "args0": [
+                    {
+                        "type": "input_value",
+                        "name": "LIGHT"
+                    },
+                    {
+                        "type": "field_dropdown",
+                        "name": "PROPERTY",
+                        "options": [
+                            ["intensity", "intensity"],
+                            ["range", "range"],
+                            ["radius", "radius"]
+                        ]
+                    },
+                    {
+                        "type": "input_value",
+                        "name": "VALUE",
+                        "check": "Number"
+                    }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": "#A55B80",
+                "tooltip": "Sets a property on a light (intensity, range, radius).",
+                "helpUrl": ""
+            },
+            {
                 "type": "create_environment",
                 "message0": "Create environment with skybox %1 ground %2",
                 "args0": [
@@ -9889,6 +10077,30 @@ if (${name}) {
             javascript.javascriptGenerator.forBlock['camera_zoom'] = function (block, generator) {
                 const zoomValue = generator.valueToCode(block, 'ZOOM', generator.ORDER_ATOMIC) || 0;
                 return `sceneManager.cameraZoom(${zoomValue});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['set_camera_property'] = function (block, generator) {
+                const property = block.getFieldValue('PROPERTY');
+                const value = generator.valueToCode(block, 'VALUE', generator.ORDER_ATOMIC) || '0';
+                return `sceneManager.setCameraProperty('${property}', ${value});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['get_distance_between'] = function (block, generator) {
+                const mesh1 = generator.valueToCode(block, 'MESH1', generator.ORDER_ATOMIC) || 'null';
+                const mesh2 = generator.valueToCode(block, 'MESH2', generator.ORDER_ATOMIC) || 'null';
+                return [`sceneManager.getDistance(${mesh1}, ${mesh2})`, generator.ORDER_FUNCTION_CALL];
+            };
+
+            javascript.javascriptGenerator.forBlock['set_skybox_url'] = function (block, generator) {
+                const url = generator.valueToCode(block, 'URL', generator.ORDER_ATOMIC) || "''";
+                return `sceneManager.setSkyboxUrl(${url});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['set_light_property'] = function (block, generator) {
+                const light = generator.valueToCode(block, 'LIGHT', generator.ORDER_ATOMIC) || 'null';
+                const property = block.getFieldValue('PROPERTY');
+                const value = generator.valueToCode(block, 'VALUE', generator.ORDER_ATOMIC) || '0';
+                return `sceneManager.setLightProperty(${light}, '${property}', ${value});\n`;
             };
 
             // --- Gameplay Block Generators ---
