@@ -708,7 +708,7 @@
         // --- URL Sanitization ---
         function isValidAssetURL(url) {
             if (typeof url !== 'string') return false;
-            const normalized = url.trim().toLowerCase();
+            const normalized = url.trim().replace(/\\/g, '/').toLowerCase();
             if (normalized.startsWith('//')) {
                 console.error('Invalid URL:', url, 'Protocol-relative URLs are not allowed.');
                 return false;
@@ -757,6 +757,20 @@
                     normalized.startsWith('data:application/javascript') ||
                     normalized.startsWith('data:text/javascript')) {
                     console.error('Invalid URL:', url, 'HTML, XML, or JavaScript data URLs are not allowed.');
+                    return false;
+                }
+                const safeDataPrefixes = [
+                    'data:image/',
+                    'data:audio/',
+                    'data:video/',
+                    'data:model/',
+                    'data:font/',
+                    'data:application/octet-stream',
+                    'data:application/json',
+                    'data:text/plain'
+                ];
+                if (!safeDataPrefixes.some(prefix => normalized.startsWith(prefix))) {
+                    console.error('Invalid URL:', url, 'Data URL MIME type is not permitted.');
                     return false;
                 }
                 return true;

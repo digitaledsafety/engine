@@ -218,8 +218,11 @@ test.describe('Engine Popup Security Validation', () => {
         xmlData: fn('data:text/xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIj8+'),
         jsData: fn('data:application/javascript;base64,YWxlcnQoMSk='),
         svgData: fn('data:image/svg+xml;utf8,<svg></svg>'),
+        ecmaData: fn('data:text/ecmascript;base64,YWxlcnQoMSk='),
+        appXmlData: fn('data:application/xml;base64,PD94bWw='),
         safeImageData: fn('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='),
-        safeAudioData: fn('data:audio/mp3;base64,SUQzBAAAAAAA')
+        safeAudioData: fn('data:audio/mp3;base64,SUQzBAAAAAAA'),
+        safeModelData: fn('data:model/gltf-binary;base64,glTF')
       };
     });
 
@@ -228,7 +231,31 @@ test.describe('Engine Popup Security Validation', () => {
     expect(result.xmlData).toBe(false);
     expect(result.jsData).toBe(false);
     expect(result.svgData).toBe(false);
+    expect(result.ecmaData).toBe(false);
+    expect(result.appXmlData).toBe(false);
     expect(result.safeImageData).toBe(true);
     expect(result.safeAudioData).toBe(true);
+    expect(result.safeModelData).toBe(true);
+  });
+
+  test('Backslash protocol-relative URL bypasses are normalized and rejected', async ({ page }) => {
+    await page.goto('/');
+    await page.click("#start-button");
+
+    const result = await page.evaluate(() => {
+      const fn = window.isValidAssetURL;
+      if (typeof fn !== 'function') return null;
+
+      return {
+        doubleBackslash: fn('\\\\tracking-pixel.com/image.png'),
+        mixedSlashBackslash: fn('/\\tracking-pixel.com/image.png'),
+        backslashMixedSlash: fn('\\/tracking-pixel.com/image.png')
+      };
+    });
+
+    expect(result).not.toBeNull();
+    expect(result.doubleBackslash).toBe(false);
+    expect(result.mixedSlashBackslash).toBe(false);
+    expect(result.backslashMixedSlash).toBe(false);
   });
 });
