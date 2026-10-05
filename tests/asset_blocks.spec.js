@@ -79,4 +79,77 @@ test.describe('Engine Asset Blocks Verification', () => {
     expect(result.hasTexture).toBe(true);
     expect(result.textureName).toContain('blob:'); // Object URL blob
   });
+
+  test('playSoundAsset, importModelAsset, setTexture, and createImageFromAsset handle ArrayBuffer and Blob assets', async ({ page }) => {
+    await page.evaluate(async () => {
+      // Create asset with ArrayBuffer data
+      const encoder = new TextEncoder();
+      const abData = encoder.encode('dummy binary content').buffer;
+      await window.assetManager.addAsset({
+        name: 'abModel.glb',
+        type: 'model/gltf-binary',
+        data: abData
+      });
+
+      const audioAbData = encoder.encode('dummy audio content').buffer;
+      await window.assetManager.addAsset({
+        name: 'abSound.mp3',
+        type: 'audio/mp3',
+        data: audioAbData
+      });
+
+      const imgAbData = encoder.encode('dummy image content').buffer;
+      await window.assetManager.addAsset({
+        name: 'abImage.png',
+        type: 'image/png',
+        data: imgAbData
+      });
+    });
+
+    // Mock SceneLoader and CreateStreamingSoundAsync
+    await page.evaluate(() => {
+      BABYLON.SceneLoader.ImportMeshAsync = async (meshesNames, rootUrl, sceneFilename, scene) => {
+        const root = new BABYLON.Mesh("abModel.glb", scene);
+        return { meshes: [root], particleSystems: [], skeletons: [], animationGroups: [], transformNodes: [], geometries: [], lights: [] };
+      };
+
+      BABYLON.CreateStreamingSoundAsync = async (name, url) => {
+        return {
+          play: () => {},
+          dispose: () => {}
+        };
+      };
+    });
+
+    const result = await page.evaluate(async () => {
+      // Test importModelAsset with ArrayBuffer
+      const model = await window.sceneManager.importModelAsset('abModel.glb', window.assetManager);
+
+      // Test setTexture with ArrayBuffer
+      await window.sceneManager.setTexture('abModel.glb', 'abImage.png', window.assetManager);
+
+      // Test playSoundAsset with ArrayBuffer
+      await window.sceneManager.playSoundAsset('abSound.mp3', window.assetManager);
+
+      // Test createImageFromAsset with ArrayBuffer
+      const guiImg = await window.sceneManager.uiManager.createImageFromAsset('testGuiImg', 'abImage.png');
+
+      const mesh = window.sceneManager.objects['abModel.glb'];
+      const hasTexture = !!mesh && !!mesh.material && !!mesh.material.diffuseTexture;
+      const soundCreated = window.sceneManager.sounds.length > 0;
+      const guiImgCreated = !!guiImg && window.sceneManager.uiManager.controls['testGuiImg'] === guiImg;
+
+      return {
+        modelImported: !!model,
+        hasTexture,
+        soundCreated,
+        guiImgCreated
+      };
+    });
+
+    expect(result.modelImported).toBe(true);
+    expect(result.hasTexture).toBe(true);
+    expect(result.soundCreated).toBe(true);
+    expect(result.guiImgCreated).toBe(true);
+  });
 });

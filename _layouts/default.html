@@ -2866,8 +2866,9 @@ workspace_data: "${base64WorkspaceData}"
                 const mesh = this._getMesh(target);
                 if (mesh) {
                     const asset = await assetManager.getAsset(assetName);
-                    if (asset && asset.data instanceof Blob) {
-                        const objectUrl = URL.createObjectURL(asset.data);
+                    if (asset && asset.data) {
+                        const blob = asset.data instanceof Blob ? asset.data : new Blob([asset.data]);
+                        const objectUrl = URL.createObjectURL(blob);
                         const texture = new BABYLON.Texture(objectUrl, this.scene);
                         if (!mesh.material) {
                             mesh.material = new BABYLON.StandardMaterial(mesh.name + "_material", this.scene);
@@ -4700,15 +4701,17 @@ workspace_data: "${base64WorkspaceData}"
 
             async playSoundAsset(name, assetManager) {
                 let asset = await assetManager.getAsset(name);
-                if (asset && asset.data instanceof ArrayBuffer) {
-                    this.playSound(URL.createObjectURL(new Blob([asset.data])));
+                if (asset && asset.data) {
+                    const blob = asset.data instanceof Blob ? asset.data : new Blob([asset.data]);
+                    await this.playSound(URL.createObjectURL(blob));
                 }
             }
 
             async importModelAsset(name, assetManager) {
                 let asset = await assetManager.getAsset(name);
-                if (asset && asset.data instanceof Blob) {
-                    const objectUrl = URL.createObjectURL(asset.data);
+                if (asset && asset.data) {
+                    const blob = asset.data instanceof Blob ? asset.data : new Blob([asset.data]);
+                    const objectUrl = URL.createObjectURL(blob);
                     return await this.importModel(name, objectUrl);
                 }
                 return null;
@@ -6797,7 +6800,8 @@ workspace_data: "${base64WorkspaceData}"
                     URL.revokeObjectURL(this.assetUrls[name]);
                 }
 
-                const url = URL.createObjectURL(asset.data);
+                const blob = asset.data instanceof Blob ? asset.data : new Blob([asset.data]);
+                const url = URL.createObjectURL(blob);
                 this.assetUrls[name] = url; // Store the URL
                 const image = new BABYLON.GUI.Image(name, url);
 
