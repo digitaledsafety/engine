@@ -2798,17 +2798,22 @@ workspace_data: "${base64WorkspaceData}"
                 this.llmEndpoint = null;
                 this.llmApiKey = null;
                 this.flightAnchors = {
-                    'shoulder': new BABYLON.Vector3(3, 1.5, 0),
+                    'shoulder': new BABYLON.Vector3(0, -2.5, 0),
+                    'bottom': new BABYLON.Vector3(0, -2.5, 0),
+                    'bottom_center': new BABYLON.Vector3(0, -2.5, 0),
                     'center': new BABYLON.Vector3(0, 0, 0),
                     'workspace': new BABYLON.Vector3(-3, -1, 0)
                 };
                 this.proceduralFlight = {
                     enabled: false,
                     targetMesh: null,
-                    currentAnchor: 'shoulder',
+                    currentAnchor: 'bottom',
                     time: 0,
-                    currentPos: new BABYLON.Vector3(3, 1.5, 0),
-                    isRegistered: false
+                    currentPos: new BABYLON.Vector3(0, -2.5, 0),
+                    isRegistered: false,
+                    isLooping: false,
+                    loopTime: 0,
+                    loopDuration: 1.5
                 };
 
                 this.initScene();
@@ -3151,6 +3156,7 @@ workspace_data: "${base64WorkspaceData}"
                 const rootMesh = BABYLON.MeshBuilder.CreateBox(name + "_root", { size: 0.1 }, this.scene);
                 rootMesh.isVisible = false;
                 rootMesh.position.set(x, y, z);
+                rootMesh.scaling.setAll(0.1);
 
                 const particleModel = BABYLON.MeshBuilder.CreateBox("particleModel_" + name, { size: 1 }, this.scene);
                 const sps = new BABYLON.SolidParticleSystem("SPS_" + name, this.scene, { updatable: true });
@@ -4981,7 +4987,7 @@ workspace_data: "${base64WorkspaceData}"
             }
 
             initScene() {
-                const camera = new BABYLON.ArcRotateCamera('Camera', Math.PI / 2, Math.PI / 4, 10, BABYLON.Vector3.Zero(), this.scene);
+                const camera = new BABYLON.ArcRotateCamera('Camera', Math.PI / 2, Math.PI / 4, 12, BABYLON.Vector3.Zero(), this.scene);
                 camera.attachControl(this.canvas, true);
 
                 // Smooth navigation
@@ -5570,13 +5576,20 @@ workspace_data: "${base64WorkspaceData}"
                             "[FLY_CENTER] Why did the developer go broke? Because they used up all their cache!"
                         ];
                         textResponse = jokes[Math.floor(Math.random() * jokes.length)];
+                    } else if (lower.includes('fact') || lower.includes('check') || lower.includes('transcript') || lower.includes('presenter')) {
+                        const factChecks = [
+                            "[EXCITED] Fact check: The first 3D engine featured real-time polygon rendering in 1992!",
+                            "[EXCITED] Fun detail: WebGL allows GPU-accelerated 3D graphics right inside HTML5 browsers!",
+                            "[EMOTE_THINKING] Fact check: JavaScript was created in 10 days by Brendan Eich in May 1995."
+                        ];
+                        textResponse = factChecks[Math.floor(Math.random() * factChecks.length)];
                     } else if (lower.includes('question') || lower.includes('what') || lower.includes('how') || lower.includes('why')) {
                         textResponse = "[EMOTE_THINKING] Great question! As your AI co-host, I analyze logic blocks in real time to optimize our 3D stream!";
                     } else {
                         const defaultQuips = [
                             "[FLY_SHOULDER] [GLOW_ON] Copy that, streamer! Standing by for our next move.",
                             "[EMOTE_THINKING] [FLY_CENTER] Analyzing stream metrics... looking 100% operational!",
-                            "[GLOW_ON] Systems primed and synced. What are we building next?"
+                            "[EXCITED] Systems primed and synced. Standing by to fact check or share stream details!"
                         ];
                         textResponse = defaultQuips[Math.floor(Math.random() * defaultQuips.length)];
                     }
@@ -5599,13 +5612,16 @@ workspace_data: "${base64WorkspaceData}"
                 const mesh = this._getMesh(target);
                 const upperTag = (tag || '').replace(/[\[\]]/g, '').toUpperCase();
 
-                if (upperTag === 'FLY_SHOULDER') {
+                if (upperTag === 'EXCITED' || upperTag === 'FLY_LOOP') {
+                    this.proceduralFlight.isLooping = true;
+                    this.proceduralFlight.loopTime = 0;
+                } else if (upperTag === 'FLY_SHOULDER') {
                     this.setFlightAnchor('shoulder');
                 } else if (upperTag === 'FLY_CENTER') {
                     this.setFlightAnchor('center');
                 } else if (upperTag === 'FLY_WORKSPACE') {
                     this.setFlightAnchor('workspace');
-                } else if (upperTag === 'EMOTE_THINKING') {
+                } else if (upperTag === 'EMOTE_THINKING' || upperTag === 'THINKING') {
                     if (mesh) {
                         this.animateRotation(mesh, 0, Math.PI * 2, 0, 1.5, false, 'CYCLE');
                     }
@@ -5641,18 +5657,34 @@ workspace_data: "${base64WorkspaceData}"
                 }
             }
 
-            enableProceduralFlight(targetMesh, initialAnchor = 'shoulder') {
+            startIdleFactChecker(targetMesh, intervalSec = 12) {
+                if (this._cohostFactCheckInterval) {
+                    clearInterval(this._cohostFactCheckInterval);
+                }
+                this._cohostFactCheckInterval = setInterval(async () => {
+                    if (!this.proceduralFlight || !this.proceduralFlight.enabled) return;
+                    const transcript = this.getSpeechTranscript() || "Live stream presentation";
+                    const res = await this.queryCohostLLM("Fact-check presenter transcript or share interesting detail", transcript);
+                    if (res && res.text) {
+                        this.showSpeechBubble(targetMesh || 'avatar', res.text, 5);
+                    }
+                }, intervalSec * 1000);
+            }
+
+            enableProceduralFlight(targetMesh, initialAnchor = 'bottom') {
                 this.proceduralFlight.enabled = true;
                 this.proceduralFlight.targetMesh = targetMesh;
-                this.proceduralFlight.currentAnchor = (initialAnchor || 'shoulder').toLowerCase();
+                this.proceduralFlight.currentAnchor = (initialAnchor || 'bottom').toLowerCase();
 
                 const mesh = this._getMesh(targetMesh);
                 if (mesh && mesh.position) {
                     this.proceduralFlight.currentPos = mesh.position.clone();
                 } else {
-                    const defaultAnchor = this.flightAnchors[this.proceduralFlight.currentAnchor] || this.flightAnchors['shoulder'];
+                    const defaultAnchor = this.flightAnchors[this.proceduralFlight.currentAnchor] || this.flightAnchors['bottom'];
                     this.proceduralFlight.currentPos = defaultAnchor.clone();
                 }
+
+                this.startIdleFactChecker(targetMesh);
 
                 if (!this.proceduralFlight.isRegistered) {
                     this.proceduralFlight.isRegistered = true;
@@ -5664,11 +5696,29 @@ workspace_data: "${base64WorkspaceData}"
                         this.proceduralFlight.time += dt;
                         const t = this.proceduralFlight.time;
 
+                        let loopOffsetX = 0;
+                        let loopOffsetY = 0;
+                        let loopOffsetZ = 0;
+
+                        if (this.proceduralFlight.isLooping) {
+                            this.proceduralFlight.loopTime += dt;
+                            const progress = this.proceduralFlight.loopTime / (this.proceduralFlight.loopDuration || 1.5);
+                            if (progress >= 1.0) {
+                                this.proceduralFlight.isLooping = false;
+                                m.rotation.x = 0;
+                            } else {
+                                const angle = progress * Math.PI * 2;
+                                loopOffsetX = Math.sin(angle) * 1.2;
+                                loopOffsetY = (1 - Math.cos(angle)) * 1.5;
+                                m.rotation.x = angle;
+                            }
+                        }
+
                         const lissajousX = Math.sin(t * 1.2) * 0.4;
                         const lissajousY = Math.sin(t * 2.4) * 0.2;
                         const lissajousZ = Math.cos(t * 1.5) * 0.3;
 
-                        const targetAnchorPos = this.flightAnchors[this.proceduralFlight.currentAnchor] || this.flightAnchors['shoulder'];
+                        const targetAnchorPos = this.flightAnchors[this.proceduralFlight.currentAnchor] || this.flightAnchors['bottom'];
 
                         const lerpSpeed = 2.5 * dt;
                         this.proceduralFlight.currentPos = BABYLON.Vector3.Lerp(
@@ -5677,9 +5727,9 @@ workspace_data: "${base64WorkspaceData}"
                             Math.min(lerpSpeed, 1.0)
                         );
 
-                        m.position.x = this.proceduralFlight.currentPos.x + lissajousX;
-                        m.position.y = this.proceduralFlight.currentPos.y + lissajousY;
-                        m.position.z = this.proceduralFlight.currentPos.z + lissajousZ;
+                        m.position.x = this.proceduralFlight.currentPos.x + lissajousX + loopOffsetX;
+                        m.position.y = this.proceduralFlight.currentPos.y + lissajousY + loopOffsetY;
+                        m.position.z = this.proceduralFlight.currentPos.z + lissajousZ + loopOffsetZ;
                     };
 
                     this.perFrameFunctions.push(flightUpdate);
@@ -5840,6 +5890,10 @@ workspace_data: "${base64WorkspaceData}"
                 this.pendingObjectEvents = {};
                 this.pendingLazyObjectEvents = [];
                 this.materials = {};
+                if (this._cohostFactCheckInterval) {
+                    clearInterval(this._cohostFactCheckInterval);
+                    this._cohostFactCheckInterval = null;
+                }
                 this.registeredCollisionPairs.clear();
                 this.pendingCollisions = [];
 
@@ -5855,10 +5909,13 @@ workspace_data: "${base64WorkspaceData}"
                 this.proceduralFlight = {
                     enabled: false,
                     targetMesh: null,
-                    currentAnchor: 'shoulder',
+                    currentAnchor: 'bottom',
                     time: 0,
-                    currentPos: new BABYLON.Vector3(3, 1.5, 0),
-                    isRegistered: false
+                    currentPos: new BABYLON.Vector3(0, -2.5, 0),
+                    isRegistered: false,
+                    isLooping: false,
+                    loopTime: 0,
+                    loopDuration: 1.5
                 };
                 this.inputState = { keys: {} }; // Reset state on clear
                 this.background = null;

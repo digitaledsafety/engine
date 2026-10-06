@@ -62,8 +62,14 @@ test.describe('Digital Co-Host Avatar ("Word") Verification', () => {
 
         // Test Procedural Flight Physics & Flight Anchor Transitions
         const flightState = await page.evaluate(async () => {
-            window.sceneManager.enableProceduralFlight('avatar', 'shoulder');
+            window.sceneManager.enableProceduralFlight('avatar', 'bottom');
             const anchor1 = window.sceneManager.proceduralFlight.currentAnchor;
+            const bottomAnchorPos = window.sceneManager.flightAnchors['bottom'];
+
+            // Trigger excited loop flight
+            window.sceneManager.triggerActionTag('avatar', '[EXCITED]');
+            const isLooping = window.sceneManager.proceduralFlight.isLooping;
+
             window.sceneManager.setFlightAnchor('center');
             const anchor2 = window.sceneManager.proceduralFlight.currentAnchor;
             window.sceneManager.setFlightAnchor('workspace');
@@ -71,12 +77,16 @@ test.describe('Digital Co-Host Avatar ("Word") Verification', () => {
             return {
                 enabled: window.sceneManager.proceduralFlight.enabled,
                 anchor1,
+                bottomY: bottomAnchorPos ? bottomAnchorPos.y : 0,
+                isLooping,
                 anchor2,
                 anchor3
             };
         });
         expect(flightState.enabled).toBe(true);
-        expect(flightState.anchor1).toBe('shoulder');
+        expect(flightState.anchor1).toBe('bottom');
+        expect(flightState.bottomY).toBe(-2.5);
+        expect(flightState.isLooping).toBe(true);
         expect(flightState.anchor2).toBe('center');
         expect(flightState.anchor3).toBe('workspace');
 
@@ -306,9 +316,10 @@ test.describe('Digital Co-Host Avatar ("Word") Verification', () => {
             const exists = !!window.sceneManager.uiManager.controls['speech_bubble_avatar'];
             const textContent = window.sceneManager.uiManager.controls['speech_bubble_avatar'].children[0].text;
 
-            // Test fallback LLM quips for jokes and questions
+            // Test fallback LLM quips for jokes, questions, and fact checks
             const jokeRes = await window.sceneManager.queryCohostLLM('tell me a funny joke');
             const questionRes = await window.sceneManager.queryCohostLLM('what is your purpose?');
+            const factCheckRes = await window.sceneManager.queryCohostLLM('fact check presenter transcript');
 
             // Test show_speech_bubble block execution via doRun (including avatar creation)
             const code = `
@@ -323,6 +334,7 @@ test.describe('Digital Co-Host Avatar ("Word") Verification', () => {
                 textContent,
                 jokeText: jokeRes.text,
                 questionText: questionRes.text,
+                factCheckText: factCheckRes.text,
                 updatedText
             };
         });
@@ -331,6 +343,7 @@ test.describe('Digital Co-Host Avatar ("Word") Verification', () => {
         expect(res.textContent).toBe('Hello from speech bubble!');
         expect(res.jokeText).toBeTruthy();
         expect(res.questionText).toBeTruthy();
+        expect(res.factCheckText).toBeTruthy();
         expect(res.updatedText).toBe('Block test speech');
     });
 });
