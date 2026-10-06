@@ -5,10 +5,35 @@ const scopeDesc = params.get('desc');
 const scopeIcon = params.get('icon');
 const scopePath = params.get('scope');
 
+function sanitizeScopePath(path) {
+  if (!path) return null;
+  const trimmed = path.trim();
+  if (trimmed.startsWith('/') && !trimmed.startsWith('//') && !trimmed.startsWith('/\\')) {
+    return trimmed;
+  }
+  return null;
+}
+
+function sanitizeIcon(iconUrl) {
+  if (!iconUrl) return '/assets/icons/gamepad-2.svg';
+  const trimmed = iconUrl.trim();
+  if (trimmed.startsWith('/') && !trimmed.startsWith('//') && !trimmed.startsWith('/\\')) {
+    return trimmed;
+  }
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol === 'https:') {
+      return trimmed;
+    }
+  } catch (e) {}
+  return '/assets/icons/gamepad-2.svg';
+}
+
 const title = scopeTitle || 'Engine';
 const desc = scopeDesc || 'An open-source, block-based 3D coding environment.';
-const icon = scopeIcon || '/assets/icons/gamepad-2.svg';
-const startUrl = scopePath ? (scopePath + '?mode=app&fullscreen=true') : '/?mode=app&fullscreen=true';
+const icon = sanitizeIcon(scopeIcon);
+const sanitizedScope = sanitizeScopePath(scopePath);
+const startUrl = sanitizedScope ? (sanitizedScope + '?mode=app&fullscreen=true') : '/?mode=app&fullscreen=true';
 
 const CACHE_NAME = 'engine-cache-v1';
 const criticalUrls = [
