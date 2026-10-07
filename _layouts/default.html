@@ -2802,7 +2802,11 @@ workspace_data: "${base64WorkspaceData}"
                     'bottom': new BABYLON.Vector3(0, -2.5, 0),
                     'bottom_center': new BABYLON.Vector3(0, -2.5, 0),
                     'center': new BABYLON.Vector3(0, 0, 0),
-                    'workspace': new BABYLON.Vector3(-3, -1, 0)
+                    'workspace': new BABYLON.Vector3(-3, -1, 0),
+                    'top_left': new BABYLON.Vector3(-5, 3, 0),
+                    'top_right': new BABYLON.Vector3(5, 3, 0),
+                    'bottom_left': new BABYLON.Vector3(-5, -3, 0),
+                    'bottom_right': new BABYLON.Vector3(5, -3, 0)
                 };
                 this.proceduralFlight = {
                     enabled: false,
@@ -3277,7 +3281,7 @@ workspace_data: "${base64WorkspaceData}"
                 };
 
                 const pointerObserver = this.scene.onPointerObservable.add((pointerInfo) => {
-                    if (pointerInfo.type === BABYLON.PointerEventTypes.POINTERMOVE) {
+                    if (pointerInfo.type === BABYLON.PointerEventTypes.POINTERMOVE || pointerInfo.type === BABYLON.PointerEventTypes.POINTERDOWN) {
                         const ray = this.scene.createPickingRay(this.scene.pointerX, this.scene.pointerY, BABYLON.Matrix.Identity(), this.scene.activeCamera);
                         if (!ray || !ray.direction || Math.abs(ray.direction.z) < 1e-5) return;
                         const distance = -ray.origin.z / ray.direction.z;
@@ -3286,7 +3290,7 @@ workspace_data: "${base64WorkspaceData}"
                         const dy = currentMouse3D.y - lastValidTargetPosition.y;
                         const dz = currentMouse3D.z - lastValidTargetPosition.z;
                         const moveDistance = Math.sqrt(dx * dx + dy * dy + dz * dz);
-                        const moveThreshold = 5.5;
+                        const moveThreshold = 0.05;
 
                         if (moveDistance > moveThreshold) {
                             isMouseMoving = true;
@@ -3326,65 +3330,14 @@ workspace_data: "${base64WorkspaceData}"
                         particle.color.copyFrom(particle.baseColor);
                         particle.scaling.setAll(1.0);
                     } else {
-                        if (particle.isOuterShell) {
-                            particle.velocity.setAll(0);
-                            const easeSpeed = 0.3 + particle.randomOrderWeight * 0.05;
+                        particle.velocity.setAll(0);
+                        const easeSpeed = 0.3 + particle.randomOrderWeight * 0.05;
 
-                            particle.position.x += (particle.homeX - particle.position.x) * easeSpeed;
-                            particle.position.y += (particle.homeY - particle.position.y) * easeSpeed;
-                            particle.position.z += (particle.homeZ - particle.position.z) * easeSpeed;
+                        particle.position.x += (particle.homeX - particle.position.x) * easeSpeed;
+                        particle.position.y += (particle.homeY - particle.position.y) * easeSpeed;
+                        particle.position.z += (particle.homeZ - particle.position.z) * easeSpeed;
 
-                            particle.color.copyFrom(particle.baseColor);
-                        } else {
-                            const thrustPower = 0.12 + particle.randomOrderWeight * 0.18;
-                            particle.velocity.y -= thrustPower;
-
-                            particle.velocity.x += (Math.random() - 0.5) * 0.06;
-                            particle.velocity.z += (Math.random() - 0.5) * 0.06;
-
-                            particle.position.x += particle.velocity.x;
-                            particle.position.y += particle.velocity.y;
-                            particle.position.z += particle.velocity.z;
-
-                            const currentCubeCenterX = particle.homeX - particle.localGridOffsetX;
-                            const currentCubeCenterY = particle.homeY - particle.localGridOffsetY;
-                            const currentCubeCenterZ = particle.homeZ - particle.localGridOffsetZ;
-
-                            const wallLimit = 4.0;
-
-                            if (particle.position.y >= currentCubeCenterY - wallLimit) {
-                                const relX = particle.position.x - currentCubeCenterX;
-                                if (Math.abs(relX) > wallLimit) {
-                                    particle.position.x = currentCubeCenterX + Math.sign(relX) * wallLimit;
-                                    particle.velocity.x *= -0.4;
-                                }
-
-                                const relZ = particle.position.z - currentCubeCenterZ;
-                                if (Math.abs(relZ) > wallLimit) {
-                                    particle.position.z = currentCubeCenterZ + Math.sign(relZ) * wallLimit;
-                                    particle.velocity.z *= -0.4;
-                                }
-                            }
-
-                            const relY = particle.position.y - currentCubeCenterY;
-                            if (relY > wallLimit) {
-                                particle.position.y = currentCubeCenterY + wallLimit;
-                                particle.velocity.y = 0;
-                            }
-
-                            particle.color.r = particle.baseColor.r;
-                            particle.color.g = Math.max(0, particle.baseColor.g - (Math.abs(particle.velocity.y) * 0.08));
-                            particle.color.b = particle.baseColor.b;
-
-                            const jetisonDistance = 7.0;
-                            const exhaustThreshold = currentCubeCenterY - wallLimit - jetisonDistance;
-                            if (particle.position.y < exhaustThreshold) {
-                                particle.position.x = currentCubeCenterX + (Math.random() - 0.5) * 7.0;
-                                particle.position.z = currentCubeCenterZ + (Math.random() - 0.5) * 7.0;
-                                particle.position.y = currentCubeCenterY + 3.5;
-                                particle.velocity.setAll(0);
-                            }
-                        }
+                        particle.color.copyFrom(particle.baseColor);
                     }
                     return particle;
                 };
