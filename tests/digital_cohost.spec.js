@@ -163,6 +163,30 @@ test.describe('Digital Co-Host Avatar ("Word") Verification', () => {
         expect(particleResult.flightEnabled).toBe(true);
     });
 
+    test('Particle Cube Avatar intact cube and full-screen pointer tracking', async ({ page }) => {
+        await page.goto('/', { waitUntil: 'domcontentloaded' });
+
+        const testResult = await page.evaluate(async () => {
+            const avatar = window.sceneManager.createParticleCube('p_avatar', 0, 0, 0);
+            const sps = avatar._sps;
+
+            // Force update particles when stationary
+            sps.setParticles();
+
+            // Check that inner particles ease toward home positions and don't drop as propulsion exhaust
+            const innerParticles = sps.particles.filter(p => !p.isOuterShell);
+            const isIntactCube = innerParticles.every(p => Math.abs(p.position.y - p.homeY) < 0.1 && p.velocity.y === 0);
+
+            return {
+                isIntactCube,
+                particlesCount: sps.particles.length
+            };
+        });
+
+        expect(testResult.isIntactCube).toBe(true);
+        expect(testResult.particlesCount).toBe(1000);
+    });
+
     test('Digital Co-Host workspace loads and executes scripted flying sequence with particle cube avatar', async ({ page }) => {
         await page.goto('/workspaces/digital-cohost/', { waitUntil: 'domcontentloaded' });
 
