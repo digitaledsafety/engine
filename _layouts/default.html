@@ -2407,7 +2407,6 @@ workspace_data: "${base64WorkspaceData}"
                         { kind: 'block', type: 'event_on_object_detected' },
                         { kind: 'block', type: 'event_on_cursor_move' },
                         { kind: 'block', type: 'get_cursor_position' },
-                        { kind: 'block', type: 'event_on_speech_recognized' },
                         { kind: 'block', type: 'start_speech_recognition' },
                         { kind: 'block', type: 'get_speech_transcript' },
                         { kind: 'block', type: 'start_webcam_tracking' },
@@ -3246,7 +3245,6 @@ workspace_data: "${base64WorkspaceData}"
                 this.speechTranscript = '';
                 this.speechRecognition = null;
                 this.isListening = false;
-                this.speechCallbacks = [];
                 this.webcamTracking = { active: false, x: 0, y: 0, z: 0, gesture: 'neutral' };
                 this.objectRecognition = {
                     active: false,
@@ -4575,26 +4573,39 @@ workspace_data: "${base64WorkspaceData}"
                 this.pendingCollisions = stillPending;
             }
 
-            onClick(name, callback) {
-                let targetMesh = this.objects[name];
-                if (targetMesh) {
-                    if (!targetMesh.actionManager) {
-                        targetMesh.actionManager = new BABYLON.ActionManager(this.scene);
-                    }
-                    targetMesh.actionManager.registerAction(
-                        new BABYLON.ExecuteCodeAction(BABYLON.ActionManager.OnPickTrigger, () => callback(targetMesh))
-                    );
+            onClick(target, callback) {
+                if (!this.pendingClickHandlers) {
+                    this.pendingClickHandlers = [];
                 }
+                this.pendingClickHandlers.push({ target, callback });
+                this.processPendingClickHandlers();
             }
 
-            everyFrame(name, callback) {
-                let targetMesh = this.objects[name];
-                if (targetMesh) {
-                    this.perFrameFunctions.push({
-                        targetMesh: targetMesh,
-                        func: (thisMesh, deltaTime) => callback(thisMesh, deltaTime)
-                    });
+            processPendingClickHandlers() {
+                if (!this.pendingClickHandlers || this.pendingClickHandlers.length === 0) return;
+                const remaining = [];
+                for (const item of this.pendingClickHandlers) {
+                    const resolved = this._resolveTarget(item.target);
+                    const mesh = this._getMesh(resolved);
+                    if (mesh) {
+                        if (!mesh.actionManager) {
+                            mesh.actionManager = new BABYLON.ActionManager(this.scene);
+                        }
+                        mesh.actionManager.registerAction(
+                            new BABYLON.ExecuteCodeAction(BABYLON.ActionManager.OnPickTrigger, () => item.callback(mesh))
+                        );
+                    } else {
+                        remaining.push(item);
+                    }
                 }
+                this.pendingClickHandlers = remaining;
+            }
+
+            everyFrame(target, callback) {
+                this.perFrameFunctions.push({
+                    targetGetter: target,
+                    func: (thisMesh, deltaTime) => callback(thisMesh, deltaTime)
+                });
             }
 
             playerJump(force) {
@@ -5113,9 +5124,20 @@ workspace_data: "${base64WorkspaceData}"
                     if (name && this.objects[name]) {
                         delete this.objects[name];
                     }
-                    this.perFrameFunctions = this.perFrameFunctions.filter(
-                        task => !meshesToFilter.includes(task.targetMesh)
-                    );
+                    this.perFrameFunctions = this.perFrameFunctions.filter(task => {
+                        if (task.targetMesh && meshesToFilter.includes(task.targetMesh)) {
+                            return false;
+                        }
+                        const resolvedTaskMesh = this._getMesh(task.targetGetter);
+                        if (resolvedTaskMesh && meshesToFilter.includes(resolvedTaskMesh)) {
+                            return false;
+                        }
+                        const resolvedTarget = this._resolveTarget(task.targetGetter);
+                        if (resolvedTarget === target || resolvedTarget === name) {
+                            return false;
+                        }
+                        return true;
+                    });
                 }
             }
 
@@ -5502,9 +5524,6 @@ workspace_data: "${base64WorkspaceData}"
                     if (finalTranscript) {
                         this.speechTranscript = finalTranscript.trim();
                         if (onResultCallback) onResultCallback(this.speechTranscript);
-                        this.speechCallbacks.forEach(cb => {
-                            try { cb(this.speechTranscript); } catch(err) { console.error('Error executing speech recognition callback:', err); }
-                        });
                     }
                 };
                 recognition.onerror = (err) => {
@@ -5535,13 +5554,6 @@ workspace_data: "${base64WorkspaceData}"
 
             getSpeechTranscript() {
                 return this.speechTranscript || '';
-            }
-
-            onSpeechRecognized(callback) {
-                if (typeof callback === 'function') {
-                    this.speechCallbacks.push(callback);
-                }
-                this.startSpeechRecognition();
             }
 
             // --- Spatial & Visual Awareness (Webcam Tracking) ---
@@ -6312,11 +6324,20 @@ workspace_data: "${base64WorkspaceData}"
                     }
 
                     this.perFrameFunctions.forEach(task => {
-                        if (task.targetMesh && !task.targetMesh.isDisposed() && typeof task.func === 'function') {
+                        if (typeof task === 'function') {
                             try {
-                                task.func(task.targetMesh, deltaTime);
+                                task(deltaTime);
                             } catch (e) {
-                                console.error(`Error executing per-frame function for mesh ${task.targetMesh.name}:`, e);
+                                console.error('Error executing per-frame task:', e);
+                            }
+                            return;
+                        }
+                        const targetMesh = task.targetMesh || this._getMesh(task.targetGetter);
+                        if (targetMesh && !targetMesh.isDisposed() && typeof task.func === 'function') {
+                            try {
+                                task.func(targetMesh, deltaTime);
+                            } catch (e) {
+                                console.error(`Error executing per-frame function for mesh ${targetMesh.name}:`, e);
                             }
                         }
                     });
@@ -6387,7 +6408,6 @@ workspace_data: "${base64WorkspaceData}"
                 this.stopScreenCapture();
                 this.stopObjectRecognition();
                 this.stopSpeechRecognition();
-                this.speechCallbacks = [];
                 this.webcamTracking.active = false;
                 if (this.webcamVideoStream) {
                     this.webcamVideoStream.getTracks().forEach(track => track.stop());
@@ -6791,6 +6811,10 @@ workspace_data: "${base64WorkspaceData}"
             triggerSceneStart() {
                 this.onSceneStartObservable.notifyObservers();
                 this.processPendingCollisions();
+                this.processPendingClickHandlers();
+                if (this.uiManager) {
+                    this.uiManager.processPendingControlClicks();
+                }
             }
 
             // --- Global Event Bus ---
@@ -6888,9 +6912,9 @@ workspace_data: "${base64WorkspaceData}"
             }
 
             _resolveTarget(target) {
-                if (typeof target === 'function') {
+                while (typeof target === 'function') {
                     try {
-                        return target();
+                        target = target();
                     } catch (e) {
                         return null;
                     }
@@ -7386,7 +7410,19 @@ workspace_data: "${base64WorkspaceData}"
                 return textBlock;
             }
 
+            _resolveTarget(target) {
+                while (typeof target === 'function') {
+                    try {
+                        target = target();
+                    } catch (e) {
+                        return null;
+                    }
+                }
+                return target;
+            }
+
             _getControl(target) {
+                target = this._resolveTarget(target);
                 if (!target) return null;
                 if (typeof target === 'string') {
                     return this.controls[target] || null;
@@ -7488,10 +7524,25 @@ workspace_data: "${base64WorkspaceData}"
             }
 
             onControlClick(target, callback) {
-                const control = this._getControl(target);
-                if (control) {
-                    control.onPointerClickObservable.add(callback);
+                if (!this.pendingControlClickHandlers) {
+                    this.pendingControlClickHandlers = [];
                 }
+                this.pendingControlClickHandlers.push({ target, callback });
+                this.processPendingControlClicks();
+            }
+
+            processPendingControlClicks() {
+                if (!this.pendingControlClickHandlers || this.pendingControlClickHandlers.length === 0) return;
+                const remaining = [];
+                for (const item of this.pendingControlClickHandlers) {
+                    const control = this._getControl(item.target);
+                    if (control) {
+                        control.onPointerClickObservable.add(item.callback);
+                    } else {
+                        remaining.push(item);
+                    }
+                }
+                this.pendingControlClickHandlers = remaining;
             }
 
             getControlByName(name) {
@@ -8006,17 +8057,6 @@ workspace_data: "${base64WorkspaceData}"
                 "output": "Number",
                 "colour": "#4A90E2",
                 "tooltip": "Gets current X or Y coordinate of user cursor.",
-                "helpUrl": ""
-            },
-            {
-                "type": "event_on_speech_recognized",
-                "message0": "when voice speech recognized %1 %2",
-                "args0": [
-                    { "type": "input_dummy" },
-                    { "type": "input_statement", "name": "DO_CODE" }
-                ],
-                "style": "event_blocks",
-                "tooltip": "Triggers code when spoken speech is recognized from the microphone.",
                 "helpUrl": ""
             },
             {
@@ -10738,14 +10778,14 @@ workspace_data: "${base64WorkspaceData}"
                 const objectName = generator.valueToCode(block, 'OBJECT_SELECTOR', generator.ORDER_ATOMIC) || 'null';
                 const doCode = generator.statementToCode(block, 'DO_CODE');
                 const callback = `async function(thisMesh) {\n${doCode}\n}`;
-                return `sceneManager.onClick(${objectName}, ${callback});\n`;
+                return `sceneManager.onClick(() => ${objectName}, ${callback});\n`;
             };
 
             javascript.javascriptGenerator.forBlock['event_every_frame'] = function (block, generator) {
                 const objectName = generator.valueToCode(block, 'OBJECT_SELECTOR', generator.ORDER_ATOMIC) || 'null';
                 const doCode = generator.statementToCode(block, 'DO_CODE');
                 const callback = `async function(${objectName}) {\n${doCode}\n}`;
-                return `sceneManager.everyFrame(${objectName}, ${callback});\n`;
+                return `sceneManager.everyFrame(() => ${objectName}, ${callback});\n`;
             };
 
             javascript.javascriptGenerator.forBlock['action_rotate_continuously'] = function (block, generator) {
@@ -11374,7 +11414,7 @@ if (${name}) {
                 const element = generator.valueToCode(block, 'ELEMENT', generator.ORDER_ATOMIC) || generator.valueToCode(block, 'NAME', generator.ORDER_ATOMIC) || 'null';
                 const doCode = generator.statementToCode(block, 'DO');
                 const callback = `function() {\n${doCode}\n}`;
-                return `sceneManager.uiManager.onControlClick(${element}, ${callback});\n`;
+                return `sceneManager.uiManager.onControlClick(() => ${element}, ${callback});\n`;
             };
 
             // --- Console Block Generators ---
@@ -11426,11 +11466,6 @@ if (${name}) {
             javascript.javascriptGenerator.forBlock['get_cursor_position'] = function (block, generator) {
                 const axis = block.getFieldValue('AXIS') || 'x';
                 return [`sceneManager.getCursorPos('${axis}')`, generator.ORDER_FUNCTION_CALL];
-            };
-
-            javascript.javascriptGenerator.forBlock['event_on_speech_recognized'] = function (block, generator) {
-                const doCode = generator.statementToCode(block, 'DO_CODE');
-                return `sceneManager.onSpeechRecognized(async function(transcript) {\n${doCode}\n});\n`;
             };
 
             javascript.javascriptGenerator.forBlock['start_speech_recognition'] = function (block, generator) {
