@@ -38,12 +38,33 @@ test.describe('Digital Co-Host Avatar ("Word") Verification', () => {
         });
         expect(esmLoaded).toBe(true);
 
-        // Test Voice Perception STT
+        // Test Voice Perception STT and onSpeechRecognized callback
         const transcript = await page.evaluate(async () => {
+            let callbackTranscript = '';
+            window.sceneManager.onSpeechRecognized((t) => {
+                callbackTranscript = t;
+            });
             await window.sceneManager.startSpeechRecognition();
-            return window.sceneManager.getSpeechTranscript();
+
+            // Simulate speech recognition result if SpeechRecognition mock is needed or fallback
+            if (window.sceneManager.speechRecognition && window.sceneManager.speechRecognition.onresult) {
+                window.sceneManager.speechRecognition.onresult({
+                    resultIndex: 0,
+                    results: [[{ transcript: 'Hello co-host avatar' }]]
+                });
+            } else {
+                // Trigger callbacks directly if SpeechRecognition API unavailable
+                window.sceneManager.speechTranscript = 'Hello co-host avatar';
+                window.sceneManager.speechCallbacks.forEach(cb => cb('Hello co-host avatar'));
+            }
+
+            return {
+                stt: window.sceneManager.getSpeechTranscript(),
+                callbackTranscript
+            };
         });
-        expect(typeof transcript).toBe('string');
+        expect(typeof transcript.stt).toBe('string');
+        expect(transcript.callbackTranscript).toBe('Hello co-host avatar');
 
         // Test Webcam Tracking & Spatial Perception
         const webcamX = await page.evaluate(async () => {
@@ -369,5 +390,34 @@ test.describe('Digital Co-Host Avatar ("Word") Verification', () => {
         expect(res.questionText).toBeTruthy();
         expect(res.factCheckText).toBeTruthy();
         expect(res.updatedText).toBe('Block test speech');
+    });
+
+    test('event_on_speech_recognized block execution and callback trigger', async ({ page }) => {
+        await page.goto('/', { waitUntil: 'domcontentloaded' });
+
+        const result = await page.evaluate(async () => {
+            window._testSpeechTriggered = false;
+            window._testReceivedTranscript = '';
+
+            const code = `
+                sceneManager.onSpeechRecognized(async function(transcript) {
+                    window._testSpeechTriggered = true;
+                    window._testReceivedTranscript = transcript;
+                });
+            `;
+            await window.doRun(code);
+
+            // Simulate recognized speech event
+            window.sceneManager.speechTranscript = 'Can you fact check this?';
+            window.sceneManager.speechCallbacks.forEach(cb => cb('Can you fact check this?'));
+
+            return {
+                speechTriggered: window._testSpeechTriggered,
+                receivedTranscript: window._testReceivedTranscript
+            };
+        });
+
+        expect(result.speechTriggered).toBe(true);
+        expect(result.receivedTranscript).toBe('Can you fact check this?');
     });
 });
