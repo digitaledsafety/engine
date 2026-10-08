@@ -39,6 +39,7 @@ The PWA captures microphone audio via the browser's Web Audio API and transcribe
 
 ### Visual Blockly Example:
 * `start voice perception (STT)`
+* `when voice speech recognized do [...]`
 * `speech transcript text`
 
 ### JavaScript Code Example:
@@ -46,6 +47,13 @@ The PWA captures microphone audio via the browser's Web Audio API and transcribe
 // Start continuous real-time voice speech-to-text
 sceneManager.startSpeechRecognition((transcript) => {
     console.log("Streamer said:", transcript);
+});
+
+// Register event handler triggered whenever speech is transcribed
+sceneManager.onSpeechRecognized(async (transcript) => {
+    console.log("Recognized speech:", transcript);
+    const reply = await sceneManager.queryCohostLLM(transcript, "Live stream STT input");
+    sceneManager.showSpeechBubble("avatar", reply, 5);
 });
 
 // Retrieve latest transcribed text
