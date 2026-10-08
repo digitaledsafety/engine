@@ -211,4 +211,116 @@ test.describe('Event System and Observables Functionality', () => {
 
     await expect.poll(() => consoleMessages, { timeout: 15000 }).toContain('COIN_COLLECTED_LOCAL');
   });
+
+  test('Variable created inside when scene starts block works with click and every frame event blocks', async ({ page }) => {
+    const consoleMessages = [];
+    page.on('console', msg => consoleMessages.push(msg.text()));
+
+    const workspace_json = {
+      "variables": [
+        {"name": "myBox", "id": "myBox_var"}
+      ],
+      "blocks": {
+        "languageVersion": 0,
+        "blocks": [
+          {
+            "type": "event_on_scene_start",
+            "x": 10,
+            "y": 10,
+            "inputs": {
+              "DO_CODE": {
+                "block": {
+                  "type": "variables_set",
+                  "fields": {"VAR": {"id": "myBox_var"}},
+                  "inputs": {
+                    "VALUE": {
+                      "block": {
+                        "type": "create_primitive",
+                        "fields": {"TYPE": "box"},
+                        "inputs": {
+                          "X": {"block": {"type": "math_number", "fields": {"NUM": 0}}},
+                          "Y": {"block": {"type": "math_number", "fields": {"NUM": 0}}},
+                          "Z": {"block": {"type": "math_number", "fields": {"NUM": 0}}}
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "event_on_click",
+            "x": 10,
+            "y": 200,
+            "inputs": {
+              "OBJECT_SELECTOR": {
+                "block": {
+                  "type": "variables_get",
+                  "fields": {"VAR": {"id": "myBox_var"}}
+                }
+              },
+              "DO_CODE": {
+                "block": {
+                  "type": "console_log",
+                  "inputs": {
+                    "VALUE": {
+                      "block": {
+                        "type": "text",
+                        "fields": {"TEXT": "VARIABLE_BOX_CLICKED"}
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "event_every_frame",
+            "x": 10,
+            "y": 350,
+            "inputs": {
+              "OBJECT_SELECTOR": {
+                "block": {
+                  "type": "variables_get",
+                  "fields": {"VAR": {"id": "myBox_var"}}
+                }
+              },
+              "DO_CODE": {
+                "block": {
+                  "type": "console_log",
+                  "inputs": {
+                    "VALUE": {
+                      "block": {
+                        "type": "text",
+                        "fields": {"TEXT": "EVERY_FRAME_FIRED"}
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    };
+
+    await page.evaluate((json) => {
+      Blockly.serialization.workspaces.load(json, workspace);
+      window.doRun();
+    }, workspace_json);
+
+    // Verify per frame logic fires for the variable created inside when scene starts
+    await expect.poll(() => consoleMessages, { timeout: 15000 }).toContain('EVERY_FRAME_FIRED');
+
+    // Simulate clicking the box created inside when scene starts
+    await page.evaluate(() => {
+      const box = Object.values(window.sceneManager.objects)[0];
+      if (box && box.actionManager) {
+        box.actionManager.processTrigger(BABYLON.ActionManager.OnPickTrigger);
+      }
+    });
+
+    await expect.poll(() => consoleMessages, { timeout: 15000 }).toContain('VARIABLE_BOX_CLICKED');
+  });
 });

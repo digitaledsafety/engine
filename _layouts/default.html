@@ -4573,26 +4573,39 @@ workspace_data: "${base64WorkspaceData}"
                 this.pendingCollisions = stillPending;
             }
 
-            onClick(name, callback) {
-                let targetMesh = this.objects[name];
-                if (targetMesh) {
-                    if (!targetMesh.actionManager) {
-                        targetMesh.actionManager = new BABYLON.ActionManager(this.scene);
-                    }
-                    targetMesh.actionManager.registerAction(
-                        new BABYLON.ExecuteCodeAction(BABYLON.ActionManager.OnPickTrigger, () => callback(targetMesh))
-                    );
+            onClick(target, callback) {
+                if (!this.pendingClickHandlers) {
+                    this.pendingClickHandlers = [];
                 }
+                this.pendingClickHandlers.push({ target, callback });
+                this.processPendingClickHandlers();
             }
 
-            everyFrame(name, callback) {
-                let targetMesh = this.objects[name];
-                if (targetMesh) {
-                    this.perFrameFunctions.push({
-                        targetMesh: targetMesh,
-                        func: (thisMesh, deltaTime) => callback(thisMesh, deltaTime)
-                    });
+            processPendingClickHandlers() {
+                if (!this.pendingClickHandlers || this.pendingClickHandlers.length === 0) return;
+                const remaining = [];
+                for (const item of this.pendingClickHandlers) {
+                    const resolved = this._resolveTarget(item.target);
+                    const mesh = this._getMesh(resolved);
+                    if (mesh) {
+                        if (!mesh.actionManager) {
+                            mesh.actionManager = new BABYLON.ActionManager(this.scene);
+                        }
+                        mesh.actionManager.registerAction(
+                            new BABYLON.ExecuteCodeAction(BABYLON.ActionManager.OnPickTrigger, () => item.callback(mesh))
+                        );
+                    } else {
+                        remaining.push(item);
+                    }
                 }
+                this.pendingClickHandlers = remaining;
+            }
+
+            everyFrame(target, callback) {
+                this.perFrameFunctions.push({
+                    targetGetter: target,
+                    func: (thisMesh, deltaTime) => callback(thisMesh, deltaTime)
+                });
             }
 
             playerJump(force) {
@@ -6300,11 +6313,20 @@ workspace_data: "${base64WorkspaceData}"
                     }
 
                     this.perFrameFunctions.forEach(task => {
-                        if (task.targetMesh && !task.targetMesh.isDisposed() && typeof task.func === 'function') {
+                        if (typeof task === 'function') {
                             try {
-                                task.func(task.targetMesh, deltaTime);
+                                task(deltaTime);
                             } catch (e) {
-                                console.error(`Error executing per-frame function for mesh ${task.targetMesh.name}:`, e);
+                                console.error('Error executing per-frame task:', e);
+                            }
+                            return;
+                        }
+                        const targetMesh = task.targetMesh || this._getMesh(task.targetGetter);
+                        if (targetMesh && !targetMesh.isDisposed() && typeof task.func === 'function') {
+                            try {
+                                task.func(targetMesh, deltaTime);
+                            } catch (e) {
+                                console.error(`Error executing per-frame function for mesh ${targetMesh.name}:`, e);
                             }
                         }
                     });
@@ -6778,6 +6800,10 @@ workspace_data: "${base64WorkspaceData}"
             triggerSceneStart() {
                 this.onSceneStartObservable.notifyObservers();
                 this.processPendingCollisions();
+                this.processPendingClickHandlers();
+                if (this.uiManager) {
+                    this.uiManager.processPendingControlClicks();
+                }
             }
 
             // --- Global Event Bus ---
@@ -6875,9 +6901,9 @@ workspace_data: "${base64WorkspaceData}"
             }
 
             _resolveTarget(target) {
-                if (typeof target === 'function') {
+                while (typeof target === 'function') {
                     try {
-                        return target();
+                        target = target();
                     } catch (e) {
                         return null;
                     }
@@ -7373,7 +7399,19 @@ workspace_data: "${base64WorkspaceData}"
                 return textBlock;
             }
 
+            _resolveTarget(target) {
+                while (typeof target === 'function') {
+                    try {
+                        target = target();
+                    } catch (e) {
+                        return null;
+                    }
+                }
+                return target;
+            }
+
             _getControl(target) {
+                target = this._resolveTarget(target);
                 if (!target) return null;
                 if (typeof target === 'string') {
                     return this.controls[target] || null;
@@ -7475,10 +7513,25 @@ workspace_data: "${base64WorkspaceData}"
             }
 
             onControlClick(target, callback) {
-                const control = this._getControl(target);
-                if (control) {
-                    control.onPointerClickObservable.add(callback);
+                if (!this.pendingControlClickHandlers) {
+                    this.pendingControlClickHandlers = [];
                 }
+                this.pendingControlClickHandlers.push({ target, callback });
+                this.processPendingControlClicks();
+            }
+
+            processPendingControlClicks() {
+                if (!this.pendingControlClickHandlers || this.pendingControlClickHandlers.length === 0) return;
+                const remaining = [];
+                for (const item of this.pendingControlClickHandlers) {
+                    const control = this._getControl(item.target);
+                    if (control) {
+                        control.onPointerClickObservable.add(item.callback);
+                    } else {
+                        remaining.push(item);
+                    }
+                }
+                this.pendingControlClickHandlers = remaining;
             }
 
             getControlByName(name) {
@@ -10714,14 +10767,14 @@ workspace_data: "${base64WorkspaceData}"
                 const objectName = generator.valueToCode(block, 'OBJECT_SELECTOR', generator.ORDER_ATOMIC) || 'null';
                 const doCode = generator.statementToCode(block, 'DO_CODE');
                 const callback = `async function(thisMesh) {\n${doCode}\n}`;
-                return `sceneManager.onClick(${objectName}, ${callback});\n`;
+                return `sceneManager.onClick(() => ${objectName}, ${callback});\n`;
             };
 
             javascript.javascriptGenerator.forBlock['event_every_frame'] = function (block, generator) {
                 const objectName = generator.valueToCode(block, 'OBJECT_SELECTOR', generator.ORDER_ATOMIC) || 'null';
                 const doCode = generator.statementToCode(block, 'DO_CODE');
                 const callback = `async function(${objectName}) {\n${doCode}\n}`;
-                return `sceneManager.everyFrame(${objectName}, ${callback});\n`;
+                return `sceneManager.everyFrame(() => ${objectName}, ${callback});\n`;
             };
 
             javascript.javascriptGenerator.forBlock['action_rotate_continuously'] = function (block, generator) {
@@ -11350,7 +11403,7 @@ if (${name}) {
                 const element = generator.valueToCode(block, 'ELEMENT', generator.ORDER_ATOMIC) || generator.valueToCode(block, 'NAME', generator.ORDER_ATOMIC) || 'null';
                 const doCode = generator.statementToCode(block, 'DO');
                 const callback = `function() {\n${doCode}\n}`;
-                return `sceneManager.uiManager.onControlClick(${element}, ${callback});\n`;
+                return `sceneManager.uiManager.onControlClick(() => ${element}, ${callback});\n`;
             };
 
             // --- Console Block Generators ---
