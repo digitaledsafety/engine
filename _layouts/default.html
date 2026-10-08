@@ -2407,7 +2407,6 @@ workspace_data: "${base64WorkspaceData}"
                         { kind: 'block', type: 'event_on_object_detected' },
                         { kind: 'block', type: 'event_on_cursor_move' },
                         { kind: 'block', type: 'get_cursor_position' },
-                        { kind: 'block', type: 'event_on_speech_recognized' },
                         { kind: 'block', type: 'start_speech_recognition' },
                         { kind: 'block', type: 'get_speech_transcript' },
                         { kind: 'block', type: 'start_webcam_tracking' },
@@ -3246,7 +3245,6 @@ workspace_data: "${base64WorkspaceData}"
                 this.speechTranscript = '';
                 this.speechRecognition = null;
                 this.isListening = false;
-                this.speechCallbacks = [];
                 this.webcamTracking = { active: false, x: 0, y: 0, z: 0, gesture: 'neutral' };
                 this.objectRecognition = {
                     active: false,
@@ -5126,9 +5124,20 @@ workspace_data: "${base64WorkspaceData}"
                     if (name && this.objects[name]) {
                         delete this.objects[name];
                     }
-                    this.perFrameFunctions = this.perFrameFunctions.filter(
-                        task => !meshesToFilter.includes(task.targetMesh)
-                    );
+                    this.perFrameFunctions = this.perFrameFunctions.filter(task => {
+                        if (task.targetMesh && meshesToFilter.includes(task.targetMesh)) {
+                            return false;
+                        }
+                        const resolvedTaskMesh = this._getMesh(task.targetGetter);
+                        if (resolvedTaskMesh && meshesToFilter.includes(resolvedTaskMesh)) {
+                            return false;
+                        }
+                        const resolvedTarget = this._resolveTarget(task.targetGetter);
+                        if (resolvedTarget === target || resolvedTarget === name) {
+                            return false;
+                        }
+                        return true;
+                    });
                 }
             }
 
@@ -5515,9 +5524,6 @@ workspace_data: "${base64WorkspaceData}"
                     if (finalTranscript) {
                         this.speechTranscript = finalTranscript.trim();
                         if (onResultCallback) onResultCallback(this.speechTranscript);
-                        this.speechCallbacks.forEach(cb => {
-                            try { cb(this.speechTranscript); } catch(err) { console.error('Error executing speech recognition callback:', err); }
-                        });
                     }
                 };
                 recognition.onerror = (err) => {
@@ -5548,13 +5554,6 @@ workspace_data: "${base64WorkspaceData}"
 
             getSpeechTranscript() {
                 return this.speechTranscript || '';
-            }
-
-            onSpeechRecognized(callback) {
-                if (typeof callback === 'function') {
-                    this.speechCallbacks.push(callback);
-                }
-                this.startSpeechRecognition();
             }
 
             // --- Spatial & Visual Awareness (Webcam Tracking) ---
@@ -6409,7 +6408,6 @@ workspace_data: "${base64WorkspaceData}"
                 this.stopScreenCapture();
                 this.stopObjectRecognition();
                 this.stopSpeechRecognition();
-                this.speechCallbacks = [];
                 this.webcamTracking.active = false;
                 if (this.webcamVideoStream) {
                     this.webcamVideoStream.getTracks().forEach(track => track.stop());
@@ -8059,17 +8057,6 @@ workspace_data: "${base64WorkspaceData}"
                 "output": "Number",
                 "colour": "#4A90E2",
                 "tooltip": "Gets current X or Y coordinate of user cursor.",
-                "helpUrl": ""
-            },
-            {
-                "type": "event_on_speech_recognized",
-                "message0": "when voice speech recognized %1 %2",
-                "args0": [
-                    { "type": "input_dummy" },
-                    { "type": "input_statement", "name": "DO_CODE" }
-                ],
-                "style": "event_blocks",
-                "tooltip": "Triggers code when spoken speech is recognized from the microphone.",
                 "helpUrl": ""
             },
             {
@@ -11479,11 +11466,6 @@ if (${name}) {
             javascript.javascriptGenerator.forBlock['get_cursor_position'] = function (block, generator) {
                 const axis = block.getFieldValue('AXIS') || 'x';
                 return [`sceneManager.getCursorPos('${axis}')`, generator.ORDER_FUNCTION_CALL];
-            };
-
-            javascript.javascriptGenerator.forBlock['event_on_speech_recognized'] = function (block, generator) {
-                const doCode = generator.statementToCode(block, 'DO_CODE');
-                return `sceneManager.onSpeechRecognized(async function(transcript) {\n${doCode}\n});\n`;
             };
 
             javascript.javascriptGenerator.forBlock['start_speech_recognition'] = function (block, generator) {
