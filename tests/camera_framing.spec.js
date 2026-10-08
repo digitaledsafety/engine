@@ -44,4 +44,26 @@ test.describe('Camera Framing Functionality', () => {
     expect(result.targetZ).toBeCloseTo(-5);
     expect(result.radius).toBeGreaterThan(0);
   });
+
+  test('setCameraProperty updates active camera properties correctly', async ({ page }) => {
+    const result = await page.evaluate(async () => {
+      sceneManager.setCameraProperty('inertia', 0.5);
+      sceneManager.setCameraProperty('wheelPrecision', 15);
+      sceneManager.setCameraProperty('speed', 2);
+      sceneManager.setCameraProperty('fov', 0.9);
+
+      const camera = sceneManager.scene.activeCamera;
+      return {
+        inertia: camera.inertia,
+        wheelPrecision: camera.wheelPrecision,
+        speed: camera.speed,
+        fov: camera.fov
+      };
+    });
+
+    expect(result.inertia).toBe(0.5);
+    expect(result.wheelPrecision).toBe(15);
+    expect(result.speed).toBe(2);
+    expect(result.fov).toBe(0.9);
+  });
 });
