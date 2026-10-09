@@ -117,4 +117,22 @@ test.describe('Engine Features V2', () => {
         expect(result.countAfterSecond).toBe(1);
         expect(result.countAfterHide).toBe(0);
     });
+
+    test('should generate valid hex colors with colour_random generator using slice', async ({ page }) => {
+        const isValidHex = await page.evaluate(() => {
+            const workspace = window.Blockly.getMainWorkspace();
+            const generator = window.javascript.javascriptGenerator;
+            generator.init(workspace);
+            const block = workspace.newBlock('colour_random');
+            const code = generator.blockToCode(block);
+            const definitions = Object.values(generator.definitions_ || {}).join('\n');
+            block.dispose();
+
+            // Evaluate helper function and invocation in window context
+            eval(definitions);
+            const color = eval(code[0]);
+            return typeof color === 'string' && /^#[0-9a-fA-F]{6}$/.test(color);
+        });
+        expect(isValidHex).toBe(true);
+    });
 });
