@@ -6265,6 +6265,7 @@ workspace_data: "${base64WorkspaceData}"
                 this.engine.runRenderLoop(() => {
                     this.processedCollisions.clear();
                     this.processPendingCollisions();
+                    this.processPendingClickHandlers();
                     const currentTime = performance.now();
                     const deltaTime = currentTime - lastTime;
                     lastTime = currentTime;
