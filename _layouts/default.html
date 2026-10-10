@@ -10954,9 +10954,7 @@ if (${name}) {
                 const x = generator.valueToCode(block, 'X', generator.ORDER_ATOMIC) || 0;
                 const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || 5;
                 const z = generator.valueToCode(block, 'Z', generator.ORDER_ATOMIC) || -10;
-                const uniqueId = Blockly.utils.idGenerator.genUid();
-                const idStr = `'id_${uniqueId}'`;
-                const code = `sceneManager.createCamera('${type}', ${idStr}, ${x}, ${y}, ${z})`;
+                const code = `sceneManager.createCamera('${type}', 'id_' + Blockly.utils.idGenerator.genUid(), ${x}, ${y}, ${z})`;
                 return [code, generator.ORDER_FUNCTION_CALL];
             };
 
@@ -11015,8 +11013,6 @@ if (${name}) {
                 const x = generator.valueToCode(block, 'X', generator.ORDER_ATOMIC) || 0;
                 const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || 0;
                 const z = generator.valueToCode(block, 'Z', generator.ORDER_ATOMIC) || 0;
-                const uniqueId = Blockly.utils.idGenerator.genUid();
-                const idStr = `'id_${uniqueId}'`;
 
                 let method = 'createBox';
                 if (type === 'sphere') method = 'createSphere';
@@ -11027,7 +11023,7 @@ if (${name}) {
                 else if (type === 'capsule') method = 'createCapsule';
                 else if (type === 'particle_cube') method = 'createParticleCube';
 
-                const code = `sceneManager.${method}(${idStr}, ${x}, ${y}, ${z})`;
+                const code = `sceneManager.${method}('id_' + Blockly.utils.idGenerator.genUid(), ${x}, ${y}, ${z})`;
                 return [code, generator.ORDER_FUNCTION_CALL];
             };
 
@@ -11105,9 +11101,7 @@ if (${name}) {
                 const x = generator.valueToCode(block, 'X', generator.ORDER_ATOMIC) || 0;
                 const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || 0;
                 const z = generator.valueToCode(block, 'Z', generator.ORDER_ATOMIC) || 0;
-                const uniqueId = Blockly.utils.idGenerator.genUid();
-                const idStr = `'id_${uniqueId}'`;
-                const code = `sceneManager.createAdvancedLight('${type}', ${idStr}, ${x}, ${y}, ${z}, 0, -1, 0)`;
+                const code = `sceneManager.createAdvancedLight('${type}', 'id_' + Blockly.utils.idGenerator.genUid(), ${x}, ${y}, ${z}, 0, -1, 0)`;
                 return [code, generator.ORDER_FUNCTION_CALL];
             };
 
@@ -11396,8 +11390,7 @@ if (${name}) {
                     left = generator.valueToCode(block, 'LEFT', generator.ORDER_ATOMIC) || "'0px'";
                 }
 
-                const uniqueId = Blockly.utils.idGenerator.genUid();
-                const name = `'gui_${uniqueId}'`;
+                const name = `'gui_' + Blockly.utils.idGenerator.genUid()`;
                 const options = `{ horizontalAlignment: ${hAlign}, verticalAlignment: ${vAlign}, top: ${top}, left: ${left} }`;
 
                 const code = `sceneManager.uiManager.createText(${name}, ${text}, ${options})`;
@@ -11429,8 +11422,7 @@ if (${name}) {
                     left = generator.valueToCode(block, 'LEFT', generator.ORDER_ATOMIC) || "'0px'";
                 }
 
-                const uniqueId = Blockly.utils.idGenerator.genUid();
-                const name = `'gui_${uniqueId}'`;
+                const name = `'gui_' + Blockly.utils.idGenerator.genUid()`;
                 const options = `{ horizontalAlignment: ${hAlign}, verticalAlignment: ${vAlign}, top: ${top}, left: ${left} }`;
 
                 const code = `sceneManager.uiManager.createInput(${name}, ${options})`;
@@ -11445,24 +11437,21 @@ if (${name}) {
 
             javascript.javascriptGenerator.forBlock['gui_create_button'] = function (block, generator) {
                 const text = generator.valueToCode(block, 'TEXT', generator.ORDER_ATOMIC) || "''";
-                const uniqueId = Blockly.utils.idGenerator.genUid();
-                const name = `'gui_${uniqueId}'`;
+                const name = `'gui_' + Blockly.utils.idGenerator.genUid()`;
                 const code = `sceneManager.uiManager.createButton(${name}, ${text})`;
                 return [code, generator.ORDER_FUNCTION_CALL];
             };
 
             javascript.javascriptGenerator.forBlock['gui_create_image_from_url'] = function (block, generator) {
                 const url = generator.valueToCode(block, 'URL', generator.ORDER_ATOMIC) || "''";
-                const uniqueId = Blockly.utils.idGenerator.genUid();
-                const name = `'gui_${uniqueId}'`;
+                const name = `'gui_' + Blockly.utils.idGenerator.genUid()`;
                 const code = `sceneManager.uiManager.createImage(${name}, ${url})`;
                 return [code, generator.ORDER_FUNCTION_CALL];
             };
 
             javascript.javascriptGenerator.forBlock['gui_create_image_from_asset'] = function (block, generator) {
                 const assetName = generator.valueToCode(block, 'ASSET', generator.ORDER_ATOMIC) || "''";
-                const uniqueId = Blockly.utils.idGenerator.genUid();
-                const name = `'gui_${uniqueId}'`;
+                const name = `'gui_' + Blockly.utils.idGenerator.genUid()`;
                 const code = `await sceneManager.uiManager.createImageFromAsset(${name}, ${assetName})`;
                 return [code, generator.ORDER_AWAIT];
             };
