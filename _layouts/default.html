@@ -4587,7 +4587,7 @@ workspace_data: "${base64WorkspaceData}"
                 for (const item of this.pendingClickHandlers) {
                     const resolved = this._resolveTarget(item.target);
                     const targets = Array.isArray(resolved) ? resolved : [resolved];
-                    let allResolved = true;
+                    let allResolved = targets.length > 0;
 
                     for (const subTarget of targets) {
                         const mesh = this._getMesh(subTarget);
@@ -4609,7 +4609,8 @@ workspace_data: "${base64WorkspaceData}"
                         }
                     }
 
-                    if (!allResolved || Array.isArray(resolved)) {
+                    const isArrayTarget = Array.isArray(resolved) || (typeof item.target === 'function' && Array.isArray(this._resolveTarget(item.target)));
+                    if (!allResolved || isArrayTarget) {
                         remaining.push(item);
                     }
                 }
@@ -6894,7 +6895,14 @@ workspace_data: "${base64WorkspaceData}"
                     if (!targetMesh.customObservables[eventName]) {
                         targetMesh.customObservables[eventName] = new BABYLON.Observable();
                     }
-                    targetMesh.customObservables[eventName].add(callback);
+                    if (!targetMesh._attachedObjectEvents) {
+                        targetMesh._attachedObjectEvents = new Set();
+                    }
+                    const eventKey = `${eventName}_${callback}`;
+                    if (!targetMesh._attachedObjectEvents.has(eventKey)) {
+                        targetMesh._attachedObjectEvents.add(eventKey);
+                        targetMesh.customObservables[eventName].add(callback);
+                    }
                 } else {
                     let name;
                     if (typeof target === 'string') {
@@ -6925,15 +6933,16 @@ workspace_data: "${base64WorkspaceData}"
                     for (const item of this.pendingLazyObjectEvents) {
                         const resolved = this._resolveTarget(item.targetGetter);
                         const targets = Array.isArray(resolved) ? resolved : [resolved];
-                        let anyResolved = false;
+                        let allResolved = targets.length > 0;
                         for (const subTarget of targets) {
                             const m = this._getMesh(subTarget);
                             if (m) {
                                 this.onObjectEvent(m, item.eventName, item.callback);
-                                anyResolved = true;
+                            } else {
+                                allResolved = false;
                             }
                         }
-                        if (!anyResolved) {
+                        if (!allResolved) {
                             remaining.push(item);
                         }
                     }
@@ -9174,12 +9183,17 @@ workspace_data: "${base64WorkspaceData}"
             // Phase 2 Blockly Blocks
             {
                 "type": "event_on_click",
-                "message0": "when %1 is clicked %2 do %3",
+                "message0": "when %1 is clicked as %2 %3 do %4",
                 "args0": [
                     {
                         "type": "input_value",
                         "name": "OBJECT_SELECTOR",
                         "check": ["Array", "String", "Mesh"]
+                    },
+                    {
+                        "type": "field_variable",
+                        "name": "CLICKED_ITEM",
+                        "variable": "clicked_item"
                     },
                     {
                         "type": "input_dummy"
@@ -9191,7 +9205,7 @@ workspace_data: "${base64WorkspaceData}"
                 ],
                 "nextStatement": null,
                 "style": "event_blocks",
-                "tooltip": "Executes code when the specified object is clicked.",
+                "tooltip": "Executes code when the specified object or list item is clicked, storing the clicked item in a variable.",
                 "helpUrl": ""
             },
             {
@@ -10815,8 +10829,12 @@ workspace_data: "${base64WorkspaceData}"
 
             javascript.javascriptGenerator.forBlock['event_on_click'] = function (block, generator) {
                 const objectName = generator.valueToCode(block, 'OBJECT_SELECTOR', generator.ORDER_ATOMIC) || 'null';
+                const rawVar = block.getFieldValue('CLICKED_ITEM') || 'clicked_item';
+                const clickedItemVar = (generator.nameDB_ && typeof generator.nameDB_.getName === 'function')
+                    ? generator.nameDB_.getName(rawVar, Blockly.VARIABLE_CATEGORY_NAME || Blockly.Variables.NAME_TYPE)
+                    : rawVar;
                 const doCode = generator.statementToCode(block, 'DO_CODE');
-                const callback = `async function(thisMesh) {\n${doCode}\n}`;
+                const callback = `async function(${clickedItemVar}) {\n${doCode}\n}`;
                 return `sceneManager.onClick(() => ${objectName}, ${callback});\n`;
             };
 

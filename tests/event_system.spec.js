@@ -331,6 +331,14 @@ test.describe('Event System and Observables Functionality', () => {
     await page.goto('/', { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => window.sceneManager && window.workspace);
 
+    // Test code generation for event_on_click with designated variable
+    const generatedCode = await page.evaluate(() => {
+      const block = window.workspace.newBlock('event_on_click');
+      block.setFieldValue('clicked_item_var_id', 'CLICKED_ITEM');
+      return javascript.javascriptGenerator.blockToCode(block);
+    });
+    expect(generatedCode).toContain('async function(');
+
     await page.evaluate(() => {
       // Direct scene test of onClick with a list of meshes
       window.clickedMeshes = [];
@@ -342,9 +350,9 @@ test.describe('Event System and Observables Functionality', () => {
       const box2 = window.sceneManager.createBox('box2', 1, '#00FF00', 2, 0, 0);
       const objectList = [box1, box2];
 
-      // Test onClick with list
-      window.sceneManager.onClick(() => objectList, (thisMesh) => {
-        window.clickedMeshes.push(thisMesh.name);
+      // Test onClick with list and designated item parameter
+      window.sceneManager.onClick(() => objectList, (item) => {
+        window.clickedMeshes.push(item.name);
       });
 
       // Test everyFrame with list
