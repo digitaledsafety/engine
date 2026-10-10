@@ -4586,15 +4586,30 @@ workspace_data: "${base64WorkspaceData}"
                 const remaining = [];
                 for (const item of this.pendingClickHandlers) {
                     const resolved = this._resolveTarget(item.target);
-                    const mesh = this._getMesh(resolved);
-                    if (mesh) {
-                        if (!mesh.actionManager) {
-                            mesh.actionManager = new BABYLON.ActionManager(this.scene);
+                    const targets = Array.isArray(resolved) ? resolved : [resolved];
+                    let allResolved = true;
+
+                    for (const subTarget of targets) {
+                        const mesh = this._getMesh(subTarget);
+                        if (mesh) {
+                            if (!mesh._attachedClickCallbacks) {
+                                mesh._attachedClickCallbacks = new Set();
+                            }
+                            if (!mesh._attachedClickCallbacks.has(item.callback)) {
+                                mesh._attachedClickCallbacks.add(item.callback);
+                                if (!mesh.actionManager) {
+                                    mesh.actionManager = new BABYLON.ActionManager(this.scene);
+                                }
+                                mesh.actionManager.registerAction(
+                                    new BABYLON.ExecuteCodeAction(BABYLON.ActionManager.OnPickTrigger, () => item.callback(mesh))
+                                );
+                            }
+                        } else {
+                            allResolved = false;
                         }
-                        mesh.actionManager.registerAction(
-                            new BABYLON.ExecuteCodeAction(BABYLON.ActionManager.OnPickTrigger, () => item.callback(mesh))
-                        );
-                    } else {
+                    }
+
+                    if (!allResolved || Array.isArray(resolved)) {
                         remaining.push(item);
                     }
                 }
@@ -6332,14 +6347,18 @@ workspace_data: "${base64WorkspaceData}"
                             }
                             return;
                         }
-                        const targetMesh = task.targetMesh || this._getMesh(task.targetGetter);
-                        if (targetMesh && !targetMesh.isDisposed() && typeof task.func === 'function') {
-                            try {
-                                task.func(targetMesh, deltaTime);
-                            } catch (e) {
-                                console.error(`Error executing per-frame function for mesh ${targetMesh.name}:`, e);
+                        const resolved = this._resolveTarget(task.targetGetter);
+                        const targets = Array.isArray(resolved) ? resolved : [task.targetMesh || resolved];
+                        targets.forEach(subTarget => {
+                            const targetMesh = this._getMesh(subTarget);
+                            if (targetMesh && !targetMesh.isDisposed() && typeof task.func === 'function') {
+                                try {
+                                    task.func(targetMesh, deltaTime);
+                                } catch (e) {
+                                    console.error(`Error executing per-frame function for mesh ${targetMesh.name}:`, e);
+                                }
                             }
-                        }
+                        });
                     });
                     this.scene.render();
                 });
@@ -6845,10 +6864,13 @@ workspace_data: "${base64WorkspaceData}"
                     this.swipeCallbacks[dir].forEach(item => {
                         try {
                             const resolved = this._resolveTarget(item.target);
-                            const mesh = this._getMesh(resolved);
-                            if (mesh) {
-                                item.callback(mesh);
-                            }
+                            const targets = Array.isArray(resolved) ? resolved : [resolved];
+                            targets.forEach(subTarget => {
+                                const mesh = this._getMesh(subTarget);
+                                if (mesh) {
+                                    item.callback(mesh);
+                                }
+                            });
                         } catch (e) {
                             console.error(`Error running onSwipe callback for ${dir}:`, e);
                         }
@@ -6858,6 +6880,12 @@ workspace_data: "${base64WorkspaceData}"
 
             // --- Local Object Observables ---
             onObjectEvent(target, eventName, callback) {
+                const resolved = this._resolveTarget(target);
+                if (Array.isArray(resolved)) {
+                    resolved.forEach(subTarget => this.onObjectEvent(subTarget, eventName, callback));
+                    return;
+                }
+
                 let targetMesh = this._getMesh(target);
                 if (targetMesh) {
                     if (!targetMesh.customObservables) {
@@ -6895,20 +6923,31 @@ workspace_data: "${base64WorkspaceData}"
                 if (this.pendingLazyObjectEvents && this.pendingLazyObjectEvents.length > 0) {
                     const remaining = [];
                     for (const item of this.pendingLazyObjectEvents) {
-                        const m = this._getMesh(item.targetGetter);
-                        if (m) {
-                            this.onObjectEvent(m, item.eventName, item.callback);
-                        } else {
+                        const resolved = this._resolveTarget(item.targetGetter);
+                        const targets = Array.isArray(resolved) ? resolved : [resolved];
+                        let anyResolved = false;
+                        for (const subTarget of targets) {
+                            const m = this._getMesh(subTarget);
+                            if (m) {
+                                this.onObjectEvent(m, item.eventName, item.callback);
+                                anyResolved = true;
+                            }
+                        }
+                        if (!anyResolved) {
                             remaining.push(item);
                         }
                     }
                     this.pendingLazyObjectEvents = remaining;
                 }
 
-                let targetMesh = this._getMesh(target);
-                if (targetMesh && targetMesh.customObservables && targetMesh.customObservables[eventName]) {
-                    targetMesh.customObservables[eventName].notifyObservers();
-                }
+                const resolved = this._resolveTarget(target);
+                const targets = Array.isArray(resolved) ? resolved : [resolved];
+                targets.forEach(subTarget => {
+                    let targetMesh = this._getMesh(subTarget);
+                    if (targetMesh && targetMesh.customObservables && targetMesh.customObservables[eventName]) {
+                        targetMesh.customObservables[eventName].notifyObservers();
+                    }
+                });
             }
 
             _resolveTarget(target) {
@@ -9140,7 +9179,7 @@ workspace_data: "${base64WorkspaceData}"
                     {
                         "type": "input_value",
                         "name": "OBJECT_SELECTOR",
-                        "check": "String"
+                        "check": ["Array", "String", "Mesh"]
                     },
                     {
                         "type": "input_dummy"
@@ -9162,7 +9201,7 @@ workspace_data: "${base64WorkspaceData}"
                     {
                         "type": "input_value",
                         "name": "OBJECT_SELECTOR",
-                        "check": "String"
+                        "check": ["Array", "String", "Mesh"]
                     },
                     {
                         "type": "input_dummy"
@@ -10042,7 +10081,7 @@ workspace_data: "${base64WorkspaceData}"
                     {
                         "type": "input_value",
                         "name": "OBJECT_NAME",
-                        "check": "String"
+                        "check": ["Array", "String", "Mesh"]
                     },
                     {
                         "type": "input_value",
@@ -10063,7 +10102,7 @@ workspace_data: "${base64WorkspaceData}"
                     {
                         "type": "input_value",
                         "name": "OBJECT_NAME",
-                        "check": "String"
+                        "check": ["Array", "String", "Mesh"]
                     },
                     {
                         "type": "input_value",
@@ -10090,7 +10129,7 @@ workspace_data: "${base64WorkspaceData}"
                     {
                         "type": "input_value",
                         "name": "OBJECT_SELECTOR",
-                        "check": "String"
+                        "check": ["Array", "String", "Mesh"]
                     },
                     {
                         "type": "field_dropdown",
