@@ -323,4 +323,72 @@ test.describe('Event System and Observables Functionality', () => {
 
     await expect.poll(() => consoleMessages, { timeout: 15000 }).toContain('VARIABLE_BOX_CLICKED');
   });
+
+  test('Event blocks work seamlessly when passed a list/array of objects', async ({ page }) => {
+    const consoleMessages = [];
+    page.on('console', msg => consoleMessages.push(msg.text()));
+
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => window.sceneManager && window.workspace);
+
+    await page.evaluate(() => {
+      // Direct scene test of onClick with a list of meshes
+      window.clickedMeshes = [];
+      window.frameMeshes = new Set();
+      window.swipedMeshes = [];
+      window.receivedEvents = [];
+
+      const box1 = window.sceneManager.createBox('box1', 1, '#FF0000', 0, 0, 0);
+      const box2 = window.sceneManager.createBox('box2', 1, '#00FF00', 2, 0, 0);
+      const objectList = [box1, box2];
+
+      // Test onClick with list
+      window.sceneManager.onClick(() => objectList, (thisMesh) => {
+        window.clickedMeshes.push(thisMesh.name);
+      });
+
+      // Test everyFrame with list
+      window.sceneManager.everyFrame(() => objectList, (thisMesh) => {
+        window.frameMeshes.add(thisMesh.name);
+      });
+
+      // Test onSwipe with list
+      window.sceneManager.onSwipe(() => objectList, 'LEFT', (thisMesh) => {
+        window.swipedMeshes.push(thisMesh.name);
+      });
+
+      // Test onObjectEvent / triggerObjectEvent with list
+      window.sceneManager.onObjectEvent(() => objectList, 'CUSTOM_EVT', () => {
+        window.receivedEvents.push('EVT_RECEIVED');
+      });
+
+      // Simulate clicks on box1 and box2
+      window.sceneManager.processPendingClickHandlers();
+      box1.actionManager.processTrigger(BABYLON.ActionManager.OnPickTrigger);
+      box2.actionManager.processTrigger(BABYLON.ActionManager.OnPickTrigger);
+
+      // Simulate swipe
+      window.sceneManager.triggerSwipe('LEFT');
+
+      // Simulate object event trigger
+      window.sceneManager.triggerObjectEvent(() => objectList, 'CUSTOM_EVT');
+    });
+
+    // Check click results
+    const clicked = await page.evaluate(() => window.clickedMeshes);
+    expect(clicked).toEqual(['box1', 'box2']);
+
+    // Check swipe results
+    const swiped = await page.evaluate(() => window.swipedMeshes);
+    expect(swiped).toEqual(['box1', 'box2']);
+
+    // Check object event results
+    const events = await page.evaluate(() => window.receivedEvents);
+    expect(events.length).toBe(2);
+
+    // Check frame results
+    await expect.poll(async () => {
+      return await page.evaluate(() => Array.from(window.frameMeshes));
+    }, { timeout: 10000 }).toEqual(expect.arrayContaining(['box1', 'box2']));
+  });
 });
