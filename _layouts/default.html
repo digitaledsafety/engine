@@ -6829,8 +6829,8 @@ workspace_data: "${base64WorkspaceData}"
                 this.onSceneStartObservable.add(callback);
             }
 
-            triggerSceneStart() {
-                this.onSceneStartObservable.notifyObservers();
+            async triggerSceneStart() {
+                await Promise.all(this.onSceneStartObservable.observers.map(obs => obs.callback()));
                 this.processPendingCollisions();
                 this.processPendingClickHandlers();
                 if (this.uiManager) {
@@ -11744,9 +11744,24 @@ if (${name}) {
             };
         }
 
-        // Convert Blockly Code to JavaScript
+        // Convert Blockly Code to JavaScript, giving precedence to event_on_scene_start blocks
         function generateCode() {
-            return javascript.javascriptGenerator.workspaceToCode(workspace);
+            if (!workspace) return '';
+            javascript.javascriptGenerator.init(workspace);
+
+            const topBlocks = workspace.getTopBlocks(true);
+            const sceneStartBlocks = topBlocks.filter(b => b.type === 'event_on_scene_start');
+            const otherBlocks = topBlocks.filter(b => b.type !== 'event_on_scene_start');
+
+            let code = '';
+            sceneStartBlocks.forEach(b => {
+                code += javascript.javascriptGenerator.blockToCode(b);
+            });
+            otherBlocks.forEach(b => {
+                code += javascript.javascriptGenerator.blockToCode(b);
+            });
+
+            return javascript.javascriptGenerator.finish(code);
         }
 
         // Resize canvas to fit its container
@@ -11814,7 +11829,7 @@ if (${name}) {
                 const AsyncFunction = Object.getPrototypeOf(async function () { }).constructor;
                 const userGeneratedCode = new AsyncFunction('sceneManager', 'assetManager', codeToRun);
                 await userGeneratedCode(sceneManager, assetManager);
-                sceneManager.triggerSceneStart();
+                await sceneManager.triggerSceneStart();
             } catch (error) {
                 console.error('Error executing code:', error);
             } finally {
