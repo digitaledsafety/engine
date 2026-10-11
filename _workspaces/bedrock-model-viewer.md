@@ -1,4 +1,5 @@
 ---
+runtime: "babylon"
 layout: "default"
 title: "Bedrock .mcstructure Viewer"
 description: "Explore and animate Minecraft Bedrock .mcstructure files using visual logic!"

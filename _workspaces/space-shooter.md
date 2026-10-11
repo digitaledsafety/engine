@@ -1,4 +1,5 @@
 ---
+runtime: "babylon"
 layout: "default"
 title: "Space Shooter"
 description: "Protect the galaxy from alien invaders!"

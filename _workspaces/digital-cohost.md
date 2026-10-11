@@ -1,4 +1,5 @@
 ---
+runtime: "babylon"
 layout: "default"
 title: "Digital Co-Host Avatar"
 description: "Standalone PWA workspace for Word, a real-time AI co-host streamer avatar."

@@ -1,4 +1,5 @@
 ---
+runtime: "babylon"
 layout: "default"
 title: "Maze"
 description: "Escape the maze in this 3D puzzle game."

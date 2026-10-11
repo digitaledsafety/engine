@@ -1,4 +1,5 @@
 ---
+runtime: "babylon"
 layout: "default"
 title: "VFX Demo"
 description: "A showcase of visual effects and particles."

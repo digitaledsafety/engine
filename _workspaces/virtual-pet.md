@@ -1,4 +1,5 @@
 ---
+runtime: "babylon"
 layout: "default"
 title: "Virtual Pet"
 description: "Take care of your very own 3D companion."
