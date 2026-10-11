@@ -2452,7 +2452,15 @@ workspace_data: "${base64WorkspaceData}"
                         {
                             kind: 'block',
                             type: 'camera_zoom',
-                        },                        
+                        },
+                        {
+                            kind: 'block',
+                            type: 'set_camera_inertia',
+                        },
+                        {
+                            kind: 'block',
+                            type: 'set_camera_wheel_precision',
+                        },
                         {
                             kind: 'block',
                             type: 'create_ground',
@@ -4728,6 +4736,18 @@ workspace_data: "${base64WorkspaceData}"
             cameraZoom(value) {
                 if (this.scene.activeCamera && typeof this.scene.activeCamera.radius === 'number') {
                     this.scene.activeCamera.radius = Math.max(1, this.scene.activeCamera.radius - value);
+                }
+            }
+
+            setCameraInertia(inertia) {
+                if (this.scene.activeCamera && typeof inertia === 'number') {
+                    this.scene.activeCamera.inertia = inertia;
+                }
+            }
+
+            setCameraWheelPrecision(precision) {
+                if (this.scene.activeCamera && typeof precision === 'number') {
+                    this.scene.activeCamera.wheelPrecision = precision;
                 }
             }
 
@@ -9456,6 +9476,38 @@ workspace_data: "${base64WorkspaceData}"
                 "helpUrl": ""
             },
             {
+                "type": "set_camera_inertia",
+                "message0": "set camera inertia to %1",
+                "args0": [
+                    {
+                        "type": "input_value",
+                        "name": "INERTIA",
+                        "check": "Number"
+                    }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": "#A55B80",
+                "tooltip": "Sets active camera movement inertia (0 for instant movement, default 0.9 or 0.2 for smooth).",
+                "helpUrl": ""
+            },
+            {
+                "type": "set_camera_wheel_precision",
+                "message0": "set camera wheel precision to %1",
+                "args0": [
+                    {
+                        "type": "input_value",
+                        "name": "PRECISION",
+                        "check": "Number"
+                    }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": "#A55B80",
+                "tooltip": "Sets active camera mouse wheel zoom precision (higher values slow down zoom speed).",
+                "helpUrl": ""
+            },
+            {
                 "type": "play_sound_url",
                 "message0": "play sound from URL %1",
                 "args0": [
@@ -10889,6 +10941,16 @@ if (${name}) {
             javascript.javascriptGenerator.forBlock['camera_zoom'] = function (block, generator) {
                 const zoomValue = generator.valueToCode(block, 'ZOOM', generator.ORDER_ATOMIC) || 0;
                 return `sceneManager.cameraZoom(${zoomValue});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['set_camera_inertia'] = function (block, generator) {
+                const inertia = generator.valueToCode(block, 'INERTIA', generator.ORDER_ATOMIC) || 0.2;
+                return `sceneManager.setCameraInertia(${inertia});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['set_camera_wheel_precision'] = function (block, generator) {
+                const precision = generator.valueToCode(block, 'PRECISION', generator.ORDER_ATOMIC) || 10;
+                return `sceneManager.setCameraWheelPrecision(${precision});\n`;
             };
 
             // --- Gameplay Block Generators ---
