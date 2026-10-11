@@ -7185,7 +7185,7 @@ if (${name}) {
             window.sceneManager = new BabylonSceneManager(canvas);
             if (window.EngineRuntime) window.EngineRuntime.setActive(window.sceneManager);
         }
-        const sceneManager = window.sceneManager;
+        let sceneManager = window.sceneManager;
         const projectManager = new ProjectManager(assetManager, workspace, sceneManager);
         window.projectManager = projectManager;
         window.collabWorkspaceManager = new CollabWorkspaceManager(workspace);
