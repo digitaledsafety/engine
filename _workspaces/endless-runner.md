@@ -1,4 +1,5 @@
 ---
+runtime: "babylon"
 layout: "default"
 title: "Endless Runner"
 description: "Dodge the red obstacles and collect yellow coins on mobile or desktop!"

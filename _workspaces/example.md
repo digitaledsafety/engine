@@ -1,4 +1,5 @@
 ---
+runtime: "babylon"
 layout: "default"
 title: "Example Project"
 description: "A simple example to get you started."

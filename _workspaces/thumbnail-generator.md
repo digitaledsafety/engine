@@ -1,4 +1,5 @@
 ---
+runtime: "babylon"
 layout: "default"
 title: "Thumbnail Generator"
 description: "Generate perfect thumbnails for your 3D models."
