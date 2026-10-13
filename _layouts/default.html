@@ -848,7 +848,7 @@
         // --- URL Sanitization ---
         function isValidAssetURL(url) {
             if (typeof url !== 'string') return false;
-            const normalized = url.trim().toLowerCase();
+            const normalized = url.trim().toLowerCase().replace(/\\/g, '/');
             if (normalized.startsWith('//')) {
                 console.error('Invalid URL:', url, 'Protocol-relative URLs are not allowed.');
                 return false;
@@ -890,13 +890,22 @@
             }
 
             if (normalized.startsWith('data:')) {
-                // Prevent XSS vectors via HTML or executable script data URIs
-                if (normalized.startsWith('data:text/html') ||
-                    normalized.startsWith('data:text/xml') ||
-                    normalized.startsWith('data:image/svg+xml') ||
-                    normalized.startsWith('data:application/javascript') ||
-                    normalized.startsWith('data:text/javascript')) {
-                    console.error('Invalid URL:', url, 'HTML, XML, or JavaScript data URLs are not allowed.');
+                if (normalized.startsWith('data:image/svg+xml')) {
+                    console.error('Invalid URL:', url, 'SVG data URLs are not allowed due to script execution risks.');
+                    return false;
+                }
+                const safePrefixes = [
+                    'data:image/',
+                    'data:audio/',
+                    'data:model/',
+                    'data:font/',
+                    'data:application/octet-stream',
+                    'data:application/json',
+                    'data:text/plain'
+                ];
+                const isSafe = safePrefixes.some(prefix => normalized.startsWith(prefix));
+                if (!isSafe) {
+                    console.error('Invalid URL:', url, 'Only safe image, audio, model, font, json, octet-stream, or text/plain data URLs are allowed.');
                     return false;
                 }
                 return true;
