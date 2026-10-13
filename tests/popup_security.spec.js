@@ -216,8 +216,10 @@ test.describe('Engine Popup Security Validation', () => {
       return {
         htmlData: fn('data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg=='),
         xmlData: fn('data:text/xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIj8+'),
+        xhtmlData: fn('data:application/xhtml+xml;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg=='),
         jsData: fn('data:application/javascript;base64,YWxlcnQoMSk='),
         svgData: fn('data:image/svg+xml;utf8,<svg></svg>'),
+        backslashProto: fn('\\\\tracking-pixel.com/image.png'),
         safeImageData: fn('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='),
         safeAudioData: fn('data:audio/mp3;base64,SUQzBAAAAAAA')
       };
@@ -226,8 +228,10 @@ test.describe('Engine Popup Security Validation', () => {
     expect(result).not.toBeNull();
     expect(result.htmlData).toBe(false);
     expect(result.xmlData).toBe(false);
+    expect(result.xhtmlData).toBe(false);
     expect(result.jsData).toBe(false);
     expect(result.svgData).toBe(false);
+    expect(result.backslashProto).toBe(false);
     expect(result.safeImageData).toBe(true);
     expect(result.safeAudioData).toBe(true);
   });
