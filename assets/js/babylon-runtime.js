@@ -1604,6 +1604,17 @@
                 }
             }
 
+            setCameraProperties(inertia, wheelPrecision) {
+                const camera = this.scene.activeCamera;
+                if (!camera) return;
+                if (typeof inertia === 'number' && !isNaN(inertia)) {
+                    camera.inertia = inertia;
+                }
+                if (typeof wheelPrecision === 'number' && !isNaN(wheelPrecision)) {
+                    camera.wheelPrecision = wheelPrecision;
+                }
+            }
+
             frameCameraOnMesh(target) {
                 let camera = this.scene.activeCamera;
                 if (!camera) return;
@@ -2344,7 +2355,6 @@
                 camera.attachControl(this.canvas, true);
 
                 // Smooth navigation
-                // TODO: Via blocks
                 camera.inertia = 0.2;
                 camera.wheelPrecision = 10;
 
