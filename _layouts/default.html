@@ -2209,6 +2209,22 @@ workspace_data: "${base64WorkspaceData}"
                         {
                             kind: 'block',
                             type: 'game_over',
+                        },
+                        {
+                            kind: 'block',
+                            type: 'game_set_timer',
+                        },
+                        {
+                            kind: 'block',
+                            type: 'game_get_timer',
+                        },
+                        {
+                            kind: 'block',
+                            type: 'game_start_timer',
+                        },
+                        {
+                            kind: 'block',
+                            type: 'when_timer_finished',
                         }
                     ]
                 },
@@ -5831,7 +5847,7 @@ workspace_data: "${base64WorkspaceData}"
             },
             {
                 "type": "game_display_hud",
-                "message0": "display game HUD score %1 health %2 max health %3",
+                "message0": "display game HUD score %1 health %2 max health %3 timer %4 %5 s",
                 "args0": [
                     {
                         "type": "field_checkbox",
@@ -5847,12 +5863,22 @@ workspace_data: "${base64WorkspaceData}"
                         "type": "input_value",
                         "name": "MAX_HEALTH",
                         "check": "Number"
+                    },
+                    {
+                        "type": "field_checkbox",
+                        "name": "SHOW_TIMER",
+                        "checked": false
+                    },
+                    {
+                        "type": "input_value",
+                        "name": "TIMER_DURATION",
+                        "check": "Number"
                     }
                 ],
                 "previousStatement": null,
                 "nextStatement": null,
                 "colour": "#2196F3",
-                "tooltip": "Displays an automatic floating HUD overlay for score and health."
+                "tooltip": "Displays an automatic floating HUD overlay for score, health, and round timer."
             },
             {
                 "type": "game_over",
@@ -5873,6 +5899,58 @@ workspace_data: "${base64WorkspaceData}"
                 "nextStatement": null,
                 "colour": "#FF5722",
                 "tooltip": "Triggers a game over or victory screen with a summary."
+            },
+            {
+                "type": "game_set_timer",
+                "message0": "set timer duration to %1 seconds auto start %2",
+                "args0": [
+                    {
+                        "type": "input_value",
+                        "name": "DURATION",
+                        "check": "Number"
+                    },
+                    {
+                        "type": "field_checkbox",
+                        "name": "AUTO_START",
+                        "checked": true
+                    }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": "#FF5722",
+                "tooltip": "Sets the game round timer duration in seconds."
+            },
+            {
+                "type": "game_get_timer",
+                "message0": "game timer remaining",
+                "output": "Number",
+                "colour": "#FF5722",
+                "tooltip": "Returns remaining game timer seconds."
+            },
+            {
+                "type": "game_start_timer",
+                "message0": "start game timer",
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": "#FF5722",
+                "tooltip": "Starts or resumes the game timer countdown."
+            },
+            {
+                "type": "when_timer_finished",
+                "message0": "when timer finishes %1 %2",
+                "args0": [
+                    {
+                        "type": "input_dummy"
+                    },
+                    {
+                        "type": "input_statement",
+                        "name": "DO"
+                    }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": "#FF5722",
+                "tooltip": "Triggers code when the game timer countdown reaches zero."
             }
         ]);
 
@@ -5967,13 +6045,34 @@ workspace_data: "${base64WorkspaceData}"
                 const showScore = block.getFieldValue('SHOW_SCORE') === 'TRUE';
                 const showHealth = block.getFieldValue('SHOW_HEALTH') === 'TRUE';
                 const maxHealth = generator.valueToCode(block, 'MAX_HEALTH', generator.ORDER_ATOMIC) || 100;
-                return `sceneManager.displayGameHUD(${showScore}, ${showHealth}, ${maxHealth});\n`;
+                const showTimer = block.getFieldValue('SHOW_TIMER') === 'TRUE';
+                const timerDuration = generator.valueToCode(block, 'TIMER_DURATION', generator.ORDER_ATOMIC) || 60;
+                return `sceneManager.displayGameHUD(${showScore}, ${showHealth}, ${maxHealth}, ${showTimer}, ${timerDuration});\n`;
             };
 
             javascript.javascriptGenerator.forBlock['game_over'] = function (block, generator) {
                 const isWin = block.getFieldValue('IS_WIN') === 'TRUE';
                 const message = generator.valueToCode(block, 'MESSAGE', generator.ORDER_ATOMIC) || "''";
                 return `sceneManager.triggerGameOver(${isWin}, ${message});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['game_set_timer'] = function (block, generator) {
+                const duration = generator.valueToCode(block, 'DURATION', generator.ORDER_ATOMIC) || 60;
+                const autoStart = block.getFieldValue('AUTO_START') === 'TRUE';
+                return `sceneManager.setGameTimer(${duration}, ${autoStart});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['game_get_timer'] = function (block, generator) {
+                return ['sceneManager.getGameTimer()', generator.ORDER_FUNCTION_CALL];
+            };
+
+            javascript.javascriptGenerator.forBlock['game_start_timer'] = function (block, generator) {
+                return `sceneManager.startGameTimer();\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['when_timer_finished'] = function (block, generator) {
+                const branch = generator.statementToCode(block, 'DO');
+                return `sceneManager.onGameTimerFinish(() => {\n${branch}});\n`;
             };
 
             javascript.javascriptGenerator.forBlock['set_oit'] = function (block, generator) {

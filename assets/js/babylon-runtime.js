@@ -154,9 +154,13 @@
                 this.gameScore = 0;
                 this.gameHealth = 100;
                 this.maxGameHealth = 100;
+                this.gameTimer = 0;
+                this.gameTimerInitial = 0;
+                this.gameTimerRunning = false;
+                this.timerFinishCallbacks = [];
                 this.gameStateChangeCallbacks = [];
-                this.hudElements = { container: null, scoreText: null, healthBarFill: null, healthText: null };
-                this.hudConfig = { showScore: true, showHealth: true };
+                this.hudElements = { container: null, scoreText: null, healthBarFill: null, healthText: null, timerText: null };
+                this.hudConfig = { showScore: true, showHealth: true, showTimer: false };
                 this.flightAnchors = {
                     'shoulder': new BABYLON.Vector3(0, -2.5, 0),
                     'bottom': new BABYLON.Vector3(0, -2.5, 0),
@@ -3143,6 +3147,17 @@
                     const deltaTime = currentTime - lastTime;
                     lastTime = currentTime;
 
+                    if (this.gameTimerRunning && this.gameTimer > 0) {
+                        this.gameTimer = Math.max(0, this.gameTimer - (deltaTime / 1000));
+                        if (this.gameTimer === 0) {
+                            this.gameTimerRunning = false;
+                            for (const cb of this.timerFinishCallbacks) {
+                                try { cb(); } catch(e) { console.error("Error in timer finish callback:", e); }
+                            }
+                        }
+                        this._updateGameHUD();
+                    }
+
                     // Reset movement direction at the start of the frame
                     this.moveDirection.set(0, 0, 0);
 
@@ -3343,11 +3358,14 @@
                 this.gameState = 'start';
                 this.gameScore = 0;
                 this.gameHealth = 100;
+                this.gameTimer = 0;
+                this.gameTimerRunning = false;
+                this.timerFinishCallbacks = [];
                 this.gameStateChangeCallbacks = [];
                 if (this.hudElements && this.hudElements.container) {
                     try { this.hudElements.container.dispose(); } catch(e) {}
                 }
-                this.hudElements = { container: null, scoreText: null, healthBarFill: null, healthText: null };
+                this.hudElements = { container: null, scoreText: null, healthBarFill: null, healthText: null, timerText: null };
 
                 // Clean up PeerJS multiplayer connections
                 this.disconnectPeer();
@@ -3586,7 +3604,32 @@
                 return this.gameHealth || 0;
             }
 
-            displayGameHUD(showScore = true, showHealth = true, maxHealth = 100) {
+            setGameTimer(duration, autoStart = true) {
+                this.gameTimer = Math.max(0, Number(duration) || 0);
+                this.gameTimerInitial = this.gameTimer;
+                this.gameTimerRunning = !!autoStart;
+                this._updateGameHUD();
+            }
+
+            getGameTimer() {
+                return Math.max(0, Math.ceil(this.gameTimer || 0));
+            }
+
+            startGameTimer() {
+                this.gameTimerRunning = true;
+            }
+
+            pauseGameTimer() {
+                this.gameTimerRunning = false;
+            }
+
+            onGameTimerFinish(callback) {
+                if (typeof callback === 'function') {
+                    this.timerFinishCallbacks.push(callback);
+                }
+            }
+
+            displayGameHUD(showScore = true, showHealth = true, maxHealth = 100, showTimer = false, timerDuration = 60) {
                 this.maxGameHealth = Number(maxHealth) || 100;
                 if (this.gameHealth === undefined || this.gameHealth === null) {
                     this.gameHealth = this.maxGameHealth;
@@ -3594,7 +3637,14 @@
                 if (this.gameScore === undefined) {
                     this.gameScore = 0;
                 }
-                this.hudConfig = { showScore: !!showScore, showHealth: !!showHealth };
+                if (showTimer) {
+                    if (!this.gameTimer || this.gameTimer === 0) {
+                        this.gameTimer = Number(timerDuration) || 60;
+                        this.gameTimerInitial = this.gameTimer;
+                        this.gameTimerRunning = true;
+                    }
+                }
+                this.hudConfig = { showScore: !!showScore, showHealth: !!showHealth, showTimer: !!showTimer };
                 this._createOrUpdateGameHUD();
             }
 
@@ -3659,6 +3709,23 @@
                     this.hudElements.healthText = healthText;
                 }
 
+                if (this.hudConfig && this.hudConfig.showTimer) {
+                    const timerBlock = new BABYLON.GUI.TextBlock('game_hud_timer_text');
+                    const totalSecs = Math.max(0, Math.ceil(this.gameTimer || 0));
+                    const mins = Math.floor(totalSecs / 60);
+                    const secs = Math.floor(totalSecs % 60);
+                    timerBlock.text = `Time: ${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+                    timerBlock.color = "#00E5FF";
+                    timerBlock.fontSize = 20;
+                    timerBlock.fontWeight = "bold";
+                    timerBlock.textHorizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+                    timerBlock.height = "35px";
+                    timerBlock.shadowColor = "black";
+                    timerBlock.shadowBlur = 4;
+                    container.addControl(timerBlock);
+                    this.hudElements.timerText = timerBlock;
+                }
+
                 this.uiManager.advancedTexture.addControl(container);
                 this.hudElements.container = container;
             }
@@ -3673,6 +3740,12 @@
                     this.hudElements.healthBarFill.width = (pct / 100 * 216) + "px";
                     this.hudElements.healthBarFill.background = pct > 50 ? "#4CAF50" : (pct > 25 ? "#FF9800" : "#F44336");
                     this.hudElements.healthText.text = `HP: ${this.gameHealth || 0}/${this.maxGameHealth || 100}`;
+                }
+                if (this.hudElements.timerText) {
+                    const totalSecs = Math.max(0, Math.ceil(this.gameTimer || 0));
+                    const mins = Math.floor(totalSecs / 60);
+                    const secs = Math.floor(totalSecs % 60);
+                    this.hudElements.timerText.text = `Time: ${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
                 }
             }
 
