@@ -429,6 +429,9 @@
                     });
                     delete this.pendingObjectEvents[logicalName];
                 }
+
+                this.processPendingClickHandlers();
+                this.processPendingCollisions();
             }
 
             _normalizeAndCenter(wrapper, importedRoots) {
