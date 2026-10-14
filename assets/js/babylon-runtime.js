@@ -158,6 +158,7 @@
                 this.gameTimerInitial = 0;
                 this.gameTimerRunning = false;
                 this.timerFinishCallbacks = [];
+                this.timerManager = new TimerManager(this);
                 this.gameStateChangeCallbacks = [];
                 this.hudElements = { container: null, scoreText: null, healthBarFill: null, healthText: null, timerText: null };
                 this.hudConfig = { showScore: true, showHealth: true, showTimer: false };
@@ -3158,6 +3159,10 @@
                         this._updateGameHUD();
                     }
 
+                    if (this.timerManager) {
+                        this.timerManager.update(deltaTime / 1000);
+                    }
+
                     // Reset movement direction at the start of the frame
                     this.moveDirection.set(0, 0, 0);
 
@@ -3361,6 +3366,9 @@
                 this.gameTimer = 0;
                 this.gameTimerRunning = false;
                 this.timerFinishCallbacks = [];
+                if (this.timerManager) {
+                    this.timerManager.clear();
+                }
                 this.gameStateChangeCallbacks = [];
                 if (this.hudElements && this.hudElements.container) {
                     try { this.hudElements.container.dispose(); } catch(e) {}
@@ -3602,6 +3610,18 @@
 
             getGameHealth() {
                 return this.gameHealth || 0;
+            }
+
+            createTimer(duration = 60, autoStart = true) {
+                if (!this.timerManager) {
+                    this.timerManager = new TimerManager(this);
+                }
+                const timer = this.timerManager.createTimer(duration, autoStart);
+                if (!this.gameTimer || this.gameTimer === 0) {
+                    this.gameTimer = timer.initialDuration;
+                    this.gameTimerRunning = timer.isRunning;
+                }
+                return timer;
             }
 
             setGameTimer(duration, autoStart = true) {
@@ -4743,6 +4763,110 @@
             }
         }
 
+
+    class Timer {
+        constructor(duration = 60, autoStart = true, sceneManager = null) {
+            this.id = 'timer_' + Math.random().toString(36).substr(2, 9);
+            this.initialDuration = Number(duration) || 0;
+            this.remaining = this.initialDuration;
+            this.isRunning = !!autoStart;
+            this.isFinished = false;
+            this.sceneManager = sceneManager;
+            this.onFinishCallbacks = [];
+        }
+
+        start() {
+            this.isRunning = true;
+            this.isFinished = false;
+            return this;
+        }
+
+        pause() {
+            this.isRunning = false;
+            return this;
+        }
+
+        reset(duration = null, autoStart = null) {
+            if (duration !== null && duration !== undefined) {
+                this.initialDuration = Number(duration) || 0;
+            }
+            this.remaining = this.initialDuration;
+            this.isFinished = false;
+            if (autoStart !== null && autoStart !== undefined) {
+                this.isRunning = !!autoStart;
+            } else {
+                this.isRunning = true;
+            }
+            if (this.sceneManager) {
+                this.sceneManager._updateGameHUD();
+            }
+            return this;
+        }
+
+        update(dt) {
+            if (!this.isRunning || this.isFinished) return;
+
+            this.remaining = Math.max(0, this.remaining - dt);
+
+            if (this.remaining <= 0) {
+                this.remaining = 0;
+                this.isRunning = false;
+                this.isFinished = true;
+                for (const cb of this.onFinishCallbacks) {
+                    try { cb(); } catch(e) { console.error("Error in timer finish callback:", e); }
+                }
+            }
+
+            if (this.sceneManager) {
+                this.sceneManager._updateGameHUD();
+            }
+        }
+
+        getRemaining() {
+            return Math.max(0, Math.ceil(this.remaining));
+        }
+
+        onFinish(callback) {
+            if (typeof callback === 'function') {
+                this.onFinishCallbacks.push(callback);
+            }
+            return this;
+        }
+
+        valueOf() {
+            return this.getRemaining();
+        }
+
+        toString() {
+            return String(this.getRemaining());
+        }
+    }
+
+    class TimerManager {
+        constructor(sceneManager) {
+            this.sceneManager = sceneManager;
+            this.timers = [];
+        }
+
+        createTimer(duration = 60, autoStart = true) {
+            const timer = new Timer(duration, autoStart, this.sceneManager);
+            this.timers.push(timer);
+            return timer;
+        }
+
+        update(dt) {
+            for (const timer of this.timers) {
+                timer.update(dt);
+            }
+        }
+
+        clear() {
+            this.timers = [];
+        }
+    }
+
+    global.Timer = Timer;
+    global.TimerManager = TimerManager;
 
     if (typeof global.EngineRuntime !== 'undefined' && global.EngineRuntime.register) {
         global.EngineRuntime.register('babylon', BabylonSceneManager);

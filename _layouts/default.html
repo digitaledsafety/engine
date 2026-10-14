@@ -2212,6 +2212,10 @@ workspace_data: "${base64WorkspaceData}"
                         },
                         {
                             kind: 'block',
+                            type: 'create_timer',
+                        },
+                        {
+                            kind: 'block',
                             type: 'set_timer',
                         },
                         {
@@ -5901,9 +5905,33 @@ workspace_data: "${base64WorkspaceData}"
                 "tooltip": "Triggers a game over or victory screen with a summary."
             },
             {
-                "type": "set_timer",
-                "message0": "set timer duration to %1 seconds auto start %2",
+                "type": "create_timer",
+                "message0": "create timer duration %1 s auto start %2",
                 "args0": [
+                    {
+                        "type": "input_value",
+                        "name": "DURATION",
+                        "check": "Number"
+                    },
+                    {
+                        "type": "field_checkbox",
+                        "name": "AUTO_START",
+                        "checked": true
+                    }
+                ],
+                "output": "Timer",
+                "colour": "#FF5722",
+                "tooltip": "Creates a timer instance that can be stored in a variable."
+            },
+            {
+                "type": "set_timer",
+                "message0": "set timer %1 duration to %2 seconds auto start %3",
+                "args0": [
+                    {
+                        "type": "input_value",
+                        "name": "TIMER",
+                        "check": "Timer"
+                    },
                     {
                         "type": "input_value",
                         "name": "DURATION",
@@ -5918,27 +5946,46 @@ workspace_data: "${base64WorkspaceData}"
                 "previousStatement": null,
                 "nextStatement": null,
                 "colour": "#FF5722",
-                "tooltip": "Sets the game round timer duration in seconds."
+                "tooltip": "Sets or resets the duration of a timer."
             },
             {
                 "type": "get_timer",
-                "message0": "timer remaining",
+                "message0": "remaining time of %1",
+                "args0": [
+                    {
+                        "type": "input_value",
+                        "name": "TIMER",
+                        "check": "Timer"
+                    }
+                ],
                 "output": "Number",
                 "colour": "#FF5722",
-                "tooltip": "Returns remaining game timer seconds."
+                "tooltip": "Returns remaining seconds of specified timer."
             },
             {
                 "type": "start_timer",
-                "message0": "start timer",
+                "message0": "start timer %1",
+                "args0": [
+                    {
+                        "type": "input_value",
+                        "name": "TIMER",
+                        "check": "Timer"
+                    }
+                ],
                 "previousStatement": null,
                 "nextStatement": null,
                 "colour": "#FF5722",
-                "tooltip": "Starts or resumes the game timer countdown."
+                "tooltip": "Starts or resumes a timer."
             },
             {
                 "type": "when_timer_finished",
-                "message0": "when timer finishes %1 %2",
+                "message0": "when timer %1 finishes %2 do %3",
                 "args0": [
+                    {
+                        "type": "input_value",
+                        "name": "TIMER",
+                        "check": "Timer"
+                    },
                     {
                         "type": "input_dummy"
                     },
@@ -5947,10 +5994,9 @@ workspace_data: "${base64WorkspaceData}"
                         "name": "DO"
                     }
                 ],
-                "previousStatement": null,
                 "nextStatement": null,
-                "colour": "#FF5722",
-                "tooltip": "Triggers code when the game timer countdown reaches zero."
+                "style": "event_blocks",
+                "tooltip": "Executes code when the specified timer finishes."
             }
         ]);
 
@@ -6056,23 +6102,33 @@ workspace_data: "${base64WorkspaceData}"
                 return `sceneManager.triggerGameOver(${isWin}, ${message});\n`;
             };
 
-            javascript.javascriptGenerator.forBlock['set_timer'] = function (block, generator) {
+            javascript.javascriptGenerator.forBlock['create_timer'] = function (block, generator) {
                 const duration = generator.valueToCode(block, 'DURATION', generator.ORDER_ATOMIC) || 60;
                 const autoStart = block.getFieldValue('AUTO_START') === 'TRUE';
-                return `sceneManager.setGameTimer(${duration}, ${autoStart});\n`;
+                return [`sceneManager.createTimer(${duration}, ${autoStart})`, generator.ORDER_FUNCTION_CALL];
+            };
+
+            javascript.javascriptGenerator.forBlock['set_timer'] = function (block, generator) {
+                const timer = generator.valueToCode(block, 'TIMER', generator.ORDER_ATOMIC) || 'null';
+                const duration = generator.valueToCode(block, 'DURATION', generator.ORDER_ATOMIC) || 60;
+                const autoStart = block.getFieldValue('AUTO_START') === 'TRUE';
+                return `if (${timer}) { ${timer}.reset(${duration}, ${autoStart}); } else { sceneManager.setGameTimer(${duration}, ${autoStart}); }\n`;
             };
 
             javascript.javascriptGenerator.forBlock['get_timer'] = function (block, generator) {
-                return ['sceneManager.getGameTimer()', generator.ORDER_FUNCTION_CALL];
+                const timer = generator.valueToCode(block, 'TIMER', generator.ORDER_ATOMIC) || 'null';
+                return [`(${timer} ? ${timer}.getRemaining() : sceneManager.getGameTimer())`, generator.ORDER_CONDITIONAL];
             };
 
             javascript.javascriptGenerator.forBlock['start_timer'] = function (block, generator) {
-                return `sceneManager.startGameTimer();\n`;
+                const timer = generator.valueToCode(block, 'TIMER', generator.ORDER_ATOMIC) || 'null';
+                return `if (${timer}) { ${timer}.start(); } else { sceneManager.startGameTimer(); }\n`;
             };
 
             javascript.javascriptGenerator.forBlock['when_timer_finished'] = function (block, generator) {
+                const timer = generator.valueToCode(block, 'TIMER', generator.ORDER_ATOMIC) || 'null';
                 const branch = generator.statementToCode(block, 'DO');
-                return `sceneManager.onGameTimerFinish(() => {\n${branch}});\n`;
+                return `if (${timer}) { ${timer}.onFinish(() => {\n${branch}}); } else { sceneManager.onGameTimerFinish(() => {\n${branch}}); }\n`;
             };
 
             javascript.javascriptGenerator.forBlock['set_oit'] = function (block, generator) {
