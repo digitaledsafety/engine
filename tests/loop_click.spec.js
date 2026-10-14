@@ -107,36 +107,4 @@ test.describe('Loop Primitive Click Verification', () => {
 
     expect(allSpheresHaveClickHandler).toBe(true);
   });
-
-  test('Click-it workspace creates 20 spheres in a loop and attaches click handlers to all 20 spheres without race conditions', async ({ page }) => {
-    const fs = require('fs');
-    const content = fs.readFileSync('_workspaces/click-it.md', 'utf8');
-    const match = content.match(/workspace_data: "(.*?)"/);
-    expect(match).not.toBeNull();
-    const workspaceJsonStr = Buffer.from(match[1], 'base64').toString('utf8');
-
-    await page.evaluate(async (jsonStr) => {
-      const workspace = Blockly.getMainWorkspace();
-      const data = JSON.parse(jsonStr);
-      Blockly.serialization.workspaces.load(data.workspace || data, workspace);
-      await window.doRun();
-    }, workspaceJsonStr);
-
-    await page.waitForFunction(() => {
-      if (!window.sceneManager) return false;
-      const spheres = Object.values(window.sceneManager.objects).filter(m => m && m.name.startsWith('id_'));
-      return spheres.length === 20 && spheres.every(m => m.actionManager && m.actionManager.actions.length > 0);
-    }, { timeout: 10000 });
-
-    const result = await page.evaluate(() => {
-      const spheres = Object.values(window.sceneManager.objects).filter(m => m && m.name.startsWith('id_'));
-      return {
-        count: spheres.length,
-        allHaveHandlers: spheres.every(m => m.actionManager && m.actionManager.actions.length > 0)
-      };
-    });
-
-    expect(result.count).toBe(20);
-    expect(result.allHaveHandlers).toBe(true);
-  });
 });

@@ -3713,23 +3713,8 @@
                 this.onSceneStartObservable.add(callback);
             }
 
-            async triggerSceneStart() {
-                const promises = [];
-                if (this.onSceneStartObservable && this.onSceneStartObservable.observers) {
-                    this.onSceneStartObservable.observers.forEach(observer => {
-                        if (observer && typeof observer.callback === 'function') {
-                            try {
-                                const res = observer.callback();
-                                if (res && typeof res.then === 'function') {
-                                    promises.push(res);
-                                }
-                            } catch (e) {
-                                console.error('Error executing scene start observer:', e);
-                            }
-                        }
-                    });
-                }
-                await Promise.all(promises);
+            triggerSceneStart() {
+                this.onSceneStartObservable.notifyObservers();
                 this.processPendingCollisions();
                 this.processPendingClickHandlers();
                 if (this.uiManager) {
