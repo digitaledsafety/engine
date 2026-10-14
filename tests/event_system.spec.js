@@ -399,4 +399,48 @@ test.describe('Event System and Observables Functionality', () => {
       return await page.evaluate(() => Array.from(window.frameMeshes));
     }, { timeout: 10000 }).toEqual(expect.arrayContaining(['box1', 'box2']));
   });
+
+  test('onClick applies to all items in list including composite parent-child meshes and nested lists', async ({ page }) => {
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => window.sceneManager && window.workspace);
+
+    await page.evaluate(() => {
+      window.clickedItems = [];
+
+      // Create a primitive box
+      const box = window.sceneManager.createBox('simple_box', 1, '#FF0000', 0, 0, 0);
+
+      // Create a composite particle cube mesh (has root node and child particle sub-meshes)
+      const particleCube = window.sceneManager.createParticleCube('p_cube', 2, 0, 0);
+
+      // Create a sphere
+      const sphere = window.sceneManager.createSphere('simple_sphere', 1, '#0000FF', 4, 0, 0);
+
+      // Nested target list
+      const mixedList = [box, [particleCube, sphere]];
+
+      window.sceneManager.onClick(() => mixedList, (item) => {
+        window.clickedItems.push(item.name);
+      });
+
+      window.sceneManager.processPendingClickHandlers();
+
+      // Trigger click on primitive box
+      box.actionManager.processTrigger(BABYLON.ActionManager.OnPickTrigger);
+
+      // Trigger click on a child mesh of the particle cube composite object
+      const particleChildren = particleCube.getChildMeshes();
+      if (particleChildren.length > 0) {
+        particleChildren[0].actionManager.processTrigger(BABYLON.ActionManager.OnPickTrigger);
+      } else {
+        particleCube.actionManager.processTrigger(BABYLON.ActionManager.OnPickTrigger);
+      }
+
+      // Trigger click on simple sphere
+      sphere.actionManager.processTrigger(BABYLON.ActionManager.OnPickTrigger);
+    });
+
+    const clicked = await page.evaluate(() => window.clickedItems);
+    expect(clicked).toEqual(['simple_box', 'p_cube_root', 'simple_sphere']);
+  });
 });

@@ -6296,7 +6296,7 @@ if (${name}) {
                 const x = generator.valueToCode(block, 'X', generator.ORDER_ATOMIC) || 0;
                 const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || 5;
                 const z = generator.valueToCode(block, 'Z', generator.ORDER_ATOMIC) || -10;
-                const code = `sceneManager.createCamera('${type}', 'id_' + Blockly.utils.idGenerator.genUid(), ${x}, ${y}, ${z})`;
+                const code = `sceneManager.createCamera('${type}', 'id_' + (typeof Blockly !== 'undefined' && Blockly.utils && Blockly.utils.idGenerator ? Blockly.utils.idGenerator.genUid() : Math.random().toString(36).substring(2, 11)), ${x}, ${y}, ${z})`;
                 return [code, generator.ORDER_FUNCTION_CALL];
             };
 
@@ -6333,10 +6333,9 @@ if (${name}) {
             };
 
             javascript.javascriptGenerator.forBlock['create_ground'] = function (block, generator) {
-                const name = javascript.javascriptGenerator.nameDB_.getDistinctName(Blockly.utils.idGenerator.genUid(), Blockly.Variables.NameType);
                 const width = generator.valueToCode(block, 'WIDTH', generator.ORDER_ATOMIC) || 10;
                 const height = generator.valueToCode(block, 'HEIGHT', generator.ORDER_ATOMIC) || 10;
-                const code = `sceneManager.createGround('${name}', ${width}, ${height});\n`;
+                const code = `sceneManager.createGround('id_' + (typeof Blockly !== 'undefined' && Blockly.utils && Blockly.utils.idGenerator ? Blockly.utils.idGenerator.genUid() : Math.random().toString(36).substring(2, 11)), ${width}, ${height});\n`;
                 return [code, generator.ORDER_ATOMIC];
             };
 
@@ -6365,7 +6364,7 @@ if (${name}) {
                 else if (type === 'capsule') method = 'createCapsule';
                 else if (type === 'particle_cube') method = 'createParticleCube';
 
-                const code = `sceneManager.${method}('id_' + Blockly.utils.idGenerator.genUid(), ${x}, ${y}, ${z})`;
+                const code = `sceneManager.${method}('id_' + (typeof Blockly !== 'undefined' && Blockly.utils && Blockly.utils.idGenerator ? Blockly.utils.idGenerator.genUid() : Math.random().toString(36).substring(2, 11)), ${x}, ${y}, ${z})`;
                 return [code, generator.ORDER_FUNCTION_CALL];
             };
 
@@ -6385,11 +6384,10 @@ if (${name}) {
             };
 
             javascript.javascriptGenerator.forBlock['create_sphere'] = function (block, generator) {
-                const name = javascript.javascriptGenerator.nameDB_.getDistinctName(Blockly.utils.idGenerator.genUid(), Blockly.Variables.NameType);
                 const x = generator.valueToCode(block, 'X', generator.ORDER_ATOMIC) || 0;
                 const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || 0;
                 const z = generator.valueToCode(block, 'Z', generator.ORDER_ATOMIC) || 0;
-                const code = `sceneManager.createSphere('${name}', ${x}, ${y}, ${z})`;
+                const code = `sceneManager.createSphere('id_' + (typeof Blockly !== 'undefined' && Blockly.utils && Blockly.utils.idGenerator ? Blockly.utils.idGenerator.genUid() : Math.random().toString(36).substring(2, 11)), ${x}, ${y}, ${z})`;
                 return [code, generator.ORDER_ATOMIC];
             };
 
@@ -6443,7 +6441,7 @@ if (${name}) {
                 const x = generator.valueToCode(block, 'X', generator.ORDER_ATOMIC) || 0;
                 const y = generator.valueToCode(block, 'Y', generator.ORDER_ATOMIC) || 0;
                 const z = generator.valueToCode(block, 'Z', generator.ORDER_ATOMIC) || 0;
-                const code = `sceneManager.createAdvancedLight('${type}', 'id_' + Blockly.utils.idGenerator.genUid(), ${x}, ${y}, ${z}, 0, -1, 0)`;
+                const code = `sceneManager.createAdvancedLight('${type}', 'id_' + (typeof Blockly !== 'undefined' && Blockly.utils && Blockly.utils.idGenerator ? Blockly.utils.idGenerator.genUid() : Math.random().toString(36).substring(2, 11)), ${x}, ${y}, ${z}, 0, -1, 0)`;
                 return [code, generator.ORDER_FUNCTION_CALL];
             };
 
@@ -6732,10 +6730,10 @@ if (${name}) {
                     left = generator.valueToCode(block, 'LEFT', generator.ORDER_ATOMIC) || "'0px'";
                 }
 
-                const name = `'gui_' + Blockly.utils.idGenerator.genUid()`;
+                const nameExpr = `'gui_' + (typeof Blockly !== 'undefined' && Blockly.utils && Blockly.utils.idGenerator ? Blockly.utils.idGenerator.genUid() : Math.random().toString(36).substring(2, 11))`;
                 const options = `{ horizontalAlignment: ${hAlign}, verticalAlignment: ${vAlign}, top: ${top}, left: ${left} }`;
 
-                const code = `sceneManager.uiManager.createText(${name}, ${text}, ${options})`;
+                const code = `sceneManager.uiManager.createText(${nameExpr}, ${text}, ${options})`;
                 return [code, generator.ORDER_FUNCTION_CALL];
             };
 
@@ -6764,10 +6762,10 @@ if (${name}) {
                     left = generator.valueToCode(block, 'LEFT', generator.ORDER_ATOMIC) || "'0px'";
                 }
 
-                const name = `'gui_' + Blockly.utils.idGenerator.genUid()`;
+                const nameExpr = `'gui_' + (typeof Blockly !== 'undefined' && Blockly.utils && Blockly.utils.idGenerator ? Blockly.utils.idGenerator.genUid() : Math.random().toString(36).substring(2, 11))`;
                 const options = `{ horizontalAlignment: ${hAlign}, verticalAlignment: ${vAlign}, top: ${top}, left: ${left} }`;
 
-                const code = `sceneManager.uiManager.createInput(${name}, ${options})`;
+                const code = `sceneManager.uiManager.createInput(${nameExpr}, ${options})`;
                 return [code, generator.ORDER_FUNCTION_CALL];
             };
 
@@ -6779,22 +6777,22 @@ if (${name}) {
 
             javascript.javascriptGenerator.forBlock['gui_create_button'] = function (block, generator) {
                 const text = generator.valueToCode(block, 'TEXT', generator.ORDER_ATOMIC) || "''";
-                const name = `'gui_' + Blockly.utils.idGenerator.genUid()`;
-                const code = `sceneManager.uiManager.createButton(${name}, ${text})`;
+                const nameExpr = `'gui_' + (typeof Blockly !== 'undefined' && Blockly.utils && Blockly.utils.idGenerator ? Blockly.utils.idGenerator.genUid() : Math.random().toString(36).substring(2, 11))`;
+                const code = `sceneManager.uiManager.createButton(${nameExpr}, ${text})`;
                 return [code, generator.ORDER_FUNCTION_CALL];
             };
 
             javascript.javascriptGenerator.forBlock['gui_create_image_from_url'] = function (block, generator) {
                 const url = generator.valueToCode(block, 'URL', generator.ORDER_ATOMIC) || "''";
-                const name = `'gui_' + Blockly.utils.idGenerator.genUid()`;
-                const code = `sceneManager.uiManager.createImage(${name}, ${url})`;
+                const nameExpr = `'gui_' + (typeof Blockly !== 'undefined' && Blockly.utils && Blockly.utils.idGenerator ? Blockly.utils.idGenerator.genUid() : Math.random().toString(36).substring(2, 11))`;
+                const code = `sceneManager.uiManager.createImage(${nameExpr}, ${url})`;
                 return [code, generator.ORDER_FUNCTION_CALL];
             };
 
             javascript.javascriptGenerator.forBlock['gui_create_image_from_asset'] = function (block, generator) {
                 const assetName = generator.valueToCode(block, 'ASSET', generator.ORDER_ATOMIC) || "''";
-                const name = `'gui_' + Blockly.utils.idGenerator.genUid()`;
-                const code = `await sceneManager.uiManager.createImageFromAsset(${name}, ${assetName})`;
+                const nameExpr = `'gui_' + (typeof Blockly !== 'undefined' && Blockly.utils && Blockly.utils.idGenerator ? Blockly.utils.idGenerator.genUid() : Math.random().toString(36).substring(2, 11))`;
+                const code = `await sceneManager.uiManager.createImageFromAsset(${nameExpr}, ${assetName})`;
                 return [code, generator.ORDER_AWAIT];
             };
 
