@@ -429,9 +429,6 @@
                     });
                     delete this.pendingObjectEvents[logicalName];
                 }
-
-                this.processPendingClickHandlers();
-                this.processPendingCollisions();
             }
 
             _normalizeAndCenter(wrapper, importedRoots) {
@@ -1462,30 +1459,23 @@
                 const remaining = [];
                 for (const item of this.pendingClickHandlers) {
                     const resolved = this._resolveTarget(item.target);
-                    const rawTargets = Array.isArray(resolved) ? resolved : [resolved];
-                    const targets = rawTargets.flat(Infinity);
+                    const targets = Array.isArray(resolved) ? resolved : [resolved];
                     let allResolved = targets.length > 0;
 
                     for (const subTarget of targets) {
                         const mesh = this._getMesh(subTarget);
-                        if (mesh && !mesh.isDisposed()) {
-                            const subMeshes = [mesh];
-                            if (typeof mesh.getChildMeshes === 'function') {
-                                subMeshes.push(...mesh.getChildMeshes());
+                        if (mesh) {
+                            if (!mesh._attachedClickCallbacks) {
+                                mesh._attachedClickCallbacks = new Set();
                             }
-                            for (const m of subMeshes) {
-                                if (!m._attachedClickCallbacks) {
-                                    m._attachedClickCallbacks = new Set();
+                            if (!mesh._attachedClickCallbacks.has(item.callback)) {
+                                mesh._attachedClickCallbacks.add(item.callback);
+                                if (!mesh.actionManager) {
+                                    mesh.actionManager = new BABYLON.ActionManager(this.scene);
                                 }
-                                if (!m._attachedClickCallbacks.has(item.callback)) {
-                                    m._attachedClickCallbacks.add(item.callback);
-                                    if (!m.actionManager) {
-                                        m.actionManager = new BABYLON.ActionManager(this.scene);
-                                    }
-                                    m.actionManager.registerAction(
-                                        new BABYLON.ExecuteCodeAction(BABYLON.ActionManager.OnPickTrigger, () => item.callback(mesh))
-                                    );
-                                }
+                                mesh.actionManager.registerAction(
+                                    new BABYLON.ExecuteCodeAction(BABYLON.ActionManager.OnPickTrigger, () => item.callback(mesh))
+                                );
                             }
                         } else {
                             allResolved = false;
@@ -3233,8 +3223,7 @@
                             return;
                         }
                         const resolved = this._resolveTarget(task.targetGetter);
-                        const rawTargets = Array.isArray(resolved) ? resolved : [task.targetMesh || resolved];
-                        const targets = rawTargets.flat(Infinity);
+                        const targets = Array.isArray(resolved) ? resolved : [task.targetMesh || resolved];
                         targets.forEach(subTarget => {
                             const targetMesh = this._getMesh(subTarget);
                             if (targetMesh && !targetMesh.isDisposed() && typeof task.func === 'function') {
@@ -3750,11 +3739,10 @@
                     this.swipeCallbacks[dir].forEach(item => {
                         try {
                             const resolved = this._resolveTarget(item.target);
-                            const rawTargets = Array.isArray(resolved) ? resolved : [resolved];
-                            const targets = rawTargets.flat(Infinity);
+                            const targets = Array.isArray(resolved) ? resolved : [resolved];
                             targets.forEach(subTarget => {
                                 const mesh = this._getMesh(subTarget);
-                                if (mesh && !mesh.isDisposed()) {
+                                if (mesh) {
                                     item.callback(mesh);
                                 }
                             });
@@ -3769,7 +3757,7 @@
             onObjectEvent(target, eventName, callback) {
                 const resolved = this._resolveTarget(target);
                 if (Array.isArray(resolved)) {
-                    resolved.flat(Infinity).forEach(subTarget => this.onObjectEvent(subTarget, eventName, callback));
+                    resolved.forEach(subTarget => this.onObjectEvent(subTarget, eventName, callback));
                     return;
                 }
 
@@ -3818,12 +3806,11 @@
                     const remaining = [];
                     for (const item of this.pendingLazyObjectEvents) {
                         const resolved = this._resolveTarget(item.targetGetter);
-                        const rawTargets = Array.isArray(resolved) ? resolved : [resolved];
-                        const targets = rawTargets.flat(Infinity);
+                        const targets = Array.isArray(resolved) ? resolved : [resolved];
                         let allResolved = targets.length > 0;
                         for (const subTarget of targets) {
                             const m = this._getMesh(subTarget);
-                            if (m && !m.isDisposed()) {
+                            if (m) {
                                 this.onObjectEvent(m, item.eventName, item.callback);
                             } else {
                                 allResolved = false;
@@ -3837,8 +3824,7 @@
                 }
 
                 const resolved = this._resolveTarget(target);
-                const rawTargets = Array.isArray(resolved) ? resolved : [resolved];
-                const targets = rawTargets.flat(Infinity);
+                const targets = Array.isArray(resolved) ? resolved : [resolved];
                 targets.forEach(subTarget => {
                     let targetMesh = this._getMesh(subTarget);
                     if (targetMesh && targetMesh.customObservables && targetMesh.customObservables[eventName]) {
