@@ -7159,7 +7159,7 @@ if (${name}) {
                 const AsyncFunction = Object.getPrototypeOf(async function () { }).constructor;
                 const userGeneratedCode = new AsyncFunction('sceneManager', 'assetManager', codeToRun);
                 await userGeneratedCode(sceneManager, assetManager);
-                sceneManager.triggerSceneStart();
+                await sceneManager.triggerSceneStart();
             } catch (error) {
                 console.error('Error executing code:', error);
             } finally {
