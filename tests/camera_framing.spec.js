@@ -44,4 +44,18 @@ test.describe('Camera Framing Functionality', () => {
     expect(result.targetZ).toBeCloseTo(-5);
     expect(result.radius).toBeGreaterThan(0);
   });
+
+  test('setCameraProperties updates active camera inertia and wheel precision', async ({ page }) => {
+    const result = await page.evaluate(async () => {
+      sceneManager.setCameraProperties(0.5, 25);
+      const camera = sceneManager.scene.activeCamera;
+      return {
+        inertia: camera.inertia,
+        wheelPrecision: camera.wheelPrecision
+      };
+    });
+
+    expect(result.inertia).toBe(0.5);
+    expect(result.wheelPrecision).toBe(25);
+  });
 });
