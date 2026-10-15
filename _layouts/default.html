@@ -7303,6 +7303,24 @@ if (${name}) {
             showPlayOverlay();
         }
 
+        function createSceneManagerInstance(canvas, runtimeType) {
+            const type = (runtimeType || '{{ page.runtime }}' || 'babylon').trim();
+            if (window.EngineRuntime && window.EngineRuntime.getRegistered(type)) {
+                return window.EngineRuntime.createRuntime(type, canvas);
+            } else if (typeof BabylonSceneManager !== 'undefined') {
+                const manager = new BabylonSceneManager(canvas);
+                if (window.EngineRuntime) {
+                    window.EngineRuntime.register('babylon', BabylonSceneManager);
+                    window.EngineRuntime.setActive(manager);
+                }
+                return manager;
+            } else {
+                const manager = new BaseRuntimeEngine(canvas);
+                if (window.EngineRuntime) window.EngineRuntime.setActive(manager);
+                return manager;
+            }
+        }
+
         async function doRun(code) {
             hidePlayOverlay();
             let codeToRun = code || generateCode();
@@ -7311,12 +7329,7 @@ if (${name}) {
                 sceneManager.dispose();
             }
             const activeRuntimeType = ('{{ page.runtime }}' || 'babylon').trim();
-            if (window.EngineRuntime && window.EngineRuntime.getRegistered(activeRuntimeType)) {
-                sceneManager = window.EngineRuntime.createRuntime(activeRuntimeType, canvas);
-            } else {
-                sceneManager = new BabylonSceneManager(canvas);
-                if (window.EngineRuntime) window.EngineRuntime.setActive(sceneManager);
-            }
+            sceneManager = createSceneManagerInstance(canvas, activeRuntimeType);
             window.sceneManager = sceneManager; // Expose for debugging and testing
 
             try {
@@ -7341,12 +7354,7 @@ if (${name}) {
         const assetManager = new AssetManager();
         window.assetManager = assetManager;
         const activeRuntimeType = ('{{ page.runtime }}' || 'babylon').trim();
-        if (window.EngineRuntime && window.EngineRuntime.getRegistered(activeRuntimeType)) {
-            window.sceneManager = window.EngineRuntime.createRuntime(activeRuntimeType, canvas);
-        } else {
-            window.sceneManager = new BabylonSceneManager(canvas);
-            if (window.EngineRuntime) window.EngineRuntime.setActive(window.sceneManager);
-        }
+        window.sceneManager = createSceneManagerInstance(canvas, activeRuntimeType);
         let sceneManager = window.sceneManager;
         const projectManager = new ProjectManager(assetManager, workspace, sceneManager);
         window.projectManager = projectManager;

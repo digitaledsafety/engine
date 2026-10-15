@@ -172,6 +172,51 @@
             this.setGameState(isWin ? 'VICTORY' : 'GAME_OVER');
         }
 
+        // --- Game Timer APIs ---
+
+        createTimer(duration = 60, autoStart = true) {
+            return {
+                duration: Number(duration) || 60,
+                isRunning: !!autoStart,
+                onFinish: (cb) => { if (typeof cb === 'function') cb(); },
+                start: () => {},
+                pause: () => {},
+                reset: () => {},
+                getTimeRemaining: () => 0
+            };
+        }
+
+        setGameTimer(duration, autoStart = true) {
+            this.gameTimer = Math.max(0, Number(duration) || 0);
+            this.gameTimerInitial = this.gameTimer;
+            this.gameTimerRunning = !!autoStart;
+        }
+
+        getGameTimer() {
+            return Math.max(0, Math.ceil(this.gameTimer || 0));
+        }
+
+        startGameTimer() {
+            this.gameTimerRunning = true;
+        }
+
+        pauseGameTimer() {
+            this.gameTimerRunning = false;
+        }
+
+        onGameTimerFinish(callback) {
+            if (!this.timerFinishCallbacks) {
+                this.timerFinishCallbacks = [];
+            }
+            if (typeof callback === 'function') {
+                this.timerFinishCallbacks.push(callback);
+            }
+        }
+
+        displayGameHUD(showScore = true, showHealth = true, maxHealth = 100, showTimer = false, timerDuration = 60) {
+            // Base implementation stub for HUD display
+        }
+
         // --- Abstract Methods to be implemented by Specific Runtimes (3D, 2D, Headless) ---
 
         createPrimitive(type, options = {}) {
