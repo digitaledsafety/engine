@@ -146,6 +146,7 @@
                     y: 0,
                     callbacks: []
                 };
+                this.screenCaptureListeners = [];
                 this.llmEndpoint = null;
                 this.llmApiKey = null;
 
@@ -2844,15 +2845,31 @@
                 }
             }
 
+            onScreenAnalyzed(callback) {
+                if (typeof callback === 'function') {
+                    if (!this.screenCaptureListeners) this.screenCaptureListeners = [];
+                    this.screenCaptureListeners.push(callback);
+                }
+            }
+
             async analyzeScreenFrame(prompt = 'Describe what is happening on screen') {
+                let result;
                 if (!this.screenCapture || !this.screenCapture.active || !this.screenCapture.lastFrameDataUrl) {
                     const fallbackText = (this.screenCapture && this.screenCapture.latestSubtitles) || this.speechTranscript || '';
                     const context = fallbackText ? `[Subtitles/Audio Context]: ${fallbackText}` : '[Screen state]: Screen capture not active or initializing.';
-                    return await this.queryCohostLLM(prompt, context);
+                    result = await this.queryCohostLLM(prompt, context);
+                } else {
+                    const frameContext = `[Screen Frame Captured] [Audio Subtitles]: ${this.screenCapture.latestSubtitles || this.speechTranscript || 'None'}`;
+                    result = await this.queryCohostLLM(prompt, frameContext);
                 }
 
-                const frameContext = `[Screen Frame Captured] [Audio Subtitles]: ${this.screenCapture.latestSubtitles || this.speechTranscript || 'None'}`;
-                return await this.queryCohostLLM(prompt, frameContext);
+                if (this.screenCaptureListeners && this.screenCaptureListeners.length > 0) {
+                    this.screenCaptureListeners.forEach(cb => {
+                        try { cb(result ? result.text : ''); } catch(e) { console.error('Error in onScreenAnalyzed callback:', e); }
+                    });
+                }
+
+                return result;
             }
 
             stopScreenCapture() {
@@ -3263,6 +3280,7 @@
                 this.stopScreenCapture();
                 this.stopObjectRecognition();
                 this.cursorState.callbacks = [];
+                this.screenCaptureListeners = [];
                 if (this.joystickManager) {
                     this.joystickManager.destroy();
                     this.joystickManager = null;
