@@ -2933,18 +2933,38 @@
                 let textResponse = "";
                 let tags = [];
 
-                if (this.llmEndpoint) {
+                const endpoint = this.llmEndpoint || 'https://ai.digitaleducationsafety.org/?prompt=';
+
+                if (endpoint) {
                     try {
-                        const res = await fetch(this.llmEndpoint, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                ...(this.llmApiKey ? { 'Authorization': `Bearer ${this.llmApiKey}` } : {})
-                            },
-                            body: JSON.stringify({ prompt: userPrompt, context: contextStr })
-                        });
-                        const data = await res.json();
-                        textResponse = data.response || data.text || "";
+                        let res;
+                        if (endpoint.includes('ai.digitaleducationsafety.org')) {
+                            const fullPrompt = contextStr ? `${userPrompt} (Context: ${contextStr})` : userPrompt;
+                            const baseUrl = endpoint.includes('?') ? endpoint : `${endpoint}?prompt=`;
+                            const targetUrl = baseUrl.endsWith('=') || baseUrl.endsWith('&')
+                                ? `${baseUrl}${encodeURIComponent(fullPrompt)}`
+                                : `${baseUrl}&prompt=${encodeURIComponent(fullPrompt)}`;
+                            const proxiedUrl = (typeof getProxiedUrl === 'function') ? getProxiedUrl(targetUrl) : targetUrl;
+                            res = await fetch(proxiedUrl);
+                        } else {
+                            res = await fetch(endpoint, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    ...(this.llmApiKey ? { 'Authorization': `Bearer ${this.llmApiKey}` } : {})
+                                },
+                                body: JSON.stringify({ prompt: userPrompt, context: contextStr })
+                            });
+                        }
+                        if (res && res.ok) {
+                            const contentType = res.headers.get('content-type') || '';
+                            if (contentType.includes('json')) {
+                                const data = await res.json();
+                                textResponse = data.response || data.text || data.reply || data.result || "";
+                            } else {
+                                textResponse = await res.text();
+                            }
+                        }
                     } catch (e) {
                         console.error('LLM endpoint query failed, falling back to natural response generator:', e);
                     }
