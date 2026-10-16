@@ -2933,6 +2933,19 @@
                 let textResponse = "";
                 let tags = [];
 
+                // Immediate loading feedback to keep avatar active & engaging during API latency
+                const thinkingQuips = [
+                    "🤔 Thinking...",
+                    "🔍 Analyzing stream context...",
+                    "⚡ Consulting AI brain...",
+                    "📡 Processing stream feed...",
+                    "💭 Formulating response..."
+                ];
+                const thinkingText = thinkingQuips[Math.floor(Math.random() * thinkingQuips.length)];
+                this.triggerActionTag('avatar', '[EMOTE_THINKING]');
+                this.showSpeechBubble('avatar', thinkingText, 0);
+                this.speakRetroVoice('', 1.8, 1.5);
+
                 const endpoint = this.llmEndpoint || 'https://ai.digitaleducationsafety.org/?prompt=';
 
                 if (endpoint) {
