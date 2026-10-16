@@ -2807,11 +2807,12 @@
                         canvasCtx: ctx,
                         intervalId: null,
                         lastFrameDataUrl: null,
-                        latestSubtitles: ''
+                        latestSubtitles: '',
+                        isAnalyzing: false
                     };
 
-                    const captureFrame = () => {
-                        if (!this.screenCapture.active || !video.videoWidth || !video.videoHeight) return;
+                    const captureFrame = async () => {
+                        if (!this.screenCapture || !this.screenCapture.active || !video.videoWidth || !video.videoHeight) return;
                         canvas.width = video.videoWidth;
                         canvas.height = video.videoHeight;
                         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
@@ -2819,6 +2820,19 @@
                             this.screenCapture.lastFrameDataUrl = canvas.toDataURL('image/jpeg', 0.6);
                         } catch (e) {
                             console.warn('Error capturing screen frame:', e);
+                        }
+
+                        if (!this.screenCapture.isAnalyzing && this.screenCaptureListeners && this.screenCaptureListeners.length > 0) {
+                            this.screenCapture.isAnalyzing = true;
+                            try {
+                                await this.analyzeScreenFrame();
+                            } catch (err) {
+                                console.warn('Error in automatic screen frame analysis:', err);
+                            } finally {
+                                if (this.screenCapture) {
+                                    this.screenCapture.isAnalyzing = false;
+                                }
+                            }
                         }
                     };
 
