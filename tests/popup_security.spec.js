@@ -218,8 +218,10 @@ test.describe('Engine Popup Security Validation', () => {
         xmlData: fn('data:text/xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIj8+'),
         jsData: fn('data:application/javascript;base64,YWxlcnQoMSk='),
         svgData: fn('data:image/svg+xml;utf8,<svg></svg>'),
+        shData: fn('data:application/x-sh,echo 1'),
         safeImageData: fn('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='),
-        safeAudioData: fn('data:audio/mp3;base64,SUQzBAAAAAAA')
+        safeAudioData: fn('data:audio/mp3;base64,SUQzBAAAAAAA'),
+        backslashProtoUrl: fn('\\\\tracking-pixel.com/image.png')
       };
     });
 
@@ -228,7 +230,9 @@ test.describe('Engine Popup Security Validation', () => {
     expect(result.xmlData).toBe(false);
     expect(result.jsData).toBe(false);
     expect(result.svgData).toBe(false);
+    expect(result.shData).toBe(false);
     expect(result.safeImageData).toBe(true);
     expect(result.safeAudioData).toBe(true);
+    expect(result.backslashProtoUrl).toBe(false);
   });
 });
