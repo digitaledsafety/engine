@@ -370,4 +370,34 @@ test.describe('Digital Co-Host Avatar ("Word") Verification', () => {
         expect(res.factCheckText).toBeTruthy();
         expect(res.updatedText).toBe('Block test speech');
     });
+
+    test('event_on_screen_analyzed block generation and event execution', async ({ page }) => {
+        await page.goto('/', { waitUntil: 'domcontentloaded' });
+
+        const result = await page.evaluate(async () => {
+            let receivedText = '';
+            const avatar = window.sceneManager.createBox('avatar', 0, 1, 0);
+
+            // Register event listener using onScreenAnalyzed
+            window.sceneManager.onScreenAnalyzed((text) => {
+                receivedText = text;
+                window.sceneManager.showSpeechBubble(avatar, text, 4);
+            });
+
+            // Trigger screen analysis
+            await window.sceneManager.analyzeScreenFrame('Describe screen');
+
+            const bubbleControl = window.sceneManager.uiManager.controls['speech_bubble_avatar'];
+
+            return {
+                receivedText,
+                hasBubble: !!bubbleControl,
+                bubbleText: bubbleControl ? bubbleControl.children[0].text : ''
+            };
+        });
+
+        expect(result.receivedText).toBeTruthy();
+        expect(result.hasBubble).toBe(true);
+        expect(result.bubbleText).toBe(result.receivedText);
+    });
 });

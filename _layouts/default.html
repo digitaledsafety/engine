@@ -1966,6 +1966,10 @@ workspace_data: "${base64WorkspaceData}"
                         },
                         {
                             kind: 'block',
+                            type: 'event_on_screen_analyzed',
+                        },
+                        {
+                            kind: 'block',
                             type: 'event_on_object_detected',
                         },
                         {
@@ -2391,6 +2395,7 @@ workspace_data: "${base64WorkspaceData}"
                     contents: [
                         { kind: 'block', type: 'start_screen_capture' },
                         { kind: 'block', type: 'analyze_screen_frame' },
+                        { kind: 'block', type: 'event_on_screen_analyzed' },
                         { kind: 'block', type: 'stop_screen_capture' },
                         { kind: 'block', type: 'event_on_object_detected' },
                         { kind: 'block', type: 'event_on_cursor_move' },
@@ -5567,6 +5572,23 @@ workspace_data: "${base64WorkspaceData}"
                 "helpUrl": ""
             },
             {
+                "type": "event_on_screen_analyzed",
+                "message0": "when screen frame analyzed %1 do %2",
+                "args0": [
+                    {
+                        "type": "input_dummy"
+                    },
+                    {
+                        "type": "input_statement",
+                        "name": "DO_CODE"
+                    }
+                ],
+                "nextStatement": null,
+                "style": "event_blocks",
+                "tooltip": "Executes code when a captured screen frame is successfully analyzed.",
+                "helpUrl": ""
+            },
+            {
                 "type": "is_action_active",
                 "message0": "action %1 is active",
                 "args0": [
@@ -7000,6 +7022,13 @@ if (${name}) {
 
             javascript.javascriptGenerator.forBlock['stop_screen_capture'] = function (block, generator) {
                 return `sceneManager.stopScreenCapture();\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['event_on_screen_analyzed'] = function (block, generator) {
+                const doCode = generator.statementToCode(block, 'DO_CODE');
+                const analysisTextVar = generator.nameDB_.getName('analysis_text', Blockly.VARIABLE_CATEGORY_NAME);
+                const callback = `async function(${analysisTextVar}) {\n${doCode}\n}`;
+                return `sceneManager.onScreenAnalyzed(${callback});\n`;
             };
 
             javascript.javascriptGenerator.forBlock['event_on_object_detected'] = function (block, generator) {
