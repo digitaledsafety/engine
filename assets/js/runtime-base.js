@@ -265,6 +265,33 @@
             return this._activeInstance;
         }
 
+        /**
+         * Register Blockly blocks for a specific runtime engine if static registerBlocks exists.
+         */
+        registerBlocks(name, Blockly, generator) {
+            const RuntimeClass = this.getRegistered(name);
+            if (RuntimeClass && typeof RuntimeClass.registerBlocks === 'function') {
+                return RuntimeClass.registerBlocks(Blockly, generator);
+            }
+            return false;
+        }
+
+        /**
+         * Register Blockly blocks across all registered runtime engines.
+         */
+        registerAllBlocks(Blockly, generator) {
+            let count = 0;
+            const processedClasses = new Set();
+            for (const [, RuntimeClass] of this._runtimes.entries()) {
+                if (RuntimeClass && !processedClasses.has(RuntimeClass) && typeof RuntimeClass.registerBlocks === 'function') {
+                    RuntimeClass.registerBlocks(Blockly, generator);
+                    processedClasses.add(RuntimeClass);
+                    count++;
+                }
+            }
+            return count;
+        }
+
         createRuntime(name, canvas, options = {}) {
             const RuntimeClass = this.getRegistered(name);
             if (!RuntimeClass) {
@@ -272,6 +299,15 @@
             }
             const instance = new RuntimeClass(canvas, options);
             this.setActive(instance);
+
+            // Automatically register blocks associated with this runtime if Blockly environment exists
+            if (typeof RuntimeClass.registerBlocks === 'function') {
+                const targetBlockly = options.Blockly || (typeof global !== 'undefined' ? global.Blockly : null);
+                const targetGen = options.generator || (typeof global !== 'undefined' ? global.javascriptGenerator : null);
+                if (targetBlockly) {
+                    RuntimeClass.registerBlocks(targetBlockly, targetGen);
+                }
+            }
             return instance;
         }
     }

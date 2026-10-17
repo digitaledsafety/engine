@@ -49,6 +49,36 @@
 
 
         class BabylonSceneManager extends (typeof BaseRuntimeEngine !== "undefined" ? BaseRuntimeEngine : Object) {
+            /**
+             * Bundled static method for registering 3D Babylon runtime Blockly blocks and generators.
+             */
+            static registerBlocks(Blockly, generator) {
+                if (!Blockly || !Blockly.Blocks) return false;
+
+                // Example 3D Babylon-specific blocks registered directly with runtime
+                if (!Blockly.Blocks['babylon_set_background_color']) {
+                    Blockly.Blocks['babylon_set_background_color'] = {
+                        init: function() {
+                            this.appendValueInput("COLOR")
+                                .setCheck("String")
+                                .appendField("set 3D scene background color");
+                            this.setPreviousStatement(true, null);
+                            this.setNextStatement(true, null);
+                            this.setStyle("scene_blocks");
+                            this.setTooltip("Sets the active Babylon 3D scene background color");
+                        }
+                    };
+                }
+
+                if (generator && generator.forBlock && !generator.forBlock['babylon_set_background_color']) {
+                    generator.forBlock['babylon_set_background_color'] = function(block, gen) {
+                        const color = gen.valueToCode(block, 'COLOR', gen.ORDER_ATOMIC) || '"#000000"';
+                        return `if (window.sceneManager && window.sceneManager.scene) { window.sceneManager.scene.clearColor = BABYLON.Color3.FromHexString(${color}); }\n`;
+                    };
+                }
+                return true;
+            }
+
             constructor(canvas, options = {}) {
                 super(canvas, options);
                 this.initAudioEngine();
