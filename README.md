@@ -30,6 +30,7 @@
 
 For detailed guides on how to use the tool, create custom workspaces, or contribute to the engine, please visit our **[Wiki](_docs/home.md)**.
 
+* **[Runtime Architecture & Decision Framework](_docs/runtime-architecture.md):** Engine vs. Blockly decision framework, workspace manageability rules, pluggable runtime architecture, and block bundling guidelines.
 * **[Assets & Free Resources Guide](_docs/assets.md):** Discover free-to-use/open-source 3D models, textures, audio tools (including [audio.digitaleducationsafety.org](https://audio.digitaleducationsafety.org/)), and guidelines on creator attribution and licensing.
 
 ### Getting Started
