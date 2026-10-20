@@ -5,6 +5,34 @@
 (function (global) {
     'use strict';
 
+        if (typeof isValidAssetURL === 'undefined') {
+            global.isValidAssetURL = function (url) {
+                if (typeof url !== 'string') return false;
+                const normalized = url.trim().toLowerCase();
+                if (normalized.startsWith('//')) return false;
+                if (normalized.startsWith('data:text/html') ||
+                    normalized.startsWith('data:text/xml') ||
+                    normalized.startsWith('data:image/svg+xml') ||
+                    normalized.startsWith('data:application/javascript') ||
+                    normalized.startsWith('data:text/javascript')) {
+                    return false;
+                }
+                if (normalized.startsWith('https://') || normalized.startsWith('blob:') || normalized.startsWith('/') || normalized.startsWith('./') || normalized.startsWith('assets/') || normalized.startsWith('data:')) {
+                    return true;
+                }
+                return false;
+            };
+        }
+
+        if (typeof getProxiedUrl === 'undefined') {
+            global.getProxiedUrl = function (url) {
+                if (!url || typeof url !== 'string') return url;
+                if (url.startsWith('blob:') || url.startsWith('data:') || url.startsWith('/') || url.startsWith('./') || url.startsWith('assets/')) return url;
+                if (url.startsWith('https://proxy.functions.io/?url=')) return url;
+                return `https://proxy.functions.io/?url=${encodeURIComponent(url)}`;
+            };
+        }
+
         function CustomLoadingScreen(/* variables needed, for example:*/ loadingUIText, loadingUIBackgroundColor, loadingUITextColor) {
             //init the loader
             this.loadingUIText = loadingUIText || "Loading...";
@@ -1610,6 +1638,19 @@
                 }
             }
 
+            setCameraProperties(inertia, wheelPrecision) {
+                const camera = this.scene ? this.scene.activeCamera : null;
+                if (!camera) return;
+                const numInertia = Number(inertia);
+                const numWheelPrecision = Number(wheelPrecision);
+                if (!isNaN(numInertia)) {
+                    camera.inertia = numInertia;
+                }
+                if (!isNaN(numWheelPrecision)) {
+                    camera.wheelPrecision = numWheelPrecision;
+                }
+            }
+
             frameCameraOnMesh(target) {
                 let camera = this.scene.activeCamera;
                 if (!camera) return;
@@ -2350,9 +2391,7 @@
                 camera.attachControl(this.canvas, true);
 
                 // Smooth navigation
-                // TODO: Via blocks
-                camera.inertia = 0.2;
-                camera.wheelPrecision = 10;
+                this.setCameraProperties(0.2, 10);
 
                 const light = new BABYLON.HemisphericLight('light', new BABYLON.Vector3(1, 1, 0), this.scene);
                 const physicsPlugin = new BABYLON.CannonJSPlugin();
