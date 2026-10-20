@@ -2445,7 +2445,11 @@ workspace_data: "${base64WorkspaceData}"
                         {
                             kind: 'block',
                             type: 'camera_zoom',
-                        },                        
+                        },
+                        {
+                            kind: 'block',
+                            type: 'set_camera_properties',
+                        },
                         {
                             kind: 'block',
                             type: 'create_ground',
@@ -4829,6 +4833,28 @@ workspace_data: "${base64WorkspaceData}"
                 "helpUrl": ""
             },
             {
+                "type": "set_camera_properties",
+                "message0": "set camera inertia %1 wheel precision %2",
+                "args0": [
+                    {
+                        "type": "input_value",
+                        "name": "INERTIA",
+                        "check": "Number"
+                    },
+                    {
+                        "type": "input_value",
+                        "name": "WHEEL_PRECISION",
+                        "check": "Number"
+                    }
+                ],
+                "inputsInline": true,
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": "#A55B80",
+                "tooltip": "Sets camera inertia and scroll wheel precision properties for smooth navigation.",
+                "helpUrl": ""
+            },
+            {
                 "type": "play_sound_url",
                 "message0": "play sound from URL %1",
                 "args0": [
@@ -6414,6 +6440,12 @@ if (${name}) {
             javascript.javascriptGenerator.forBlock['camera_zoom'] = function (block, generator) {
                 const zoomValue = generator.valueToCode(block, 'ZOOM', generator.ORDER_ATOMIC) || 0;
                 return `sceneManager.cameraZoom(${zoomValue});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['set_camera_properties'] = function (block, generator) {
+                const inertia = generator.valueToCode(block, 'INERTIA', generator.ORDER_ATOMIC) || '0.2';
+                const wheelPrecision = generator.valueToCode(block, 'WHEEL_PRECISION', generator.ORDER_ATOMIC) || '10';
+                return `sceneManager.setCameraProperties(${inertia}, ${wheelPrecision});\n`;
             };
 
             // --- Gameplay Block Generators ---
