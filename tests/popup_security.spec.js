@@ -218,8 +218,14 @@ test.describe('Engine Popup Security Validation', () => {
         xmlData: fn('data:text/xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIj8+'),
         jsData: fn('data:application/javascript;base64,YWxlcnQoMSk='),
         svgData: fn('data:image/svg+xml;utf8,<svg></svg>'),
+        xhtmlData: fn('data:application/xhtml+xml;utf8,<html/>'),
         safeImageData: fn('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='),
-        safeAudioData: fn('data:audio/mp3;base64,SUQzBAAAAAAA')
+        safeAudioData: fn('data:audio/mp3;base64,SUQzBAAAAAAA'),
+        safeModelData: fn('data:model/gltf-binary;base64,gLTF'),
+        safeFontData: fn('data:font/woff2;base64,wOF2'),
+        safeOctetData: fn('data:application/octet-stream;base64,AAAA'),
+        safeJsonData: fn('data:application/json;base64,e30='),
+        safeTextData: fn('data:text/plain;base64,SGVsbG8=')
       };
     });
 
@@ -228,7 +234,34 @@ test.describe('Engine Popup Security Validation', () => {
     expect(result.xmlData).toBe(false);
     expect(result.jsData).toBe(false);
     expect(result.svgData).toBe(false);
+    expect(result.xhtmlData).toBe(false);
     expect(result.safeImageData).toBe(true);
     expect(result.safeAudioData).toBe(true);
+    expect(result.safeModelData).toBe(true);
+    expect(result.safeFontData).toBe(true);
+    expect(result.safeOctetData).toBe(true);
+    expect(result.safeJsonData).toBe(true);
+    expect(result.safeTextData).toBe(true);
+  });
+
+  test('Backslash protocol-relative URLs are normalized and blocked', async ({ page }) => {
+    await page.goto('/');
+    await page.click("#start-button");
+
+    const result = await page.evaluate(() => {
+      const fn = window.isValidAssetURL;
+      if (typeof fn !== 'function') return null;
+
+      return {
+        backslashProto1: fn('\\\\tracking-pixel.com/image.png'),
+        backslashProto2: fn('/\\tracking-pixel.com/image.png'),
+        backslashProto3: fn('\\/tracking-pixel.com/image.png')
+      };
+    });
+
+    expect(result).not.toBeNull();
+    expect(result.backslashProto1).toBe(false);
+    expect(result.backslashProto2).toBe(false);
+    expect(result.backslashProto3).toBe(false);
   });
 });
