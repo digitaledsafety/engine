@@ -1610,6 +1610,18 @@
                 }
             }
 
+            setCameraProperties(inertia = 0.2, wheelPrecision = 10) {
+                if (this.scene && this.scene.activeCamera) {
+                    const camera = this.scene.activeCamera;
+                    if (typeof inertia === 'number' && !isNaN(inertia)) {
+                        camera.inertia = inertia;
+                    }
+                    if (typeof wheelPrecision === 'number' && !isNaN(wheelPrecision)) {
+                        camera.wheelPrecision = wheelPrecision;
+                    }
+                }
+            }
+
             frameCameraOnMesh(target) {
                 let camera = this.scene.activeCamera;
                 if (!camera) return;
