@@ -1610,6 +1610,53 @@
                 }
             }
 
+            setCameraProperty(property, value) {
+                const camera = this.scene ? this.scene.activeCamera : null;
+                if (!camera) {
+                    console.warn('setCameraProperty: No active camera found in scene.');
+                    return;
+                }
+                const numVal = Number(value);
+                const allowedProps = [
+                    'inertia',
+                    'wheelPrecision',
+                    'angularSensibility',
+                    'angularSensibilityX',
+                    'angularSensibilityY',
+                    'speed',
+                    'fov',
+                    'radius',
+                    'alpha',
+                    'beta'
+                ];
+
+                if (!allowedProps.includes(property)) {
+                    console.warn(`setCameraProperty: Property '${property}' is not supported.`);
+                    return;
+                }
+
+                if (isNaN(numVal)) {
+                    console.warn(`setCameraProperty: Invalid numeric value '${value}' for property '${property}'.`);
+                    return;
+                }
+
+                if (property === 'angularSensibility') {
+                    if ('angularSensibility' in camera) {
+                        camera.angularSensibility = numVal;
+                    }
+                    if ('angularSensibilityX' in camera) {
+                        camera.angularSensibilityX = numVal;
+                    }
+                    if ('angularSensibilityY' in camera) {
+                        camera.angularSensibilityY = numVal;
+                    }
+                } else if (property in camera) {
+                    camera[property] = numVal;
+                } else {
+                    console.warn(`setCameraProperty: Active camera does not support property '${property}'.`);
+                }
+            }
+
             frameCameraOnMesh(target) {
                 let camera = this.scene.activeCamera;
                 if (!camera) return;

@@ -2445,7 +2445,21 @@ workspace_data: "${base64WorkspaceData}"
                         {
                             kind: 'block',
                             type: 'camera_zoom',
-                        },                        
+                        },
+                        {
+                            kind: 'block',
+                            type: 'set_camera_property',
+                            inputs: {
+                                VALUE: {
+                                    shadow: {
+                                        type: 'math_number',
+                                        fields: {
+                                            NUM: 0.2
+                                        }
+                                    }
+                                }
+                            }
+                        },
                         {
                             kind: 'block',
                             type: 'create_ground',
@@ -4829,6 +4843,36 @@ workspace_data: "${base64WorkspaceData}"
                 "helpUrl": ""
             },
             {
+                "type": "set_camera_property",
+                "message0": "set camera %1 to %2",
+                "args0": [
+                    {
+                        "type": "field_dropdown",
+                        "name": "PROPERTY",
+                        "options": [
+                            ["inertia", "inertia"],
+                            ["wheel precision", "wheelPrecision"],
+                            ["angular sensibility", "angularSensibility"],
+                            ["speed", "speed"],
+                            ["field of view (fov)", "fov"],
+                            ["distance (radius)", "radius"],
+                            ["rotation angle (alpha)", "alpha"],
+                            ["pitch angle (beta)", "beta"]
+                        ]
+                    },
+                    {
+                        "type": "input_value",
+                        "name": "VALUE",
+                        "check": "Number"
+                    }
+                ],
+                "previousStatement": null,
+                "nextStatement": null,
+                "colour": "#A55B80",
+                "tooltip": "Sets a configuration property on the active camera.",
+                "helpUrl": ""
+            },
+            {
                 "type": "play_sound_url",
                 "message0": "play sound from URL %1",
                 "args0": [
@@ -6414,6 +6458,12 @@ if (${name}) {
             javascript.javascriptGenerator.forBlock['camera_zoom'] = function (block, generator) {
                 const zoomValue = generator.valueToCode(block, 'ZOOM', generator.ORDER_ATOMIC) || 0;
                 return `sceneManager.cameraZoom(${zoomValue});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['set_camera_property'] = function (block, generator) {
+                const property = block.getFieldValue('PROPERTY');
+                const value = generator.valueToCode(block, 'VALUE', generator.ORDER_ATOMIC) || 0;
+                return `sceneManager.setCameraProperty('${property}', ${value});\n`;
             };
 
             // --- Gameplay Block Generators ---
