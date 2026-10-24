@@ -1610,6 +1610,17 @@
                 }
             }
 
+            setCameraProperties(inertia, wheelPrecision) {
+                if (this.scene && this.scene.activeCamera) {
+                    if (inertia !== undefined && inertia !== null) {
+                        this.scene.activeCamera.inertia = Number(inertia);
+                    }
+                    if (wheelPrecision !== undefined && wheelPrecision !== null) {
+                        this.scene.activeCamera.wheelPrecision = Number(wheelPrecision);
+                    }
+                }
+            }
+
             frameCameraOnMesh(target) {
                 let camera = this.scene.activeCamera;
                 if (!camera) return;
@@ -2350,9 +2361,7 @@
                 camera.attachControl(this.canvas, true);
 
                 // Smooth navigation
-                // TODO: Via blocks
-                camera.inertia = 0.2;
-                camera.wheelPrecision = 10;
+                this.setCameraProperties(0.2, 10);
 
                 const light = new BABYLON.HemisphericLight('light', new BABYLON.Vector3(1, 1, 0), this.scene);
                 const physicsPlugin = new BABYLON.CannonJSPlugin();
