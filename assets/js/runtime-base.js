@@ -217,6 +217,10 @@
             // Base implementation stub for HUD display
         }
 
+        setCameraProperties(inertia, wheelPrecision) {
+            // Base implementation stub for camera properties
+        }
+
         // --- Abstract Methods to be implemented by Specific Runtimes (3D, 2D, Headless) ---
 
         createPrimitive(type, options = {}) {
