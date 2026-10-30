@@ -175,14 +175,27 @@
         // --- Game Timer APIs ---
 
         createTimer(duration = 60, autoStart = true) {
+            const initialDuration = Number(duration) || 60;
             return {
-                duration: Number(duration) || 60,
+                initialDuration: initialDuration,
+                duration: initialDuration,
+                remaining: initialDuration,
                 isRunning: !!autoStart,
-                onFinish: (cb) => { if (typeof cb === 'function') cb(); },
-                start: () => {},
-                pause: () => {},
-                reset: () => {},
-                getTimeRemaining: () => 0
+                isFinished: false,
+                onFinish: function(cb) { return this; },
+                start: function() { this.isRunning = true; return this; },
+                pause: function() { this.isRunning = false; return this; },
+                stop: function() { this.isRunning = false; return this; },
+                reset: function(dur = null, auto = null) {
+                    if (dur !== null && dur !== undefined) this.initialDuration = Number(dur) || 0;
+                    this.remaining = this.initialDuration;
+                    this.isFinished = false;
+                    if (auto !== null && auto !== undefined) this.isRunning = !!auto;
+                    return this;
+                },
+                getRemaining: function() { return Math.max(0, Math.ceil(this.remaining)); },
+                getTimeRemaining: function() { return Math.max(0, Math.ceil(this.remaining)); },
+                dispose: function() {}
             };
         }
 
