@@ -159,6 +159,7 @@
                 this.gameTimerInitial = 0;
                 this.gameTimerRunning = false;
                 this.timerFinishCallbacks = [];
+                this._primaryTimer = null;
                 this.timerManager = new TimerManager(this);
                 this.gameStateChangeCallbacks = [];
                 this.hudElements = { container: null, scoreText: null, healthBarFill: null, healthText: null, timerText: null };
@@ -3221,7 +3222,7 @@
                     const deltaTime = currentTime - lastTime;
                     lastTime = currentTime;
 
-                    if (this.gameTimerRunning && this.gameTimer > 0) {
+                    if (!this._primaryTimer && this.gameTimerRunning && this.gameTimer > 0) {
                         this.gameTimer = Math.max(0, this.gameTimer - (deltaTime / 1000));
                         if (this.gameTimer === 0) {
                             this.gameTimerRunning = false;
@@ -3440,6 +3441,7 @@
                 this.gameTimer = 0;
                 this.gameTimerRunning = false;
                 this.timerFinishCallbacks = [];
+                this._primaryTimer = null;
                 if (this.timerManager) {
                     this.timerManager.clear();
                 }
@@ -3691,34 +3693,51 @@
                     this.timerManager = new TimerManager(this);
                 }
                 const timer = this.timerManager.createTimer(duration, autoStart);
-                if (!this.gameTimer || this.gameTimer === 0) {
-                    this.gameTimer = timer.initialDuration;
-                    this.gameTimerRunning = timer.isRunning;
+                if (!this._primaryTimer) {
+                    this._primaryTimer = timer;
                 }
+                this.gameTimer = timer.initialDuration;
+                this.gameTimerRunning = timer.isRunning;
                 return timer;
             }
 
             setGameTimer(duration, autoStart = true) {
-                this.gameTimer = Math.max(0, Number(duration) || 0);
-                this.gameTimerInitial = this.gameTimer;
+                const dur = Math.max(0, Number(duration) || 0);
+                if (this._primaryTimer) {
+                    this._primaryTimer.reset(dur, autoStart);
+                }
+                this.gameTimer = dur;
+                this.gameTimerInitial = dur;
                 this.gameTimerRunning = !!autoStart;
                 this._updateGameHUD();
             }
 
             getGameTimer() {
+                if (this._primaryTimer) {
+                    return this._primaryTimer.getRemaining();
+                }
                 return Math.max(0, Math.ceil(this.gameTimer || 0));
             }
 
             startGameTimer() {
+                if (this._primaryTimer) {
+                    this._primaryTimer.start();
+                }
                 this.gameTimerRunning = true;
             }
 
             pauseGameTimer() {
+                if (this._primaryTimer) {
+                    this._primaryTimer.pause();
+                }
                 this.gameTimerRunning = false;
             }
 
             onGameTimerFinish(callback) {
                 if (typeof callback === 'function') {
+                    if (this._primaryTimer) {
+                        this._primaryTimer.onFinish(callback);
+                    }
                     this.timerFinishCallbacks.push(callback);
                 }
             }
@@ -3805,7 +3824,7 @@
 
                 if (this.hudConfig && this.hudConfig.showTimer) {
                     const timerBlock = new BABYLON.GUI.TextBlock('game_hud_timer_text');
-                    const totalSecs = Math.max(0, Math.ceil(this.gameTimer || 0));
+                    const totalSecs = this._primaryTimer ? this._primaryTimer.getRemaining() : Math.max(0, Math.ceil(this.gameTimer || 0));
                     const mins = Math.floor(totalSecs / 60);
                     const secs = Math.floor(totalSecs % 60);
                     timerBlock.text = `Time: ${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
@@ -3836,7 +3855,7 @@
                     this.hudElements.healthText.text = `HP: ${this.gameHealth || 0}/${this.maxGameHealth || 100}`;
                 }
                 if (this.hudElements.timerText) {
-                    const totalSecs = Math.max(0, Math.ceil(this.gameTimer || 0));
+                    const totalSecs = this._primaryTimer ? this._primaryTimer.getRemaining() : Math.max(0, Math.ceil(this.gameTimer || 0));
                     const mins = Math.floor(totalSecs / 60);
                     const secs = Math.floor(totalSecs % 60);
                     this.hudElements.timerText.text = `Time: ${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
@@ -4860,6 +4879,11 @@
             return this;
         }
 
+        stop() {
+            this.isRunning = false;
+            return this;
+        }
+
         reset(duration = null, autoStart = null) {
             if (duration !== null && duration !== undefined) {
                 this.initialDuration = Number(duration) || 0;
@@ -4900,11 +4924,22 @@
             return Math.max(0, Math.ceil(this.remaining));
         }
 
+        getTimeRemaining() {
+            return this.getRemaining();
+        }
+
         onFinish(callback) {
             if (typeof callback === 'function') {
                 this.onFinishCallbacks.push(callback);
             }
             return this;
+        }
+
+        dispose() {
+            this.pause();
+            if (this.sceneManager && this.sceneManager.timerManager) {
+                this.sceneManager.timerManager.removeTimer(this);
+            }
         }
 
         valueOf() {
@@ -4926,6 +4961,17 @@
             const timer = new Timer(duration, autoStart, this.sceneManager);
             this.timers.push(timer);
             return timer;
+        }
+
+        removeTimer(timer) {
+            if (!timer) return;
+            const index = this.timers.indexOf(timer);
+            if (index !== -1) {
+                this.timers.splice(index, 1);
+            }
+            if (this.sceneManager && this.sceneManager._primaryTimer === timer) {
+                this.sceneManager._primaryTimer = this.timers.length > 0 ? this.timers[0] : null;
+            }
         }
 
         update(dt) {
