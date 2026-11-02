@@ -1,0 +1,28 @@
+default:
+  image: ruby:3.2
+
+variables:
+  JEKYLL_ENV: production
+  LC_ALL: C.UTF-8
+
+stages:
+  - build
+  - deploy
+
+pages:
+  stage: deploy
+  script:
+    - gem install bundler
+    - bundle install
+    - bundle exec jekyll build -d public --baseurl "/$CI_COMMIT_REF_SLUG"
+    # Print the specific branch preview URL in the pipeline logs
+    - echo "Branch preview available at - ${CI_PAGES_URL}/${CI_COMMIT_REF_SLUG}"
+  pages:
+    path_prefix: "$CI_COMMIT_REF_SLUG"
+  artifacts:
+    paths:
+      - public
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      when: never
+    - if: '($CI_PIPELINE_SOURCE == "push" || $CI_PIPELINE_SOURCE == "mirror") && $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH'
