@@ -7,8 +7,35 @@ const scopePath = params.get('scope');
 
 const title = scopeTitle || 'Engine';
 const desc = scopeDesc || 'An open-source, block-based 3D coding environment.';
-const icon = scopeIcon || '/assets/icons/gamepad-2.svg';
-const startUrl = scopePath ? (scopePath + '?mode=app&fullscreen=true') : '/?mode=app&fullscreen=true';
+
+// Validate and sanitize icon URI to prevent malicious scheme injection (e.g. javascript:, data:html, etc.)
+function sanitizeIcon(url) {
+  if (!url || typeof url !== 'string') return '/assets/icons/gamepad-2.svg';
+  const trimmed = url.trim();
+  // Safe relative paths starting with / (excluding protocol-relative //)
+  if (trimmed.startsWith('/') && !trimmed.startsWith('//')) {
+    return trimmed;
+  }
+  // Safe absolute HTTPS URLs
+  if (trimmed.startsWith('https://')) {
+    return trimmed;
+  }
+  return '/assets/icons/gamepad-2.svg';
+}
+
+// Validate and sanitize scope path to prevent open redirects (must be safe relative path)
+function sanitizeScope(path) {
+  if (!path || typeof path !== 'string') return null;
+  const trimmed = path.trim();
+  if (trimmed.startsWith('/') && !trimmed.startsWith('//') && !trimmed.includes('\\')) {
+    return trimmed;
+  }
+  return null;
+}
+
+const icon = sanitizeIcon(scopeIcon);
+const safeScopePath = sanitizeScope(scopePath);
+const startUrl = safeScopePath ? (safeScopePath + '?mode=app&fullscreen=true') : '/?mode=app&fullscreen=true';
 
 const CACHE_NAME = 'engine-cache-v1';
 const criticalUrls = [
