@@ -1078,12 +1078,19 @@
             }
 
             async importRobloxAvatar(name, userId, x = 0, y = 0, z = 0) {
+                const parsedUserId = parseInt(userId, 10);
+                if (!parsedUserId || isNaN(parsedUserId) || parsedUserId <= 0 || !/^\d+$/.test(String(userId).trim())) {
+                    throw new Error(`Invalid Roblox user ID: ${userId}. Must be a positive integer.`);
+                }
+                const cleanUserId = parsedUserId.toString();
+
                 try {
+
                     let thumbData = null;
                     const tryEndpoints = [
-                        `https://apis.roblox.com/thumbnails/v1/users/avatar-3d?userId=${userId}`,
-                        `https://thumbnails.roblox.com/v1/users/avatar-3d?userId=${userId}`,
-                        `https://www.roblox.com/avatar-thumbnail-3d/json?userId=${userId}`
+                        `https://apis.roblox.com/thumbnails/v1/users/avatar-3d?userId=${cleanUserId}`,
+                        `https://thumbnails.roblox.com/v1/users/avatar-3d?userId=${cleanUserId}`,
+                        `https://www.roblox.com/avatar-thumbnail-3d/json?userId=${cleanUserId}`
                     ];
 
                     for (const url of tryEndpoints) {
