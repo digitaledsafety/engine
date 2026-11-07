@@ -221,6 +221,21 @@
             // Base implementation stub for camera properties
         }
 
+        createMandelbulb(name, x = 0, y = 0, z = 0, options = {}) {
+            // Base implementation stub for Mandelbulb raymarched fractal
+            return null;
+        }
+
+        createMandelbulbParticles(name, x = 0, y = 0, z = 0, options = {}) {
+            // Base implementation stub for Mandelbulb particle voxel system
+            return null;
+        }
+
+        createLorenzAttractor(name, x = 0, y = 0, z = 0, options = {}) {
+            // Base implementation stub for chaotic attractor system
+            return null;
+        }
+
         // --- Abstract Methods to be implemented by Specific Runtimes (3D, 2D, Headless) ---
 
         createPrimitive(type, options = {}) {
