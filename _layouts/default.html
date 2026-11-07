@@ -782,6 +782,18 @@
                             <a href="{{ site.baseurl }}/workspaces/virtual-pet/?remix=true" class="btn btn-run" style="flex: 1; text-align: center; text-decoration: none; padding: 6px;">🔀 Remix</a>
                         </div>
                     </div>
+
+                    <!-- Algorithmic Generative Art -->
+                    <div class="template-card" style="background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 8px; padding: 15px; display: flex; flex-direction: column; justify-content: space-between;">
+                        <div>
+                            <div style="font-size: 1.2rem; font-weight: bold; margin-bottom: 5px;">🎨 Algorithmic Generative Art</div>
+                            <p style="font-size: 0.85rem; color: #555; margin: 0 0 10px 0;">3D Mandelbrot bulb algorithm, particle voxels, and chaotic attractors with real-time morphing controls.</p>
+                        </div>
+                        <div style="display: flex; gap: 8px; margin-top: 10px;">
+                            <a href="{{ site.baseurl }}/workspaces/generative-art/" class="btn" style="flex: 1; text-align: center; text-decoration: none; padding: 6px;">▶ Launch</a>
+                            <a href="{{ site.baseurl }}/workspaces/generative-art/?remix=true" class="btn btn-run" style="flex: 1; text-align: center; text-decoration: none; padding: 6px;">🔀 Remix</a>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -3910,7 +3922,10 @@ workspace_data: "${base64WorkspaceData}"
                             ['cone', 'cone'],
                             ['torus', 'torus'],
                             ['capsule', 'capsule'],
-                            ['particle_cube', 'particle_cube']
+                            ['particle_cube', 'particle_cube'],
+                            ['mandelbulb', 'mandelbulb'],
+                            ['mandelbulb_particles', 'mandelbulb_particles'],
+                            ['lorenz_attractor', 'lorenz_attractor']
                         ],
                     },
                     { type: 'input_value', name: 'X', check: 'Number' },
@@ -6580,6 +6595,9 @@ if (${name}) {
                 else if (type === 'torus') method = 'createTorus';
                 else if (type === 'capsule') method = 'createCapsule';
                 else if (type === 'particle_cube') method = 'createParticleCube';
+                else if (type === 'mandelbulb') method = 'createMandelbulb';
+                else if (type === 'mandelbulb_particles') method = 'createMandelbulbParticles';
+                else if (type === 'lorenz_attractor') method = 'createLorenzAttractor';
 
                 const code = `sceneManager.${method}('id_' + Blockly.utils.idGenerator.genUid(), ${x}, ${y}, ${z})`;
                 return [code, generator.ORDER_FUNCTION_CALL];

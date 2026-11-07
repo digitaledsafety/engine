@@ -737,6 +737,333 @@
                 return rootMesh;
             }
 
+            createMandelbulb(name, x = 0, y = 0, z = 0, options = {}) {
+                this._cleanupExisting(name);
+
+                // Ensure shaders are registered with Babylon's Effect ShadersStore
+                if (!BABYLON.Effect.ShadersStore["mandelbulbVertexShader"]) {
+                    BABYLON.Effect.ShadersStore["mandelbulbVertexShader"] = `
+                        precision highp float;
+                        attribute vec3 position;
+                        attribute vec2 uv;
+                        uniform mat4 worldViewProjection;
+                        uniform mat4 world;
+                        varying vec3 vWorldPos;
+                        varying vec3 vLocalPos;
+                        varying vec2 vUV;
+                        void main(void) {
+                            vLocalPos = position;
+                            vWorldPos = (world * vec4(position, 1.0)).xyz;
+                            vUV = uv;
+                            gl_Position = worldViewProjection * vec4(position, 1.0);
+                        }
+                    `;
+                }
+
+                if (!BABYLON.Effect.ShadersStore["mandelbulbFragmentShader"]) {
+                    BABYLON.Effect.ShadersStore["mandelbulbFragmentShader"] = `
+                        precision highp float;
+                        varying vec3 vWorldPos;
+                        varying vec3 vLocalPos;
+                        varying vec2 vUV;
+                        uniform vec3 cameraPosition;
+                        uniform float uPower;
+                        uniform float uTime;
+                        uniform float uColorPalette;
+                        uniform int uMaxIterations;
+
+                        float mandelbulbDE(vec3 pos, out float outTrap, float power) {
+                            vec3 z = pos;
+                            float dr = 1.0;
+                            float r = 0.0;
+                            float trap = 1e10;
+                            for (int i = 0; i < 15; i++) {
+                                if (i >= uMaxIterations) break;
+                                r = length(z);
+                                if (r > 2.0) break;
+                                trap = min(trap, r);
+                                float theta = acos(clamp(z.z / max(r, 0.0001), -1.0, 1.0));
+                                float phi = atan(z.y, z.x);
+                                dr = pow(r, power - 1.0) * power * dr + 1.0;
+                                float zr = pow(r, power);
+                                theta = theta * power;
+                                phi = phi * power;
+                                z = zr * vec3(sin(theta) * cos(phi), sin(theta) * sin(phi), cos(theta)) + pos;
+                            }
+                            outTrap = trap;
+                            return 0.5 * log(max(r, 1.0001)) * r / max(dr, 0.0001);
+                        }
+
+                        vec3 calcNormal(vec3 pos, float power) {
+                            float dummy;
+                            float eps = 0.002;
+                            float d = mandelbulbDE(pos, dummy, power);
+                            return normalize(vec3(
+                                mandelbulbDE(pos + vec3(eps, 0.0, 0.0), dummy, power) - d,
+                                mandelbulbDE(pos + vec3(0.0, eps, 0.0), dummy, power) - d,
+                                mandelbulbDE(pos + vec3(0.0, 0.0, eps), dummy, power) - d
+                            ));
+                        }
+
+                        vec3 getPaletteColor(float t, float palette) {
+                            if (palette < 0.5) {
+                                // Electric Neon / Cyberpunk
+                                return vec3(0.5) + vec3(0.5) * cos(6.28318 * (vec3(1.0, 1.0, 1.0) * t + vec3(0.0, 0.33, 0.67)));
+                            } else if (palette < 1.5) {
+                                // Fiery Sun & Gold
+                                return vec3(0.5, 0.4, 0.2) + vec3(0.5, 0.5, 0.5) * cos(6.28318 * (vec3(1.0, 0.7, 0.4) * t + vec3(0.0, 0.15, 0.2)));
+                            } else if (palette < 2.5) {
+                                // Deep Bioluminescent Ocean
+                                return vec3(0.1, 0.5, 0.6) + vec3(0.4, 0.5, 0.4) * cos(6.28318 * (vec3(0.8, 1.0, 1.2) * t + vec3(0.2, 0.4, 0.6)));
+                            } else {
+                                // Cosmic Rainbow
+                                return vec3(0.5) + vec3(0.5) * cos(6.28318 * (vec3(2.0, 1.0, 1.0) * t + vec3(0.5, 0.20, 0.25)));
+                            }
+                        }
+
+                        void main(void) {
+                            vec3 rayOrigin = cameraPosition;
+                            vec3 rayDir = normalize(vWorldPos - cameraPosition);
+
+                            float curT = length(vWorldPos - cameraPosition);
+                            vec3 curPos = vWorldPos;
+                            float trap = 1.0;
+                            bool hit = false;
+                            float power = uPower;
+
+                            for (int step = 0; step < 70; step++) {
+                                float d = mandelbulbDE(curPos, trap, power);
+                                if (d < 0.003) {
+                                    hit = true;
+                                    break;
+                                }
+                                curT += d;
+                                curPos = rayOrigin + rayDir * curT;
+                                if (length(curPos) > 4.5) break;
+                            }
+
+                            if (!hit) {
+                                discard;
+                            }
+
+                            vec3 normal = calcNormal(curPos, power);
+                            vec3 lightDir = normalize(vec3(1.0, 1.5, -1.0));
+                            float diff = max(dot(normal, lightDir), 0.0);
+                            vec3 viewDir = -rayDir;
+                            vec3 halfDir = normalize(lightDir + viewDir);
+                            float spec = pow(max(dot(normal, halfDir), 0.0), 32.0);
+
+                            vec3 baseColor = getPaletteColor(trap * 2.5 + uTime * 0.05, uColorPalette);
+                            vec3 finalColor = baseColor * (diff * 0.8 + 0.25) + vec3(0.9, 0.9, 1.0) * spec * 0.6;
+
+                            gl_FragColor = vec4(finalColor, 1.0);
+                        }
+                    `;
+                }
+
+                const boxMesh = BABYLON.MeshBuilder.CreateBox(name, { size: 3.2 }, this.scene);
+                boxMesh.position.set(x, y, z);
+
+                const shaderMaterial = new BABYLON.ShaderMaterial(
+                    name + "_shaderMat",
+                    this.scene,
+                    {
+                        vertex: "mandelbulb",
+                        fragment: "mandelbulb",
+                    },
+                    {
+                        attributes: ["position", "normal", "uv"],
+                        uniforms: ["world", "worldViewProjection", "cameraPosition", "uPower", "uTime", "uColorPalette", "uMaxIterations"],
+                        needAlphaBlending: false
+                    }
+                );
+
+                const defaultPower = (typeof options.power === 'number') ? options.power : 8.0;
+                const defaultPalette = (typeof options.palette === 'number') ? options.palette : 0.0;
+                const defaultMaxIter = options.maxIterations || 10;
+
+                shaderMaterial.setFloat("uPower", defaultPower);
+                shaderMaterial.setFloat("uTime", 0.0);
+                shaderMaterial.setFloat("uColorPalette", defaultPalette);
+                shaderMaterial.setInt("uMaxIterations", defaultMaxIter);
+
+                shaderMaterial.backFaceCulling = false;
+                boxMesh.material = shaderMaterial;
+
+                // Attach dynamic control state to mesh metadata
+                boxMesh.metadata = {
+                    power: defaultPower,
+                    palette: defaultPalette,
+                    maxIterations: defaultMaxIter,
+                    autoMorph: false,
+                    morphSpeed: 0.5,
+                    time: 0.0
+                };
+
+                // Per-frame hook to animate time and auto-morphing
+                this.scene.onBeforeRenderObservable.add(() => {
+                    if (boxMesh && !boxMesh.isDisposed() && boxMesh.material) {
+                        const dt = this.engine.getDeltaTime() / 1000.0;
+                        boxMesh.metadata.time += dt;
+                        shaderMaterial.setFloat("uTime", boxMesh.metadata.time);
+
+                        if (boxMesh.metadata.autoMorph) {
+                            const p = 2.0 + (Math.sin(boxMesh.metadata.time * boxMesh.metadata.morphSpeed) * 0.5 + 0.5) * 8.0;
+                            boxMesh.metadata.power = p;
+                        }
+                        shaderMaterial.setFloat("uPower", boxMesh.metadata.power);
+                        shaderMaterial.setFloat("uColorPalette", boxMesh.metadata.palette);
+                    }
+                });
+
+                this.objects[name] = boxMesh;
+                this._tagMesh(boxMesh, name);
+                return boxMesh;
+            }
+
+            createMandelbulbParticles(name, x = 0, y = 0, z = 0, options = {}) {
+                this._cleanupExisting(name);
+
+                const rootMesh = BABYLON.MeshBuilder.CreateBox(name + "_root", { size: 0.1 }, this.scene);
+                rootMesh.isVisible = false;
+                rootMesh.position.set(x, y, z);
+
+                const particleModel = BABYLON.MeshBuilder.CreateSphere("pModel_" + name, { diameter: 0.08, segments: 4 }, this.scene);
+                const sps = new BABYLON.SolidParticleSystem("SPS_" + name, this.scene, { updatable: true });
+
+                const numPhi = 22;
+                const numTheta = 16;
+                const totalParticles = numPhi * numTheta;
+                sps.addShape(particleModel, totalParticles);
+                const spsMesh = sps.buildMesh();
+                spsMesh.parent = rootMesh;
+                particleModel.dispose();
+
+                const power = (typeof options.power === 'number') ? options.power : 4.0;
+                rootMesh.metadata = {
+                    power: power,
+                    palette: 0,
+                    sps: sps
+                };
+
+                const computeSurfacePositions = (curPower) => {
+                    let pIdx = 0;
+                    for (let i = 0; i < numPhi; i++) {
+                        const phi = (i / numPhi) * 2.0 * Math.PI;
+                        for (let j = 0; j < numTheta; j++) {
+                            const theta = ((j + 0.5) / numTheta) * Math.PI;
+                            const dx = Math.sin(theta) * Math.cos(phi);
+                            const dy = Math.sin(theta) * Math.sin(phi);
+                            const dz = Math.cos(theta);
+
+                            let surfaceR = 0.3;
+                            for (let s = 25; s >= 4; s--) {
+                                const r = s * 0.045;
+                                const px = dx * r, py = dy * r, pz = dz * r;
+                                let zx = px, zy = py, zz = pz;
+                                let escaped = false;
+                                for (let iter = 0; iter < 8; iter++) {
+                                    const mag = Math.sqrt(zx*zx + zy*zy + zz*zz);
+                                    if (mag > 2.0) { escaped = true; break; }
+                                    const th = Math.atan2(Math.sqrt(zx*zx + zy*zy), zz);
+                                    const ph = Math.atan2(zy, zx);
+                                    const powR = Math.pow(mag, curPower);
+                                    zx = powR * Math.sin(th * curPower) * Math.cos(ph * curPower) + px;
+                                    zy = powR * Math.sin(th * curPower) * Math.sin(ph * curPower) + py;
+                                    zz = powR * Math.cos(th * curPower) + pz;
+                                }
+                                if (!escaped) {
+                                    surfaceR = r;
+                                    break;
+                                }
+                            }
+
+                            if (pIdx < sps.particles.length) {
+                                const particle = sps.particles[pIdx];
+                                particle.position.x = dx * surfaceR * 2.0;
+                                particle.position.y = dy * surfaceR * 2.0;
+                                particle.position.z = dz * surfaceR * 2.0;
+                                const colRatio = surfaceR / 1.1;
+                                particle.color = new BABYLON.Color4(
+                                    Math.sin(colRatio * 5.0) * 0.5 + 0.5,
+                                    Math.sin(colRatio * 5.0 + 2.0) * 0.5 + 0.5,
+                                    Math.sin(colRatio * 5.0 + 4.0) * 0.5 + 0.5,
+                                    1.0
+                                );
+                                pIdx++;
+                            }
+                        }
+                    }
+                };
+
+                sps.initParticles = () => {
+                    computeSurfacePositions(power);
+                };
+
+                sps.initParticles();
+                sps.setParticles();
+
+                rootMesh.updateMandelbulbParticles = (newPower) => {
+                    rootMesh.metadata.power = newPower;
+                    computeSurfacePositions(newPower);
+                    sps.setParticles();
+                };
+
+                this.objects[name] = rootMesh;
+                this._tagMesh(rootMesh, name);
+                return rootMesh;
+            }
+
+            createLorenzAttractor(name, x = 0, y = 0, z = 0, options = {}) {
+                this._cleanupExisting(name);
+
+                const rootMesh = BABYLON.MeshBuilder.CreateBox(name + "_root", { size: 0.1 }, this.scene);
+                rootMesh.isVisible = false;
+                rootMesh.position.set(x, y, z);
+
+                const pModel = BABYLON.MeshBuilder.CreateSphere("lorenz_pt_" + name, { diameter: 0.07, segments: 4 }, this.scene);
+                const sps = new BABYLON.SolidParticleSystem("SPS_Lorenz_" + name, this.scene, { updatable: true });
+
+                const totalPoints = 400;
+                sps.addShape(pModel, totalPoints);
+                const spsMesh = sps.buildMesh();
+                spsMesh.parent = rootMesh;
+                pModel.dispose();
+
+                sps.initParticles = () => {
+                    let lx = 0.1, ly = 0.0, lz = 0.0;
+                    const dt = 0.015;
+                    for (let i = 0; i < totalPoints; i++) {
+                        const dx = 10.0 * (ly - lx);
+                        const dy = lx * (28.0 - lz) - ly;
+                        const dz = lx * ly - (8.0 / 3.0) * lz;
+                        lx += dx * dt;
+                        ly += dy * dt;
+                        lz += dz * dt;
+
+                        const particle = sps.particles[i];
+                        particle.position.x = lx * 0.1;
+                        particle.position.y = (lz - 25.0) * 0.1;
+                        particle.position.z = ly * 0.1;
+
+                        const hue = (i / totalPoints);
+                        particle.color = new BABYLON.Color4(
+                            Math.sin(hue * 6.28) * 0.5 + 0.5,
+                            Math.sin(hue * 6.28 + 2.0) * 0.5 + 0.5,
+                            Math.sin(hue * 6.28 + 4.0) * 0.5 + 0.5,
+                            1.0
+                        );
+                    }
+                };
+
+                sps.initParticles();
+                sps.setParticles();
+
+                this.objects[name] = rootMesh;
+                this._tagMesh(rootMesh, name);
+                return rootMesh;
+            }
+
             async createText(name, text, fontUrl, size = 1, resolution = 16, depth = 0.5) {
                 if (!isValidAssetURL(fontUrl)) {
                     return null;
@@ -4521,8 +4848,12 @@
 
             setText(target, text) {
                 const control = this._getControl(target);
-                if (control && control.text !== undefined) {
-                    control.text = text;
+                if (control) {
+                    if (control.text !== undefined) {
+                        control.text = text;
+                    } else if (control.textBlock && control.textBlock.text !== undefined) {
+                        control.textBlock.text = text;
+                    }
                 }
             }
 
@@ -4551,15 +4882,30 @@
 
 
             createButton(name, text, options = {}) {
+                if (!this._buttonCount) this._buttonCount = 0;
+                const defaultTop = options.top || (options.top === 0 ? "0px" : undefined);
                 const button = BABYLON.GUI.Button.CreateSimpleButton(name, text);
-                button.width = options.width || "150px";
-                button.height = options.height || "40px";
+                button.width = options.width || "180px";
+                button.height = options.height || "36px";
                 button.color = options.color || "white";
-                button.background = options.background || "green";
-                button.top = options.top || "0px";
-                button.left = options.left || "0px";
-                button.horizontalAlignment = options.horizontalAlignment !== undefined ? options.horizontalAlignment : BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_CENTER;
-                button.verticalAlignment = options.verticalAlignment !== undefined ? options.verticalAlignment : BABYLON.GUI.Control.VERTICAL_ALIGNMENT_CENTER;
+                button.background = options.background || "#2196F3";
+                button.cornerRadius = 6;
+                button.fontSize = "13px";
+
+                if (defaultTop !== undefined) {
+                    button.top = defaultTop;
+                } else if (options.verticalAlignment !== undefined && options.verticalAlignment !== BABYLON.GUI.Control.VERTICAL_ALIGNMENT_TOP) {
+                    button.top = "0px";
+                } else {
+                    // Stagger multiple buttons vertically nicely by default so they do not overlap
+                    const offset = 20 + this._buttonCount * 45;
+                    button.top = `${offset}px`;
+                    this._buttonCount++;
+                }
+
+                button.left = options.left || "15px";
+                button.horizontalAlignment = options.horizontalAlignment !== undefined ? options.horizontalAlignment : BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT;
+                button.verticalAlignment = options.verticalAlignment !== undefined ? options.verticalAlignment : BABYLON.GUI.Control.VERTICAL_ALIGNMENT_TOP;
                 this.advancedTexture.addControl(button);
                 this.controls[name] = button;
                 return button;
