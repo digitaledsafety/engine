@@ -56,7 +56,21 @@ test.describe('Algorithmic Generative Art Workspace', () => {
     });
     expect(powerUpdateSuccess).toBe(true);
 
-    // Test clicking auto-morph button
+    // Verify default auto-morph state is enabled (ON)
+    const initialMorphState = await page.evaluate(() => {
+      const sm = window.sceneManager;
+      const controls = Object.values(sm.uiManager.controls);
+      const morphBtn = controls.find(c => c.textBlock && c.textBlock.text && c.textBlock.text.includes('Morph'));
+      const meshWithMeta = sm.scene.meshes.find(m => m.metadata && m.metadata.autoMorph !== undefined);
+      return {
+        btnText: morphBtn && morphBtn.textBlock ? morphBtn.textBlock.text : '',
+        autoMorph: meshWithMeta && meshWithMeta.metadata ? meshWithMeta.metadata.autoMorph : undefined
+      };
+    });
+    expect(initialMorphState.btnText).toContain('ON');
+    expect(initialMorphState.autoMorph).toBe(true);
+
+    // Test clicking auto-morph button toggles it OFF
     const morphUpdateSuccess = await page.evaluate(async () => {
       const sm = window.sceneManager;
       const controls = Object.values(sm.uiManager.controls);
@@ -68,7 +82,7 @@ test.describe('Algorithmic Generative Art Workspace', () => {
       }
 
       const meshWithMeta = sm.scene.meshes.find(m => m.metadata && m.metadata.autoMorph !== undefined);
-      return meshWithMeta && meshWithMeta.metadata.autoMorph === true;
+      return meshWithMeta && meshWithMeta.metadata.autoMorph === false && morphBtn.textBlock.text.includes('OFF');
     });
     expect(morphUpdateSuccess).toBe(true);
 
