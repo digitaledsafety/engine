@@ -172,6 +172,21 @@
             this.setGameState(isWin ? 'VICTORY' : 'GAME_OVER');
         }
 
+        restartGame() {
+            this.reset();
+            if (typeof window !== 'undefined' && typeof window.doRun === 'function') {
+                window.doRun();
+            }
+        }
+
+        createRestartButton(options = {}) {
+            return {
+                type: 'Button',
+                text: options.text || '🔄',
+                onClick: (cb) => { if (typeof cb === 'function') cb(); }
+            };
+        }
+
         // --- Game Timer APIs ---
 
         createTimer(duration = 60, autoStart = true) {

@@ -4170,20 +4170,64 @@
                 }
             }
 
+            restartGame() {
+                this.setGameState('ready');
+                this.gameScore = 0;
+                this.gameHealth = this.maxGameHealth || 100;
+                if (this.gameTimerInitial !== undefined) {
+                    this.gameTimer = this.gameTimerInitial;
+                }
+                this._updateGameHUD();
+                if (typeof window !== 'undefined' && typeof window.doRun === 'function') {
+                    window.doRun();
+                }
+            }
+
+            createRestartButton(name = null, options = {}) {
+                const btnName = name || 'restart_btn_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+                const button = this.uiManager.createButton(btnName, options.text || '🔄', {
+                    width: options.width || "60px",
+                    height: options.height || "60px",
+                    background: options.background || "#4CAF50",
+                    color: options.color || "white",
+                    fontSize: options.fontSize || "28px",
+                    ...options
+                });
+                this.uiManager.onControlClick(button, () => {
+                    this.restartGame();
+                });
+                return button;
+            }
+
             triggerGameOver(isWin = false, customMessage = '') {
                 this.setGameState(isWin ? 'victory' : 'game_over');
                 const title = isWin ? '🏆 VICTORY!' : '💥 GAME OVER';
                 const bodyText = customMessage || (isWin ? `Congratulations! You won with a score of ${this.gameScore || 0}.` : `Game over! Final Score: ${this.gameScore || 0}.`);
 
                 const popupName = "game_over_popup_" + Date.now();
-                this.uiManager.createPopup(popupName, title, {
-                    text: bodyText,
-                    btnCtaText: '🔄 Play Again',
-                    onCtaClick: () => {
-                        this.uiManager.hidePopup(popupName);
-                        if (window.doRun) window.doRun();
-                    }
+                const container = this.uiManager.createPopup(popupName, title, {
+                    text: bodyText
                 });
+
+                if (container && container.children && container.children[0]) {
+                    const panel = container.children[0];
+                    const restartBtnName = `${popupName}_restart`;
+                    const restartBtn = BABYLON.GUI.Button.CreateSimpleButton(restartBtnName, '🔄');
+                    restartBtn.width = "70px";
+                    restartBtn.height = "70px";
+                    restartBtn.color = "white";
+                    restartBtn.background = "#4CAF50";
+                    restartBtn.cornerRadius = 35;
+                    restartBtn.fontSize = "32px";
+                    restartBtn.thickness = 0;
+                    restartBtn.onPointerClickObservable.add(() => {
+                        this.uiManager.hidePopup(popupName);
+                        this.restartGame();
+                    });
+                    panel.addControl(restartBtn);
+                    this.uiManager.controls[restartBtnName] = restartBtn;
+                }
+
                 this.uiManager.showPopup(popupName);
             }
 
