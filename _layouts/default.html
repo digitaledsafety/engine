@@ -2229,6 +2229,10 @@ workspace_data: "${base64WorkspaceData}"
                         },
                         {
                             kind: 'block',
+                            type: 'restart_button',
+                        },
+                        {
+                            kind: 'block',
                             type: 'create_timer',
                         },
                         {
@@ -5968,6 +5972,13 @@ workspace_data: "${base64WorkspaceData}"
                 "tooltip": "Triggers a game over or victory screen with a summary."
             },
             {
+                "type": "restart_button",
+                "message0": "restart button",
+                "output": "GUIElement",
+                "colour": "#4CAF50",
+                "tooltip": "Creates a restart button (🔄) that resets game state and restarts the game when clicked."
+            },
+            {
                 "type": "create_timer",
                 "message0": "create timer duration %1 s auto start %2",
                 "args0": [
@@ -6163,6 +6174,12 @@ workspace_data: "${base64WorkspaceData}"
                 const isWin = block.getFieldValue('IS_WIN') === 'TRUE';
                 const message = generator.valueToCode(block, 'MESSAGE', generator.ORDER_ATOMIC) || "''";
                 return `sceneManager.triggerGameOver(${isWin}, ${message});\n`;
+            };
+
+            javascript.javascriptGenerator.forBlock['restart_button'] = function (block, generator) {
+                const name = `'gui_' + Blockly.utils.idGenerator.genUid()`;
+                const code = `sceneManager.createRestartButton(${name})`;
+                return [code, generator.ORDER_FUNCTION_CALL];
             };
 
             javascript.javascriptGenerator.forBlock['create_timer'] = function (block, generator) {

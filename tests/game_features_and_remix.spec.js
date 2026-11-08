@@ -36,15 +36,64 @@ test.describe('Game Rules, Remixing, Starter Templates & Collaborative Workspace
     expect(gameStateResult.hudVisible).toBe(true);
   });
 
-  test('Game over popup can be triggered programmatically', async ({ page }) => {
-    const gameOverTriggered = await page.evaluate(() => {
+  test('Game over popup can be triggered programmatically and has restart button', async ({ page }) => {
+    const gameOverInfo = await page.evaluate(() => {
       const sm = window.sceneManager;
       sm.setGameScore(250);
       sm.triggerGameOver(true, 'Test Victory Message');
-      return sm.getGameState();
+
+      const popupName = Object.keys(sm.uiManager.controls).find(k => k.startsWith('game_over_popup_'));
+      const restartBtnName = `${popupName}_restart`;
+      const restartBtn = sm.uiManager.controls[restartBtnName];
+
+      return {
+        state: sm.getGameState(),
+        hasRestartBtn: !!restartBtn,
+        restartBtnText: restartBtn && restartBtn.textBlock ? restartBtn.textBlock.text : null
+      };
     });
 
-    expect(gameOverTriggered).toBe('victory');
+    expect(gameOverInfo.state).toBe('victory');
+    expect(gameOverInfo.hasRestartBtn).toBe(true);
+    expect(gameOverInfo.restartBtnText).toBe('🔄');
+
+    // Test clicking the restart button resets game score and cleans up popup
+    const resetResult = await page.evaluate(() => {
+      const sm = window.sceneManager;
+      const popupName = Object.keys(sm.uiManager.controls).find(k => k.startsWith('game_over_popup_'));
+      const restartBtnName = `${popupName}_restart`;
+      const restartBtn = sm.uiManager.controls[restartBtnName];
+      restartBtn.onPointerClickObservable.notifyObservers();
+
+      const newSm = window.sceneManager;
+      return {
+        score: newSm.getGameScore()
+      };
+    });
+
+    expect(resetResult.score).toBe(0);
+  });
+
+  test('restart_button block definition and sceneManager.createRestartButton()', async ({ page }) => {
+    const blockEval = await page.evaluate(() => {
+      const ws = window.workspace;
+      const block = ws.newBlock('restart_button');
+      const generatedCode = javascript.javascriptGenerator.forBlock['restart_button'](block, javascript.javascriptGenerator);
+      const codeString = Array.isArray(generatedCode) ? generatedCode[0] : generatedCode;
+      block.dispose();
+
+      // Test sceneManager.createRestartButton() directly
+      const btn = window.sceneManager.createRestartButton();
+      return {
+        codeString,
+        hasButton: !!btn,
+        btnText: btn && btn.textBlock ? btn.textBlock.text : null
+      };
+    });
+
+    expect(blockEval.codeString).toContain('sceneManager.createRestartButton(');
+    expect(blockEval.hasButton).toBe(true);
+    expect(blockEval.btnText).toBe('🔄');
   });
 
   test('Project Remix button creates a copy and displays toast', async ({ page }) => {
