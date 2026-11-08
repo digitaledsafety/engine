@@ -5066,6 +5066,7 @@
                 container.height = "100%";
                 container.thickness = 0; // No border
                 container.background = "rgba(0, 0, 0, 0.7)";
+                container.isPointerBlocker = true;
                 container.isVisible = false; // Initially hidden
                 this.advancedTexture.addControl(container);
                 this.controls[name] = container;

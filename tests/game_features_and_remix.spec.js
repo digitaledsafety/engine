@@ -101,4 +101,65 @@ test.describe('Game Rules, Remixing, Starter Templates & Collaborative Workspace
     expect(isHidden).toBe(true);
   });
 
+  test('Game over popup cancels out pointer actions on objects beneath the screen', async ({ page }) => {
+    await page.goto('/workspaces/click-it', { waitUntil: 'domcontentloaded' });
+    await page.evaluate(() => {
+      const hero = document.getElementById('hero-overlay');
+      if (hero) hero.remove();
+    });
+
+    await page.click('#preview-tab');
+    await page.evaluate(() => window.doRun());
+
+    // Wait for the round timer to finish and display the game over / victory popup
+    await page.waitForTimeout(5500);
+
+    const popupInfo = await page.evaluate(() => {
+      const sm = window.sceneManager;
+      const popupName = Object.keys(sm.uiManager.controls).find(k => k.startsWith('game_over_popup_'));
+      const container = sm.uiManager.controls[popupName];
+      return {
+        popupExists: !!container,
+        isPointerBlocker: container ? container.isPointerBlocker : false
+      };
+    });
+
+    expect(popupInfo.popupExists).toBe(true);
+    expect(popupInfo.isPointerBlocker).toBe(true);
+
+    // Find screen position of an underlying 3D target sphere
+    const targetSphereScreenPos = await page.evaluate(() => {
+      const sm = window.sceneManager;
+      const meshNames = Object.keys(sm.objects);
+      for (const name of meshNames) {
+        const mesh = sm.objects[name];
+        if (mesh && !mesh.isDisposed()) {
+          const screenPos = BABYLON.Vector3.Project(
+            mesh.getAbsolutePosition(),
+            BABYLON.Matrix.Identity(),
+            sm.scene.getTransformMatrix(),
+            sm.scene.activeCamera.viewport.toGlobal(
+              sm.engine.getRenderWidth(),
+              sm.engine.getRenderHeight()
+            )
+          );
+          return { name, x: screenPos.x, y: screenPos.y };
+        }
+      }
+      return null;
+    });
+
+    expect(targetSphereScreenPos).not.toBeNull();
+
+    const initialScore = await page.evaluate(() => window.sceneManager.getGameScore());
+
+    // Click directly where the underlying sphere is located
+    const canvasBox = await page.locator('#gameCanvas').boundingBox();
+    await page.mouse.click(canvasBox.x + targetSphereScreenPos.x, canvasBox.y + targetSphereScreenPos.y);
+
+    // Verify score did not increase while game over screen is active
+    const scoreAfterClick = await page.evaluate(() => window.sceneManager.getGameScore());
+    expect(scoreAfterClick).toBe(initialScore);
+  });
+
 });
