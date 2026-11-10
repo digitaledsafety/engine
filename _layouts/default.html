@@ -373,29 +373,72 @@
 
         /* Presentation Mode and Fullscreen Styles */
         body.presentation-mode .controls,
-        body.fullscreen-active .controls {
+        body.fullscreen-active .controls,
+        body.embed-mode .controls {
             display: none;
         }
 
         body.presentation-mode .container,
-        body.fullscreen-active .container {
+        body.fullscreen-active .container,
+        body.embed-mode .container {
             display: block;
+            width: 100%;
+            height: 100vh;
+            margin: 0;
+            padding: 0;
         }
 
         body.presentation-mode .canvas-container,
-        body.fullscreen-active .canvas-container {
+        body.fullscreen-active .canvas-container,
+        body.embed-mode .canvas-container {
             display: flex;
-            width: 100vw;
-            height: 100vh;
+            width: 100%;
+            height: 100%;
         }
 
         body.fullscreen-active #bottom-nav,
-        body.presentation-mode #bottom-nav {
+        body.presentation-mode #bottom-nav,
+        body.embed-mode #bottom-nav {
             display: none;
         }
 
-        body.presentation-mode #hero-overlay {
+        body.presentation-mode #hero-overlay,
+        body.embed-mode #hero-overlay,
+        body.embed-mode .persistent-beta-badge {
+            display: none !important;
+        }
+
+        /* Floating Fullscreen Button in Embed Mode */
+        #embed-fullscreen-btn {
             display: none;
+            position: absolute;
+            bottom: 12px;
+            right: 12px;
+            z-index: 1050;
+            background: rgba(18, 18, 18, 0.75);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            color: #ffffff;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            transition: background 0.2s, transform 0.1s;
+        }
+
+        #embed-fullscreen-btn:hover {
+            background: rgba(40, 40, 40, 0.9);
+            border-color: rgba(255, 255, 255, 0.4);
+            transform: translateY(-1px);
+        }
+
+        body.embed-mode #embed-fullscreen-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
         }
 
         #blocklyDiv.toolbox-collapsed .blocklyToolbox {
@@ -679,6 +722,7 @@
             <div id="jump-button-container" class="interactive-ui">
                 <button id="touch-jump">⇧</button>
             </div>
+            <button id="embed-fullscreen-btn" title="Toggle Fullscreen" aria-label="Toggle Fullscreen">⛶ Fullscreen</button>
         </div>
         <div class="controls">
             <div id="code-view">
@@ -793,6 +837,37 @@
                             <a href="{{ site.baseurl }}/workspaces/generative-art/" class="btn" style="flex: 1; text-align: center; text-decoration: none; padding: 6px;">▶ Launch</a>
                             <a href="{{ site.baseurl }}/workspaces/generative-art/?remix=true" class="btn btn-run" style="flex: 1; text-align: center; text-decoration: none; padding: 6px;">🔀 Remix</a>
                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Share & Embed Modal -->
+    <div id="share-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h2>🔗 Share & Embed Project</h2>
+                <button id="close-share-modal" class="close-button">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="color: #666; font-size: 0.95rem; margin-top: 0;">Share a direct link to your interactive 3D project or embed it into any website using our web component.</p>
+
+                <!-- Section 1: Direct Link -->
+                <div style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+                    <label for="share-url-input" style="font-size: 0.9rem; font-weight: bold; display: block; margin-bottom: 6px; color: #333;">Direct Share Link</label>
+                    <div style="display: flex; gap: 8px;">
+                        <input type="text" id="share-url-input" readonly style="flex: 1; padding: 8px 12px; font-family: monospace; font-size: 0.85rem; border: 1px solid #ced4da; border-radius: 6px; background: #fff;">
+                        <button id="copy-share-url-btn" class="btn" style="white-space: nowrap;">📋 Copy Link</button>
+                    </div>
+                </div>
+
+                <!-- Section 2: Embed Code -->
+                <div style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px; padding: 16px;">
+                    <label for="embed-code-textarea" style="font-size: 0.9rem; font-weight: bold; display: block; margin-bottom: 6px; color: #333;">Web Component Embed Code (&lt;engine-player&gt;)</label>
+                    <textarea id="embed-code-textarea" readonly rows="4" style="width: 100%; box-sizing: border-box; padding: 8px 12px; font-family: monospace; font-size: 0.82rem; border: 1px solid #ced4da; border-radius: 6px; background: #fff; resize: vertical; margin-bottom: 8px;"></textarea>
+                    <div style="display: flex; justify-content: flex-end; gap: 8px;">
+                        <button id="copy-embed-code-btn" class="btn btn-run" style="white-space: nowrap;">📋 Copy Embed Code</button>
                     </div>
                 </div>
             </div>
@@ -7850,12 +7925,82 @@ function ${generator.FUNCTION_NAME_PLACEHOLDER_}(c1, c2, ratio) {
             redoButton.disabled = workspace.getRedoStack().length === 0;
         });
 
+        function openShareModal() {
+            const shareModal = document.getElementById('share-modal');
+            const shareUrlInput = document.getElementById('share-url-input');
+            const embedCodeTextarea = document.getElementById('embed-code-textarea');
+
+            if (!shareModal || !shareUrlInput || !embedCodeTextarea) return;
+
+            // Generate direct link
+            const currentUrl = new URL(window.location.href);
+            // Clean up any temporary query params like remix or embed
+            currentUrl.searchParams.delete('remix');
+            currentUrl.searchParams.delete('embed');
+            const shareUrl = currentUrl.toString();
+            shareUrlInput.value = shareUrl;
+
+            // Generate Web Component Embed code
+            const scriptUrl = new URL('{{ site.baseurl }}/assets/js/engine-player.js', window.location.origin).toString();
+            const workspacePath = window.location.pathname;
+            const match = workspacePath.match(/\/workspaces\/([^\/]+)/);
+            let embedTag;
+            if (match && match[1]) {
+                const workspaceName = match[1];
+                embedTag = `<engine-player workspace="${workspaceName}" width="100%" height="500px"></engine-player>`;
+            } else {
+                embedTag = `<engine-player src="${shareUrl}" width="100%" height="500px"></engine-player>`;
+            }
+
+            const embedSnippet = `<script src="${scriptUrl}"><` + `/script>\n${embedTag}`;
+            embedCodeTextarea.value = embedSnippet;
+
+            shareModal.style.display = 'flex';
+        }
+
         document.getElementById('shareButton').addEventListener('click', () => {
-            projectManager.shareProject();
+            openShareModal();
         });
 
-        document.getElementById('fullscreenBtn').addEventListener('click', () => {
+        const closeShareModalBtn = document.getElementById('close-share-modal');
+        const shareModal = document.getElementById('share-modal');
+        if (closeShareModalBtn && shareModal) {
+            closeShareModalBtn.addEventListener('click', () => {
+                shareModal.style.display = 'none';
+            });
+        }
+
+        const copyShareUrlBtn = document.getElementById('copy-share-url-btn');
+        if (copyShareUrlBtn) {
+            copyShareUrlBtn.addEventListener('click', () => {
+                const input = document.getElementById('share-url-input');
+                if (input) {
+                    input.select();
+                    navigator.clipboard.writeText(input.value);
+                    const originalText = copyShareUrlBtn.textContent;
+                    copyShareUrlBtn.textContent = '✅ Copied!';
+                    setTimeout(() => { copyShareUrlBtn.textContent = originalText; }, 2000);
+                }
+            });
+        }
+
+        const copyEmbedCodeBtn = document.getElementById('copy-embed-code-btn');
+        if (copyEmbedCodeBtn) {
+            copyEmbedCodeBtn.addEventListener('click', () => {
+                const textarea = document.getElementById('embed-code-textarea');
+                if (textarea) {
+                    textarea.select();
+                    navigator.clipboard.writeText(textarea.value);
+                    const originalText = copyEmbedCodeBtn.textContent;
+                    copyEmbedCodeBtn.textContent = '✅ Copied!';
+                    setTimeout(() => { copyEmbedCodeBtn.textContent = originalText; }, 2000);
+                }
+            });
+        }
+
+        function toggleFullscreen() {
             const canvasContainer = document.querySelector('.canvas-container');
+            if (!canvasContainer) return;
             if (!document.fullscreenElement && !document.mozFullScreenElement && !document.webkitFullscreenElement && !document.msFullscreenElement) {
                 if (canvasContainer.requestFullscreen) {
                     canvasContainer.requestFullscreen();
@@ -7877,7 +8022,13 @@ function ${generator.FUNCTION_NAME_PLACEHOLDER_}(c1, c2, ratio) {
                     document.msExitFullscreen();
                 }
             }
-        });
+        }
+
+        document.getElementById('fullscreenBtn').addEventListener('click', toggleFullscreen);
+        const embedFullscreenBtn = document.getElementById('embed-fullscreen-btn');
+        if (embedFullscreenBtn) {
+            embedFullscreenBtn.addEventListener('click', toggleFullscreen);
+        }
 
         document.addEventListener('fullscreenchange', () => {
             document.body.classList.toggle('fullscreen-active', !!document.fullscreenElement);
@@ -7976,8 +8127,18 @@ function ${generator.FUNCTION_NAME_PLACEHOLDER_}(c1, c2, ratio) {
             const projectParam = urlParams.get('project');
             const workspaceDataEl = document.getElementById('workspace-data');
 
+            const isEmbed = urlParams.get('embed') === '1' || urlParams.get('embed') === 'true';
+
             if (urlParams.has('fullscreen') || urlParams.get('obs') === '1' || urlParams.get('transparent') === '1') {
                 enterPresentationMode();
+            }
+
+            if (isEmbed) {
+                document.body.classList.add('embed-mode');
+                const heroOverlay = document.getElementById('hero-overlay');
+                if (heroOverlay) {
+                    heroOverlay.style.display = 'none';
+                }
             }
 
             if (urlParams.get('obs') === '1' || urlParams.get('transparent') === '1') {
@@ -7996,8 +8157,8 @@ function ${generator.FUNCTION_NAME_PLACEHOLDER_}(c1, c2, ratio) {
                 }
             }
 
-            // --- App Mode Logic ---
-            if (urlParams.get('mode') === 'app' || urlParams.get('obs') === '1' || urlParams.get('transparent') === '1') {
+            // --- App Mode / Embed Logic ---
+            if (isEmbed || urlParams.get('mode') === 'app' || urlParams.get('obs') === '1' || urlParams.get('transparent') === '1') {
                 const container = document.querySelector('.container');
                 const workspaceTab = document.getElementById('workspace-tab');
                 const previewTab = document.getElementById('preview-tab');
@@ -8032,6 +8193,10 @@ function ${generator.FUNCTION_NAME_PLACEHOLDER_}(c1, c2, ratio) {
                 } else {
                     // No project data found, load the default
                     loadWorkspaceDefault();
+                }
+
+                if (urlParams.get('autoplay') === '1' || urlParams.get('autoplay') === 'true') {
+                    doRun();
                 }
             } catch (e) {
                 console.error("Failed to load project from URL or Jekyll data:", e);
