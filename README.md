@@ -1,3 +1,5 @@
+> **No longer maintained.** This repository is no longer maintained. The live site is at https://engine.digitaleducationsafety.org. Active development now happens in the [foundation monorepo on GitLab](https://gitlab.com/desf-group/foundation).
+
 # Engine 
 [![CI](https://github.com/digitaledsafety/engine.digitaledsafety.github.io/actions/workflows/deploy.yml/badge.svg)](https://github.com/digitaledsafety/engine.digitaledsafety.github.io/actions/workflows/deploy.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
